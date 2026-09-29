@@ -58,8 +58,8 @@
              There is no qits-db-core here — this service has no datasource to open. The url is a
              property so the image build can point it at the address the builder container can
              actually reach — see docker/Dockerfile and .qits-maven-settings.xml. -->
-        <qits.auth-core.version>2026.917.65806</qits.auth-core.version>
-        <qits.arch-rules.version>2026.917.65806</qits.arch-rules.version>
+        <qits.auth-core.version>2026.929.140626</qits.auth-core.version>
+        <qits.arch-rules.version>2026.929.140626</qits.arch-rules.version>
         <!-- The user-story framework (test scope): TokenValidationBootstrapIT is a userflow, so a
              `mvn verify -DskipITs=false "-Dit.test=TokenValidationBootstrapIT"` also regenerates
              service/target/userstories/ — the story's documentation, network diagram included.
@@ -85,7 +85,7 @@
              block — a real JWKS fetch over HTTP, a real signature, a real audience check — runs
              nowhere else, and only a server that serves a real JWKS for a real keypair exercises
              it. -->
-        <qits.service-mock.version>2026.917.65806</qits.service-mock.version>
+        <qits.service-mock.version>2026.929.140626</qits.service-mock.version>
         <qits.maven.repository.url>http://registry.dev.localhost:8080/artifacts/maven/maven</qits.maven.repository.url>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
