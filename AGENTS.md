@@ -20,9 +20,10 @@ inheriting them, and why the suite forks a shell script instead of a daemon.
 
 **The one thing it needs besides Maven Central** is the platform's own Maven repository, for
 `qits-auth-core` and `qits-arch-rules`. `<repositories>` in the root pom points at
-`${qits.maven.repository.url}`; the image build overrides it through `.qits-maven-settings.xml`,
-which mirrors the exact repository id `qits-maven` — an exact id match is what gets past Maven's
-`external:http:*` blocker.
+`${qits.maven.repository.url}` (`https://registry.qits.wohlben.eu/artifacts/maven/maven` by
+default), which answers 401 without the commissioned client; the image build supplies it through
+`.qits-maven-settings.xml`, which mirrors the exact repository id `qits-maven` — an exact id match
+is what gets past Maven's `external:http:*` blocker.
 
 **The gate is `./mvnw clean verify -Dquarkus.http.test-port=0`**, and it needs BOTH a node on PATH
 and `git submodule update --init`. Always `clean`. Port 0 is not optional on the deployment host.

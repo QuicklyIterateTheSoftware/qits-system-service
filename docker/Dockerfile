@@ -64,28 +64,24 @@ COPY . .
 
 # --- where the two qits jars come from ------------------------------------------------------------
 # This repo depends on qits-auth-core (the forward-auth mechanism and the machine gate) and
-# qits-arch-rules, which live only on the platform's own Maven repository. That one IS reachable
-# from a build: the CI recipe passes the address the step container can use, and
-# `.qits-maven-settings.xml` mirrors the `qits-maven` repository id onto it — an exact id match,
-# which is what gets past Maven's external:http:* blocker without permitting arbitrary HTTP
-# repositories. The ARG default is the developer-host address, so a plain host-side `docker build`
-# still works.
-ARG QITS_MAVEN_REPOSITORY_URL=http://registry.dev.localhost:8080/artifacts/maven/maven
-ENV QITS_MAVEN_REPOSITORY_URL=$QITS_MAVEN_REPOSITORY_URL
-
-# --- and where Maven Central is mirrored, when it is ----------------------------------------------
-# The pipeline passes the platform's pull-through (qits-platform-mirror's central proxy, the same
-# authority the FROM lines above pull through); EMPTY — the default — means direct Maven Central.
-# `.qits-maven-settings.xml` activates its central-proxy profile only on a non-empty value, so a
-# bootstrap or hand build that passes nothing resolves exactly as it always did.
-ARG QITS_MAVEN_CENTRAL_URL=
-ENV QITS_MAVEN_CENTRAL_URL=$QITS_MAVEN_CENTRAL_URL
+# qits-arch-rules, which live only on the platform's own Maven repository. Both platform hosts are
+# code plus one input, the public domain:
+#
+#   https://registry.qits.$QITS_DOMAIN/artifacts/maven/maven   hosted Maven (qits-artifacts)
+#   https://mirror.qits.$QITS_DOMAIN/mirror/maven/central      Maven Central cache (qits-mirror)
+#
+# The RUN below derives both and exports them for that RUN alone; `.qits-maven-settings.xml` reads
+# them as ${env.…}, mirroring the `qits-maven` repository id onto the first and Central onto the
+# second — an exact id match, which is what gets past Maven's external:http:* blocker without
+# permitting arbitrary HTTP repositories. The CI recipe passes QITS_DOMAIN; the default is the live
+# platform's, so a plain host-side `docker build` still works.
+ARG QITS_DOMAIN=wohlben.eu
 
 # --- and how Maven authenticates, once that repository stops answering anonymously -----------------
 # The two secret mounts put the CI run's commissioned client into THIS `RUN`'s environment and
 # nowhere else — not a layer, not the image history. That is why they are not build args: this image
 # is pullable, and a build arg is recorded where anyone who pulls it can read it.
-# `.qits-maven-settings.xml` reads the two variables as the `qits-maven-network` server.
+# `.qits-maven-settings.xml` presents them as the username and password of both mirrors.
 # The `RUN` reads the two mounted files itself: docker 26's BuildKit has no `env=` mount option.
 # FILE form (`/run/secrets/<id>`, read into the command's own environment), not the `env=` mount
 # form: env= needs a dockerfile frontend the builder chooses, while the bare file mount is served
@@ -108,16 +104,14 @@ ENV QITS_MAVEN_CENTRAL_URL=$QITS_MAVEN_CENTRAL_URL
 # have to match the step container's node, because this stage does not build the bundle.
 #
 # service/src/main/webui is qits-platform-spa-system, and it depends on @qits/ui-components. That
-# package exists ONLY on the platform's own npm registry (qits-artifacts). A RUN step in a docker
-# build reaches the public internet — Maven Central, npmjs.org, nodejs.org — and reaches the platform
-# registry by NO address: not the qits-net alias, not registry.dev.localhost:8080, not
-# host.docker.internal. So the install cannot happen here.
+# package exists ONLY on the platform's own npm registry (qits-artifacts), which answers 401 without
+# a credential, and this stage is handed only the Maven one. So the install cannot happen here.
 #
-# THE FIRST HALF OF THAT IS NO LONGER STRICTLY TRUE UNDER THE PLATFORM BUILDER — a RUN executes on
-# qits-net there, where the registry's alias does resolve — and the arrangement still does not move.
-# The SPA's committed .npmrc and its lockfile both name edge vhosts, and the origin swap that
-# corrects them is the CI step's business, not this stage's; and this stage has to keep building on a
-# developer's host, where nothing platform-side resolves at all.
+# A RUN step under the platform builder DOES reach the registry's address (the public host, same as
+# everywhere else) — the arrangement still does not move. The SPA's committed .npmrc and its lockfile
+# both name the public registries, and the credential that answers their 401 is the CI step's
+# business, not this stage's; and this stage has to keep building on a developer's host too, where
+# the registry answers the same 401 with no credential handed to it either.
 #
 # It does not merely fail, it fails unreadably. The SPA commits an .npmrc pointing at the edge's
 # registry vhosts (right for a developer on the deployment host), npm ranks a project .npmrc above
@@ -149,6 +143,8 @@ RUN --mount=type=secret,id=qits-client-id \
     --mount=type=secret,id=qits-client-secret \
     export QITS_MAVEN_AUTH_USR="$(cat /run/secrets/qits-client-id 2>/dev/null || true)"; \
     export QITS_MAVEN_AUTH_PSW="$(cat /run/secrets/qits-client-secret 2>/dev/null || true)"; \
+    export QITS_MAVEN_REPOSITORY_URL="https://registry.qits.$QITS_DOMAIN/artifacts/maven/maven"; \
+    export QITS_MAVEN_CENTRAL_URL="https://mirror.qits.$QITS_DOMAIN/mirror/maven/central"; \
     d=service/src/main/webui/dist/qits-platform-spa-system/browser; \
     test -f "$d/index.html" || { \
       echo "No built client SPA at $d." >&2; \
