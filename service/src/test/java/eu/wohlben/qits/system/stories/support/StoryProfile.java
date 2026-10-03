@@ -72,12 +72,6 @@ public class StoryProfile extends PackagedSurfaceIT.PackagedUnderTarget {
     // the platform edge. Both doors are open here, which is what lets one catalogue tell the
     // machine's ceiling from the person's.
     overrides.put("qits.auth.machine.required", "true");
-    // THE OTHER HALF OF THAT GATE, and the only reason this key is here at all: qits-auth-core's
-    // MachineAuth refuses to start with the gate on and no qits.auth.machine.audience, and the
-    // shipped properties do not set one — validation is pinned to the platform audience as a
-    // literal, and no route in this service calls MachineAuth.require(). So the catalogue states
-    // it, and states the same audience the receiver enforces.
-    overrides.put("qits.auth.machine.audience", AUDIENCE);
     // Where the idp is. Runtime key, so the packaged artifact is otherwise exactly what ships —
     // discovery stays off and jwks-path stays `jwks`, joined onto this URL.
     overrides.put("quarkus.oidc.auth-server-url", idp.baseUrl());
