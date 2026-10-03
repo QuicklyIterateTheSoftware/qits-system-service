@@ -50,6 +50,14 @@ Both halves of the first grant are needed: the image runs as uid 1001 and the so
 The config volume is where the CLI writes and where the registry + mirror credential lives — the
 edge grants no anonymous reads, so the glances pull needs one.
 
+**The credential is moving to this service's own idp client (qits-879).** `idp:client` in
+`.config/qits/deployments.yml` has qits-deployments provision `dev-qits-system` and inject
+`QITS_RESOURCE_IDP_CLIENT_ID`/`_SECRET`; at boot `startup/DockerCredentialWriter` writes
+`/tmp/qits-docker/config.json` (0600) with a Basic entry for the mirror host of
+`glances.image-repo` and its `registry.` sibling, before the boot sweep pulls glances. Docker
+children get `DOCKER_CONFIG=/tmp/qits-docker` only when that file exists, so the mounted
+`/work/config` above keeps working for an older spec or a rollback until it is retired.
+
 With no socket the service still starts, serves its client, and answers 503 on every read. That is
 the honest behaviour: an unreachable daemon is a runtime condition to report, not a container that
 should refuse to come up.
@@ -127,7 +135,7 @@ deployment as `QITS_SYSTEM_*`. The defaults and the reasoning are in
 `system/src/main/resources/META-INF/microprofile-config.properties`; the short list:
 
     docker.binary=docker                  docker.call-timeout=PT20S
-    docker.max-output-chars=2000000
+    docker.max-output-chars=2000000       docker.config-dir=/tmp/qits-docker
     logs.max-tail=5000                    logs.max-chars=262144
     glances.image-repo=mirror.dev.localhost:8080/hub/nicolargo/glances
     glances.image-version=4.5.6-full      glances.args=      glances.pull-at-startup=true

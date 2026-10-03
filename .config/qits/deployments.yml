@@ -28,11 +28,21 @@ routes: /system
 # name, so the handshake passes.
 navigation-entries: system.System:4
 
-# NO `resources:` LINE, AND THAT IS THE DESIGN. This service is stateless: every answer is read from
-# the docker daemon at the moment it is asked, and the only state it holds is the in-memory registry
-# of live terminals — which a restart is MEANT to drop (the client reconnects and is told the
-# session is gone). A database here would be a cache of facts that are already live, and a place for
-# them to be wrong.
+# NO DATABASE, AND THAT IS THE DESIGN. This service is stateless: every answer is read from the
+# docker daemon at the moment it is asked, and the only state it holds is the in-memory registry of
+# live terminals — which a restart is MEANT to drop (the client reconnects and is told the session is
+# gone). A database here would be a cache of facts that are already live, and a place for them to be
+# wrong.
+#
+# idp:client ASKS QITS-DEPLOYMENTS TO PROVISION THIS APPLICATION'S OWN QITS-IDP SERVICE CLIENT — id
+# `dev-qits-system` (derived from env + application), roles fixed in qits-idp code. It is NEW: the
+# live `qits-platform-system` client the bootstrap wrote into /work/config is left unclaimed here,
+# for qits-878 to collect. The deployer injects QITS_RESOURCE_IDP_URL, QITS_RESOURCE_IDP_CLIENT_ID
+# and QITS_RESOURCE_IDP_CLIENT_SECRET; at boot the service writes its own docker config.json from the
+# id and secret (the glances pull through the mirror), and points docker at it only once it exists.
+#
+# Ticket qits-879.
+resources: idp:client
 #
 # WHAT IT DOES NEED IS NOT DECLARED HERE EITHER, because it is not a resource this deployer
 # provisions: the host's docker socket. This is the third socket holder on the platform, after

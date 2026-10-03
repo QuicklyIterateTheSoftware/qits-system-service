@@ -2,6 +2,7 @@ package eu.wohlben.qits.system.terminal;
 
 import eu.wohlben.qits.system.docker.DockerArgv;
 import eu.wohlben.qits.system.docker.DockerCli;
+import eu.wohlben.qits.system.docker.DockerClientConfig;
 import eu.wohlben.qits.system.docker.TerminalArgv;
 import eu.wohlben.qits.system.error.ConflictException;
 import eu.wohlben.qits.system.error.DockerUnavailableException;
@@ -254,11 +255,13 @@ public class TerminalSessions {
     }
     try {
       ProcessBuilder builder = TerminalProcesses.terminalProcess(pty.slavePath(), argv);
-      // TERM is what makes the far side draw in colour. DOCKER_CONFIG is NOT set here on purpose:
-      // it is inherited from this process, where the deployment points it at the mounted config
-      // volume — that is where the mirror credential the glances pull needs lives, and uid 1001 has
-      // no HOME for the CLI to fall back to.
+      // TERM is what makes the far side draw in colour. DOCKER_CONFIG points at the config.json
+      // this service wrote from its own idp client (qits-879) — the mirror credential the glances
+      // pull needs — but ONLY when that file exists. Otherwise it is inherited from this process,
+      // where an older deployment spec points it at the mounted config volume; uid 1001 has no HOME
+      // for the CLI to fall back to either way.
       builder.environment().put("TERM", TerminalArgv.TERM);
+      DockerClientConfig.applyTo(builder.environment(), docker.configDir());
       Process process = builder.start();
       return new TerminalSession(
           id,
