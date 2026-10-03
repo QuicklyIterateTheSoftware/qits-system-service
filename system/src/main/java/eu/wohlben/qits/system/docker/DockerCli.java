@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import eu.wohlben.qits.system.error.DockerUnavailableException;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,11 +45,23 @@ public class DockerCli {
   @ConfigProperty(name = "qits.system.docker.max-output-chars")
   int maxOutputChars;
 
+  /**
+   * Where this service writes its own docker {@code config.json} (qits-879). Every docker child
+   * is pointed at it — but only once the file exists; see {@link DockerClientConfig#applyTo}.
+   */
+  @ConfigProperty(name = "qits.system.docker.config-dir")
+  Path configDir;
+
   @Inject ObjectMapper mapper;
 
   /** The binary the argv builders take as their first element. */
   public String binary() {
     return binary;
+  }
+
+  /** The directory this service's own docker {@code config.json} lives in, when it has one. */
+  public Path configDir() {
+    return configDir;
   }
 
   /** The deadline every call runs under. */
@@ -83,7 +96,7 @@ public class DockerCli {
   }
 
   public DockerProcess.Result attempt(List<String> argv, int maxChars) {
-    return DockerProcess.run(argv, callTimeout, maxChars);
+    return DockerProcess.run(argv, callTimeout, maxChars, configDir);
   }
 
   /**

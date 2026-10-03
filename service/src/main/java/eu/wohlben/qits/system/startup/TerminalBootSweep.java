@@ -14,8 +14,9 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 /**
- * What this service does on the way up: prove the daemon is there, reap the terminals a previous
- * life left behind, and fetch the glances image so the first session does not sit through a pull.
+ * What this service does on the way up: write its own docker credential, prove the daemon is there,
+ * reap the terminals a previous life left behind, and fetch the glances image so the first session
+ * does not sit through a pull.
  *
  * <p><b>NOTHING HERE IS FATAL.</b> A boot that failed because docker was unreachable would be a
  * service that cannot start on the one machine it exists to look at — and the honest answer to an
@@ -31,6 +32,13 @@ public class TerminalBootSweep {
 
   @Inject TerminalSessions sessions;
 
+  /**
+   * Called first in {@link #onStart}, which is the whole ordering guarantee: the glances pull below
+   * reads the config.json this writes. Not a second observer with a {@code @Priority} — see the
+   * writer's own comment.
+   */
+  @Inject DockerCredentialWriter credentials;
+
   @ConfigProperty(name = "qits.system.terminals.owner")
   String owner;
 
@@ -38,6 +46,9 @@ public class TerminalBootSweep {
   boolean pullAtStartup;
 
   void onStart(@Observes StartupEvent event) {
+    // BEFORE anything spawns docker: the pull in prefetchGlances needs this service's own
+    // credential, and DOCKER_CONFIG only points at it once the file exists.
+    credentials.write();
     if (!probeDaemon()) {
       // Every later step needs the daemon, and each would log the same failure again.
       return;
@@ -119,8 +130,8 @@ public class TerminalBootSweep {
     } else {
       LOG.warnf(
           "Could not pre-pull %s (%s). The first host terminal will pull it inline."
-              + " If this says 401, the docker config on this service's volume is missing the"
-              + " mirror credential.",
+              + " If this says 401, this service's docker config.json (its own idp client, or an"
+              + " older spec's mounted volume) is missing the mirror credential.",
           image, result.output() == null ? "no output" : result.output().trim());
     }
   }

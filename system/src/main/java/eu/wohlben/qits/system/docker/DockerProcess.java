@@ -2,6 +2,7 @@ package eu.wohlben.qits.system.docker;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -60,11 +61,16 @@ public final class DockerProcess {
    * @param argv the command, already assembled element by element — never a shell string
    * @param timeout the hard deadline; past it the process is force-killed
    * @param maxChars how much of the output tail is kept
+   * @param dockerConfigDir the directory this service writes its own {@code config.json} into;
+   *     {@code DOCKER_CONFIG} points there only when that file exists (see {@link
+   *     DockerClientConfig#applyTo}), otherwise the inherited environment stands
    */
-  public static Result run(List<String> argv, Duration timeout, int maxChars) {
+  public static Result run(
+      List<String> argv, Duration timeout, int maxChars, Path dockerConfigDir) {
     try {
       ProcessBuilder pb = new ProcessBuilder(argv);
       pb.redirectErrorStream(true);
+      DockerClientConfig.applyTo(pb.environment(), dockerConfigDir);
       Process process = pb.start();
       Tail tail = new Tail(maxChars);
       Thread reader =
