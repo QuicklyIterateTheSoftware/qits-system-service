@@ -41,7 +41,7 @@ import java.util.UUID;
  */
 @Path("/terminals")
 @Produces(MediaType.APPLICATION_JSON)
-@RolesAllowed({"qits:admin", "qits:system"})
+@RolesAllowed({"qits:admin", "qits:admin-agent", "qits:system"})
 public class TerminalController {
 
   @Inject TerminalSessions sessions;
@@ -49,14 +49,14 @@ public class TerminalController {
   @Inject NodeReads nodes;
 
   @GET
-  @RolesAllowed({"qits:admin", "qits:system", "qits:agent"})
+  @RolesAllowed({"qits:admin", "qits:admin-agent", "qits:system", "qits:agent"})
   public List<TerminalView> list() {
     return sessions.list().stream().map(TerminalView::of).toList();
   }
 
   @GET
   @Path("/{id}")
-  @RolesAllowed({"qits:admin", "qits:system", "qits:agent"})
+  @RolesAllowed({"qits:admin", "qits:admin-agent", "qits:system", "qits:agent"})
   public TerminalView get(@PathParam("id") String id) {
     return TerminalView.of(require(id));
   }

@@ -127,6 +127,8 @@ Any other close code means reconnect — and a reconnect gets the scrollback rep
 
 Only `qits:admin` may open a socket. Every REST route also accepts `qits:system`, because reading
 the host's shape is something a machine may do; holding a shell on the platform host is not.
+`qits:admin-agent` — an ADMIN workspace's own commissioned agent — is admitted everywhere
+`qits:admin` is, including the socket (qits-628 follow-up).
 
 ## Config
 

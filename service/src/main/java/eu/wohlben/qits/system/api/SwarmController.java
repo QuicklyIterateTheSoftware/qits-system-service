@@ -26,7 +26,7 @@ import java.util.List;
  */
 @Path("/swarm")
 @Produces(MediaType.APPLICATION_JSON)
-@RolesAllowed({"qits:admin", "qits:system", "qits:agent"})
+@RolesAllowed({"qits:admin", "qits:admin-agent", "qits:system", "qits:agent"})
 public class SwarmController {
 
   @Inject SwarmReads swarm;

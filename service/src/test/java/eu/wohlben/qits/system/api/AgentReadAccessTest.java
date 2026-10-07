@@ -105,4 +105,33 @@ class AgentReadAccessTest {
   void aRoleOutsideTheBoundaryIsStillRefused() {
     as("qits:reader").get("/system/api/overview").then().statusCode(403);
   }
+
+  /**
+   * {@code qits:admin-agent} — an ADMIN workspace's own commissioned agent — is admitted everywhere
+   * {@code qits:admin} is, including a WRITE door that {@code qits:agent} alone may not open
+   * (qits-628 follow-up). Opening and ending a terminal is the representative admin WRITE door;
+   * {@code qits:agent} alone staying refused there is covered already by {@link
+   * #anAgentListsTerminalsButOpensAndEndsNone()}, so this asserts the same refusal again, side by
+   * side with the identity that now passes.
+   */
+  @Test
+  void anAdminAgentAloneOpensAndEndsATerminalButPlainAgentDoesNot() {
+    String id =
+        as("qits:admin-agent")
+            .contentType("application/json")
+            .body("{\"kind\":\"GLANCES\"}")
+            .post("/system/api/terminals")
+            .then()
+            .statusCode(anyOf(is(200), is(201)))
+            .extract()
+            .path("id");
+    as("qits:admin-agent").delete("/system/api/terminals/" + id).then().statusCode(204);
+
+    agent()
+        .contentType("application/json")
+        .body("{\"kind\":\"GLANCES\"}")
+        .post("/system/api/terminals")
+        .then()
+        .statusCode(403);
+  }
 }
