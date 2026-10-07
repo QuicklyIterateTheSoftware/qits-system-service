@@ -20,7 +20,7 @@ import jakarta.ws.rs.core.MediaType;
  */
 @Path("/overview")
 @Produces(MediaType.APPLICATION_JSON)
-@RolesAllowed({"qits:admin", "qits:system", "qits:agent"})
+@RolesAllowed({"qits:admin", "qits:admin-agent", "qits:system", "qits:agent"})
 public class OverviewController {
 
   @Inject HostReads hosts;
