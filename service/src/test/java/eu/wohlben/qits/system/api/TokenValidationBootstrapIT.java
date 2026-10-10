@@ -46,8 +46,8 @@ import org.junit.jupiter.api.TestMethodOrder;
  * application.properties says so in as many words ("the OIDC tenant is disabled because
  * qits.auth.machine.required defaults false"), which is what keeps a clone-alone {@code ./mvnw
  * verify} free of an issuer. The consequence is that the entire shipped {@code quarkus.oidc.*}
- * block — auth-server-url with {@code discovery-enabled=false} and {@code jwks-path=jwks} joined
- * onto it, the boot-time fetch that {@code connection-delay} retries, audience enforcement,
+ * block — auth-server-url with discovery on, the boot-time discovery and JWKS fetch that {@code
+ * connection-delay} retries, audience enforcement,
  * groups→roles mapping — is exercised NOWHERE else. {@link StoryProfile} is what turns it on, for
  * the whole catalogue. The far side is {@link MockIdp}, whose recordings make the interaction
  * assertable on <b>both ends</b>.
@@ -58,7 +58,7 @@ import org.junit.jupiter.api.TestMethodOrder;
  * <ul>
  *   <li>the framework's own {@code NetworkTaps.restAssured} tap for what a story sends here,
  *       skipping the {@code /q/} probe root;
- *   <li>{@link MockIdp}'s request log, a <b>cumulative</b> source, for the startup JWKS fetch;
+ *   <li>{@link MockIdp}'s request log, a <b>cumulative</b> source, for the startup discovery and JWKS fetch;
  *   <li>{@link StoryDocker}'s recording, also cumulative, for what this service asked the docker
  *       CLI — including the two calls it makes on the way up, which this story owns;
  *   <li>and the refused terminal upgrade, observed at its own call site because it travels on the
@@ -71,7 +71,7 @@ import org.junit.jupiter.api.TestMethodOrder;
  *
  * <p><b>The two stories are ordered</b>, and that is load-bearing rather than tidiness: a
  * cumulative source is attributed by a cursor, so traffic that happened before any story ran — the
- * startup JWKS fetch and the boot sweep's two docker calls, which are half the subject of the first
+ * startup discovery and JWKS fetch and the boot sweep's two docker calls, which are half the subject of the first
  * story — lands in whichever story drains <i>first</i>. Pinning the order is what keeps that the
  * story it belongs to; and running a later class of this catalogue on its own makes ITS first story
  * inherit them and fail its edge count, loudly, which is the right way for the assumption to break.
@@ -163,8 +163,8 @@ public class TokenValidationBootstrapIT {
   @UserStoryDescription(
       """
       A freshly deployed qits-platform-system must validate service bearers before any caller
-      arrives: at startup it fetches the signing keys (JWKS) from qits-platform-idp — discovery
-      stays off, the path is configured — so the very first machine request is accepted. It also
+      arrives: at startup it reads qits-idp's discovery document and fetches the signing keys
+      (JWKS) at the jwks_uri it names, so the very first machine request is accepted. It also
       says hello to the host it exists to look at, probing the daemon and sweeping up any terminal
       container a previous life of this service left running. What that bearer then buys is this
       service's read surface, answered live off the docker daemon; and what it does NOT buy is a
@@ -177,7 +177,7 @@ public class TokenValidationBootstrapIT {
 
     story.note(
         "qits-platform-system starts with the OIDC tenant on, beside a reachable"
-            + " qits-platform-idp");
+            + " qits-idp");
     given().get("/system/q/health/ready").then().statusCode(200);
 
     // End (a), the idp side: the JWKS was served during startup — before this story presented any
@@ -190,10 +190,15 @@ public class TokenValidationBootstrapIT {
     // WHEN. This is also the story that owns it: the cursor gives pre-story traffic to whichever
     // story drains first, which is why this class pins its method order.
     assertTrue(
+        idp.recordedRequests().stream()
+            .anyMatch(r -> "/idp/.well-known/openid-configuration".equals(r.path())),
+        "the packaged service never read the discovery document at startup");
+    assertTrue(
         idp.recordedRequests().stream().anyMatch(r -> "/idp/jwks".equals(r.path())),
         "the packaged service never fetched /idp/jwks at startup");
     story
-        .note("the signing keys were fetched at startup, before this story presented any token")
+        .note("the discovery document was read and the signing keys it points to were fetched at"
+            + " startup, before this story presented any token")
         .as("jwks-fetched");
 
     // End (b), the host side, and it happened at startup too: the daemon probe whose one WARN line
@@ -322,7 +327,7 @@ public class TokenValidationBootstrapIT {
         .as("unknown-key-refused");
 
     // AND THE AUDIENCE THIS IS NOT IS WORTH BEING PRECISE ABOUT. A sibling platform service's
-    // bearer is not it: qits-platform-idp stamps `qits-platform` on every token it mints, so a
+    // bearer is not it: qits-idp stamps `qits-platform` on every token it mints, so a
     // peer's credential is addressed here too and its ROLES are what decide what it may do. What
     // is refused is a token that was never addressed to this platform at all — an aud naming
     // something outside it, which is the only thing the audience check can still be about.
@@ -394,6 +399,14 @@ public class TokenValidationBootstrapIT {
         StoryTarget.SERVICE,
         MockIdp.SERVICE_NAME,
         "GET /idp/jwks -> 200");
+    // …after the discovery document that named the JWKS address.
+    ReportAssertions.assertEdge(
+        CATEGORY_SLUG,
+        ACCEPTED_SLUG,
+        NetworkEdge.HTTP,
+        StoryTarget.SERVICE,
+        MockIdp.SERVICE_NAME,
+        "GET /idp/.well-known/openid-configuration -> 200");
     // Observed on the near side, by the framework's tap, with the actor this story set.
     ReportAssertions.assertEdge(
         CATEGORY_SLUG,
@@ -427,9 +440,9 @@ public class TokenValidationBootstrapIT {
         StoryDocker.DAEMON,
         StoryDocker.SOCKET_LABEL);
     // "It is introspection of THIS machine and no peer" is the story's own promise, and this is
-    // where it is checkable rather than described: eight edges and no ninth. A call to a host this
-    // IT would then have to stand in for would be a ninth, and no presence check could see it.
-    ReportAssertions.assertEdgeCount(CATEGORY_SLUG, ACCEPTED_SLUG, 8);
+    // where it is checkable rather than described: nine edges and no tenth. A call to a host this
+    // IT would then have to stand in for would be a tenth, and no presence check could see it.
+    ReportAssertions.assertEdgeCount(CATEGORY_SLUG, ACCEPTED_SLUG, 9);
     ReportAssertions.assertStepId(CATEGORY_SLUG, ACCEPTED_SLUG, "jwks-fetched");
     ReportAssertions.assertStepId(CATEGORY_SLUG, ACCEPTED_SLUG, "host-greeted");
     ReportAssertions.assertStepId(CATEGORY_SLUG, ACCEPTED_SLUG, "overview-served");

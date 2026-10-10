@@ -47,7 +47,7 @@ public class StoryProfile extends PackagedSurfaceIT.PackagedUnderTarget {
 
   /**
    * The audience this service enforces, and it is the PLATFORM's one audience rather than this
-   * service's name: qits-platform-idp stamps {@code qits-platform} on every token it mints, so a
+   * service's name: qits-idp stamps {@code qits-platform} on every token it mints, so a
    * token carrying it is any platform caller's and roles are what decide what that caller may do.
    *
    * <p>It is spelled here as a literal because it is spelled as a literal where it ships — {@code
@@ -64,7 +64,7 @@ public class StoryProfile extends PackagedSurfaceIT.PackagedUnderTarget {
     // quarkus.oidc.tenant-enabled=${qits.auth.machine.required:false}, so this one key is the
     // difference between a service that validates machine bearers and one that does not. No other
     // suite in this repository turns it on at all, which is why the whole quarkus.oidc.* block —
-    // the boot-time JWKS fetch, audience enforcement, groups→roles mapping — runs nowhere else.
+    // the boot-time discovery and JWKS fetch, audience enforcement, groups→roles mapping — runs nowhere else.
     //
     // It leaves a PERSON's door exactly where it was: the tenant is bearer-only, so a request
     // carrying no Authorization header is never challenged by it and falls through to
@@ -72,8 +72,8 @@ public class StoryProfile extends PackagedSurfaceIT.PackagedUnderTarget {
     // the platform edge. Both doors are open here, which is what lets one catalogue tell the
     // machine's ceiling from the person's.
     overrides.put("qits.auth.machine.required", "true");
-    // Where the idp is. Runtime key, so the packaged artifact is otherwise exactly what ships —
-    // discovery stays off and jwks-path stays `jwks`, joined onto this URL.
+    // Where the idp is. Runtime key, so the packaged artifact is otherwise exactly what ships:
+    // quarkus-oidc reads the mock's discovery document under this URL and follows its jwks_uri.
     overrides.put("quarkus.oidc.auth-server-url", idp.baseUrl());
     // THE CATALOGUE'S OWN DOCKER. The parent points this at the script under target/test-classes,
     // which the whole surefire suite has already written several hundred calls into by the time
