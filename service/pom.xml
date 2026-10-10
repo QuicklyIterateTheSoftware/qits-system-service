@@ -143,6 +143,18 @@
             <artifactId>junit5</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <!-- contracts/IdpConsumerPactTest: the pact against qits-idp-service, built from its
+                 recorded answers by the shared reader. -->
+            <groupId>${project.groupId}</groupId>
+            <artifactId>qits-pact-consumer</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>qits-idp-golden-masters</artifactId>
+            <scope>test</scope>
+        </dependency>
         <!-- NO ZONKY, HERE OR IN system/. This repository has no datasource at all — there is no
              store, no Flyway and no qits-db-core, because every answer is read from the docker
              daemon at the moment it is asked (the root pom says so at length). So the fourth
