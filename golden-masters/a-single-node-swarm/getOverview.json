@@ -1,0 +1,73 @@
+{
+  "host": {
+    "hostname": "fake-host",
+    "dockerVersion": "29.7.2",
+    "os": "Fedora Linux 43 (WSL)",
+    "osType": "linux",
+    "osVersion": "43",
+    "kernelVersion": "6.6.87.2-microsoft-standard-WSL2",
+    "architecture": "x86_64",
+    "cpus": 24,
+    "memoryBytes": 33529409536,
+    "dockerRootDir": "/var/lib/docker",
+    "storageDriver": "overlayfs",
+    "cgroupDriver": "systemd",
+    "cgroupVersion": "2",
+    "loggingDriver": "json-file",
+    "containers": 26,
+    "containersRunning": 23,
+    "containersPaused": 0,
+    "containersStopped": 3,
+    "images": 1244,
+    "warnings": [
+      "WARNING: bridge-nf-call-iptables is disabled"
+    ]
+  },
+  "usage": {
+    "imagesBytes": 308300000000,
+    "containersBytes": 59340000,
+    "volumesBytes": 33490000000,
+    "buildCacheBytes": 302500000000,
+    "reclaimableBytes": 391792110600,
+    "entries": [
+      {
+        "type": "Images",
+        "totalCount": "425",
+        "active": "18",
+        "size": "308.3GB",
+        "reclaimable": "286.8GB (93%)"
+      },
+      {
+        "type": "Containers",
+        "totalCount": "26",
+        "active": "18",
+        "size": "59.34MB",
+        "reclaimable": "110.6kB (0%)"
+      },
+      {
+        "type": "Local Volumes",
+        "totalCount": "23",
+        "active": "7",
+        "size": "33.49GB",
+        "reclaimable": "1.492GB (4%)"
+      },
+      {
+        "type": "Build Cache",
+        "totalCount": "1877",
+        "active": "0",
+        "size": "302.5GB",
+        "reclaimable": "103.5GB"
+      }
+    ]
+  },
+  "swarm": {
+    "state": "active",
+    "nodeId": "iwbwrdui2z0n62kqcjfo1erwh",
+    "nodeAddress": "192.168.152.4",
+    "controlAvailable": true,
+    "managers": 1,
+    "nodes": 1,
+    "clusterId": "lysckrdwpfyqovchlqs02nvs1",
+    "error": ""
+  }
+}

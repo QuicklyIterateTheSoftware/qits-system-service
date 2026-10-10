@@ -1,0 +1,201 @@
+{
+  "formatVersion": 1,
+  "provider": "qits-system",
+  "states": [
+    {
+      "name": "a single-node swarm",
+      "slug": "a-single-node-swarm",
+      "params": {
+        "configId": "qits-edge-vhosts",
+        "containerId": "dev-qits-ci.1.k4g0nn1ld7o272jl7fciatg6m",
+        "nodeId": "iwbwrdui2z0n62kqcjfo1erwh",
+        "serviceId": "dev-qits-artifacts"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getContainerLogs",
+          "method": "GET",
+          "path": "/system/api/nodes/local/containers/dev-qits-ci.1.k4g0nn1ld7o272jl7fciatg6m/logs?tail=200",
+          "status": 200,
+          "file": "a-single-node-swarm/getContainerLogs.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getNodeContainer",
+          "method": "GET",
+          "path": "/system/api/nodes/local/containers/dev-qits-ci.1.k4g0nn1ld7o272jl7fciatg6m",
+          "status": 200,
+          "file": "a-single-node-swarm/getNodeContainer.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getOverview",
+          "method": "GET",
+          "path": "/system/api/overview",
+          "status": 200,
+          "file": "a-single-node-swarm/getOverview.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getSwarmConfig",
+          "method": "GET",
+          "path": "/system/api/swarm/configs/qits-edge-vhosts",
+          "status": 200,
+          "file": "a-single-node-swarm/getSwarmConfig.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getSwarmNode",
+          "method": "GET",
+          "path": "/system/api/swarm/nodes/iwbwrdui2z0n62kqcjfo1erwh",
+          "status": 200,
+          "file": "a-single-node-swarm/getSwarmNode.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getSwarmService",
+          "method": "GET",
+          "path": "/system/api/swarm/services/dev-qits-artifacts",
+          "status": 200,
+          "file": "a-single-node-swarm/getSwarmService.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listNodeContainers",
+          "method": "GET",
+          "path": "/system/api/nodes/local/containers",
+          "status": 200,
+          "file": "a-single-node-swarm/listNodeContainers.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listNodeImages",
+          "method": "GET",
+          "path": "/system/api/nodes/local/images",
+          "status": 200,
+          "file": "a-single-node-swarm/listNodeImages.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listNodeNetworks",
+          "method": "GET",
+          "path": "/system/api/nodes/local/networks",
+          "status": 200,
+          "file": "a-single-node-swarm/listNodeNetworks.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listNodeVolumes",
+          "method": "GET",
+          "path": "/system/api/nodes/local/volumes",
+          "status": 200,
+          "file": "a-single-node-swarm/listNodeVolumes.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listSwarmConfigs",
+          "method": "GET",
+          "path": "/system/api/swarm/configs",
+          "status": 200,
+          "file": "a-single-node-swarm/listSwarmConfigs.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listSwarmNodes",
+          "method": "GET",
+          "path": "/system/api/swarm/nodes",
+          "status": 200,
+          "file": "a-single-node-swarm/listSwarmNodes.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listSwarmSecrets",
+          "method": "GET",
+          "path": "/system/api/swarm/secrets",
+          "status": 200,
+          "file": "a-single-node-swarm/listSwarmSecrets.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listSwarmServices",
+          "method": "GET",
+          "path": "/system/api/swarm/services",
+          "status": 200,
+          "file": "a-single-node-swarm/listSwarmServices.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    }
+  ]
+}

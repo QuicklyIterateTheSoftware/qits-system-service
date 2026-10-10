@@ -1,0 +1,17 @@
+{
+  "id": "iwbwrdui2z0n62kqcjfo1erwh",
+  "hostname": "fake-host",
+  "role": "manager",
+  "status": "ready",
+  "availability": "active",
+  "managerStatus": "Leader",
+  "engineVersion": "29.7.2",
+  "address": "192.168.152.4",
+  "os": "linux",
+  "architecture": "x86_64",
+  "cpus": 24.0,
+  "memoryBytes": 33529409536,
+  "labels": {},
+  "createdAt": "2026-08-08T07:04:02.737121551Z",
+  "updatedAt": "2026-08-23T12:27:33.948524386Z"
+}

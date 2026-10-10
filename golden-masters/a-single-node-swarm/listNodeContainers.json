@@ -1,0 +1,16 @@
+[
+  {
+    "id": "b248472f7a8e00bba8cd036232373baed8856d90eb77b06c53f3eb0b321fdb17",
+    "name": "dev-qits-ci.1.k4g0nn1ld7o272jl7fciatg6m",
+    "image": "registry.dev.localhost:8080/qits/qits-ci:3e501b6",
+    "state": "running",
+    "status": "Up 4 hours (healthy)",
+    "health": "healthy",
+    "command": "\"/work/qits-ci\"",
+    "createdAt": "2026-08-23 14:28:51 +0200 CEST",
+    "runningFor": "4 hours ago",
+    "ports": "8080/tcp",
+    "networks": "qits-net",
+    "size": "9.89MB"
+  }
+]

@@ -1,0 +1,13 @@
+[
+  {
+    "id": "sha256:14beaf669b73",
+    "repository": "registry.dev.localhost:8080/qits/qits-ci",
+    "tag": "3e501b6",
+    "digest": "<none>",
+    "size": "325MB",
+    "sizeBytes": 325000000,
+    "createdAt": "2026-08-18 04:46:43 +0200 CEST",
+    "createdSince": "5 days ago",
+    "containers": "3"
+  }
+]

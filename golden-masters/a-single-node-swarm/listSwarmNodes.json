@@ -1,0 +1,13 @@
+[
+  {
+    "id": "iwbwrdui2z0n62kqcjfo1erwh",
+    "hostname": "fake-host",
+    "role": "manager",
+    "status": "Ready",
+    "availability": "Active",
+    "managerStatus": "Leader",
+    "engineVersion": "29.7.2",
+    "address": null,
+    "self": true
+  }
+]

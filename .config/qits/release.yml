@@ -7,6 +7,12 @@ artifacts:
 # ever pushed. Measured on 2026.926.31915:
 #   no image registry.qits.wohlben.eu/qits/qits-system:2026.926.31915
   - { type: docker, name: qits/qits-system, sbom: .sbom/sbom.json }
+# The provider golden masters (ticket qits-1149): the platform packages `golden-masters/` as
+# `eu.wohlben.qits:qits-system-golden-masters` and `@qits/system-golden-masters`, each published
+# only when its content changed. `contracts/GoldenMasterRecordingTest` records them.
+contracts:
+  application: qits-system
+  golden-masters: { from: golden-masters/, packages: [maven, npm] }
 # THE SITE IS SPELLED, AND IT NAMES THE COMPONENT. `true` derives it from the REPOSITORY name,
 # which would put the retired tier modifier in a storage id and then MOVE that id the day the
 # repository is renamed — a bundle's history stranded under a name nothing publishes to any

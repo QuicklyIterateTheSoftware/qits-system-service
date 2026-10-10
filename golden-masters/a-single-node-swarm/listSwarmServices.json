@@ -1,0 +1,20 @@
+[
+  {
+    "id": "l2izhr0o4tjq",
+    "name": "dev-qits-artifacts",
+    "mode": "replicated",
+    "replicas": "1/1",
+    "image": "registry.dev.localhost:8080/qits/qits-artifacts:09920e6",
+    "ports": "",
+    "updatedAt": null
+  },
+  {
+    "id": "qz3slj0owlxd",
+    "name": "dev-qits-ci",
+    "mode": "replicated",
+    "replicas": "1/1",
+    "image": "registry.dev.localhost:8080/qits/qits-ci:3e501b6",
+    "ports": "",
+    "updatedAt": null
+  }
+]

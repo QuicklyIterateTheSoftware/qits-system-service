@@ -1,0 +1,10 @@
+[
+  {
+    "name": "qits-shared-m2",
+    "driver": "local",
+    "scope": "local",
+    "mountpoint": "/var/lib/docker/volumes/qits-shared-m2/_data",
+    "createdAt": null,
+    "labels": {}
+  }
+]

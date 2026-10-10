@@ -1,0 +1,11 @@
+{
+  "id": "ktnbjxoalbkvbvedmg1urrz8h",
+  "name": "qits-edge-vhosts",
+  "createdAt": "2026-08-18T04:31:02.113044212Z",
+  "updatedAt": "2026-08-18T04:31:02.113044212Z",
+  "labels": {
+    "qits.platform.deployments.target": "platform"
+  },
+  "data": "registry.dev.localhost -> qits-artifacts\n",
+  "binary": false
+}

@@ -1,0 +1,49 @@
+{
+  "id": "b248472f7a8e00bba8cd036232373baed8856d90eb77b06c53f3eb0b321fdb17",
+  "name": "dev-qits-ci.1.k4g0nn1ld7o272jl7fciatg6m",
+  "image": "registry.dev.localhost:8080/qits/qits-ci:3e501b6",
+  "imageId": "sha256:14beaf669b73",
+  "state": "running",
+  "running": true,
+  "health": "healthy",
+  "exitCode": 0,
+  "createdAt": "2026-08-23T12:28:51.9948477Z",
+  "startedAt": "2026-08-23T12:28:52.082646669Z",
+  "finishedAt": "0001-01-01T00:00:00Z",
+  "restartCount": 0,
+  "command": [
+    "/work/qits-ci",
+    "-Dquarkus.http.host=0.0.0.0"
+  ],
+  "user": "1001",
+  "labels": {
+    "qits.platform.deployments.app-name": "qits-ci"
+  },
+  "envKeys": [
+    "QITS_ENVIRONMENT",
+    "QITS_RESOURCE_DB_PASSWORD"
+  ],
+  "mounts": [
+    {
+      "type": "volume",
+      "source": "qits-shared-m2",
+      "destination": "/caches/m2",
+      "mode": "z",
+      "writable": true
+    }
+  ],
+  "networks": [
+    {
+      "name": "qits-net",
+      "ipAddress": "10.0.1.42"
+    }
+  ],
+  "restartPolicy": "no",
+  "memoryBytes": 0,
+  "pidsLimit": 0,
+  "oomScoreAdj": 0,
+  "privileged": false,
+  "readOnlyRootfs": false,
+  "capAdd": [],
+  "capDrop": []
+}

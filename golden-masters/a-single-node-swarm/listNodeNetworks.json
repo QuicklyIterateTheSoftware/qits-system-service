@@ -1,0 +1,12 @@
+[
+  {
+    "id": "mulnl3uqqi0h",
+    "name": "qits-net",
+    "driver": "overlay",
+    "scope": "swarm",
+    "internal": false,
+    "ipv6": false,
+    "createdAt": "2026-08-18 02:13:24 +0000 UTC",
+    "labels": {}
+  }
+]

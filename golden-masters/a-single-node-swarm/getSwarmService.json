@@ -1,0 +1,57 @@
+{
+  "id": "l2izhr0o4tjq34f7arurhgmm8",
+  "name": "dev-qits-artifacts",
+  "image": "registry.dev.localhost:8080/qits/qits-artifacts:09920e6",
+  "mode": "replicated",
+  "replicas": "1/1",
+  "ports": null,
+  "createdAt": "2026-08-18T02:32:15.775211499Z",
+  "updatedAt": "2026-08-23T12:27:33.349751944Z",
+  "labels": {
+    "qits.platform.deployments.app-name": "qits-artifacts"
+  },
+  "envKeys": [
+    "QITS_ENVIRONMENT",
+    "QITS_RESOURCE_DB_PASSWORD"
+  ],
+  "networks": [
+    {
+      "networkId": "mulnl3uqqi0hkr0yuutakpyed",
+      "address": "10.0.1.110/24"
+    }
+  ],
+  "updateOrder": "stop-first",
+  "updateParallelism": 1,
+  "updateFailureAction": "rollback",
+  "restartCondition": "any",
+  "healthcheck": [
+    "CMD-SHELL",
+    "curl -fsS localhost:8080/artifacts/q/health/ready"
+  ],
+  "tasks": [
+    {
+      "id": "abx4yo2tk0ls7z5z5t80pweo9",
+      "name": "dev-qits-artifacts.1",
+      "slot": 1,
+      "nodeId": null,
+      "nodeHostname": "fake-host",
+      "state": "Running 4 hours ago",
+      "desiredState": "Running",
+      "error": "",
+      "image": "registry.dev.localhost:8080/qits/qits-artifacts:09920e6",
+      "updatedAt": null
+    },
+    {
+      "id": "n512nrfshfr8qfrm60sv4nyfo",
+      "name": "dev-qits-artifacts.1",
+      "slot": 1,
+      "nodeId": null,
+      "nodeHostname": "fake-host",
+      "state": "Failed 4 hours ago",
+      "desiredState": "Shutdown",
+      "error": "\"No such container: dev-qits-artifacts.1.n512nrfshfr8qfrm60sv4nyfo\"",
+      "image": "registry.dev.localhost:8080/qits/qits-artifacts:09920e6",
+      "updatedAt": null
+    }
+  ]
+}
