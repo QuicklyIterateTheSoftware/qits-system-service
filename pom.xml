@@ -107,7 +107,7 @@
         <!-- The consumer half of the contracts (ticket qits-1149), test scope, service/ only: the
              shared golden-master reader from qits-integrations-quarkus, and the recorded answers of
              the one provider this service calls, qits-idp (OIDC discovery and JWKS). Exact pins. -->
-        <qits.pact-consumer.version>2026.1010.140259</qits.pact-consumer.version>
+        <qits.pact-consumer.version>2026.1010.141817</qits.pact-consumer.version>
         <qits.idp-golden-masters.version>2026.1010.134259</qits.idp-golden-masters.version>
 
         <compiler-plugin.version>3.15.0</compiler-plugin.version>

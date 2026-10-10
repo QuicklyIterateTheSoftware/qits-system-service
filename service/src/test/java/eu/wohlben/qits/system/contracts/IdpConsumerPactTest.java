@@ -3,11 +3,7 @@ package eu.wohlben.qits.system.contracts;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import eu.wohlben.qits.pact.consumer.ConsumerPact;
-import eu.wohlben.qits.pact.consumer.GoldenFiles;
 import eu.wohlben.qits.pact.consumer.GoldenInteraction;
 import eu.wohlben.qits.pact.consumer.GoldenMasters;
 import eu.wohlben.qits.pact.consumer.Trigger;
@@ -44,15 +40,14 @@ class IdpConsumerPactTest {
 
   static final GoldenInteraction DISCOVERY =
       GoldenInteraction.of(AT_STARTUP, STATE, "getOpenIdConfiguration")
-          .consumes("issuer", "jwks_uri", "token_endpoint");
+          .consumes("issuer", "jwks_uri", "token_endpoint")
+          .exact("issuer");
 
   static final GoldenInteraction JWKS =
       GoldenInteraction.of(AT_STARTUP, STATE, "getJwks")
           .consumes("keys[].kid", "keys[].kty", "keys[].n", "keys[].e", "keys[].alg", "keys[].use");
 
   static final ConsumerPact PACT = ConsumerPact.of(CONSUMER, IDP, DISCOVERY, JWKS);
-
-  private static final ObjectMapper MAPPER = new ObjectMapper();
 
   @Test
   void quarkusOidcReadsTheDiscoveryDocument() {
@@ -72,22 +67,9 @@ class IdpConsumerPactTest {
     });
   }
 
-  /**
-   * The committed pact, with the discovery row's {@code issuer} bound exactly: the reader matches
-   * every leaf by type, so this drops that one matcher before the file is compared or written.
-   */
   @Test
-  void theCommittedPactIsWhatTheRowsWrite() throws Exception {
-    JsonNode pact = PACT.normalisedPact();
-    for (JsonNode interaction : pact.path("interactions")) {
-      if (interaction.path("description").asText().equals(DISCOVERY.description())) {
-        JsonNode body = interaction.path("response").path("matchingRules").path("body");
-        assertNotNull(((ObjectNode) body).remove("$.issuer"), "the reader bound $.issuer by type");
-      }
-    }
-    GoldenFiles.compareOrWrite(
-        ConsumerPact.pactsDirectory().resolve(PACT.file()),
-        ConsumerPact.normalise(MAPPER.writeValueAsString(pact)));
+  void theCommittedPactIsWhatTheRowsWrite() {
+    PACT.compareOrWritePactFile();
   }
 
   @Test
