@@ -60,6 +60,10 @@
              actually reach — see docker/Dockerfile and .qits-maven-settings.xml. -->
         <qits.auth-core.version>2026.1002.70617</qits.auth-core.version>
         <qits.arch-rules.version>2026.1002.70617</qits.arch-rules.version>
+        <!-- CallerServerFilter/CallerClientFilter: jandex-indexed filters that record inbound
+             X-Qits-Caller as the qits.caller span attribute and stamp it on outgoing REST-client
+             calls. Also published by qits-integrations-quarkus. -->
+        <qits.http-core.version>0-qits-1198-local</qits.http-core.version>
         <!-- The user-story framework (test scope): TokenValidationBootstrapIT is a userflow, so a
              `mvn verify -DskipITs=false "-Dit.test=TokenValidationBootstrapIT"` also regenerates
              service/target/userstories/ — the story's documentation, network diagram included.
@@ -167,6 +171,14 @@
                 <groupId>${project.groupId}</groupId>
                 <artifactId>qits-arch-rules</artifactId>
                 <version>${qits.arch-rules.version}</version>
+            </dependency>
+            <dependency>
+                <!-- CallerServerFilter: having the jar on the deployable's classpath records
+                     inbound X-Qits-Caller as the qits.caller span attribute. Compile scope in
+                     `service` only; this repo builds no HttpClient of its own. -->
+                <groupId>${project.groupId}</groupId>
+                <artifactId>qits-http-core</artifactId>
+                <version>${qits.http-core.version}</version>
             </dependency>
             <dependency>
                 <!-- The userflow framework. Test scope, in `service/` only: the story runs against
