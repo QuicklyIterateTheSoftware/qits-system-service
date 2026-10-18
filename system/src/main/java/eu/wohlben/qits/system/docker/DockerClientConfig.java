@@ -63,7 +63,7 @@ public final class DockerClientConfig {
    * The hosts a credential is written for, registry first (the bootstrap's order), deduplicated.
    *
    * @param imageRepo an image reference without its tag, e.g. {@code
-   *     mirror.dev.localhost:8080/hub/nicolargo/glances}
+   *     mirror.qits.wohlben.eu/hub/nicolargo/glances}
    */
   public static List<String> hosts(String imageRepo) {
     Optional<String> mirror = hostOf(imageRepo);

@@ -37,15 +37,19 @@
 # That is the honest behaviour: an unreachable daemon is a runtime condition this service reports,
 # not a packaging error, and there is nothing an ENV here could point at that would be right.
 #
+# The platform's public domain; release recipes pass `--opt build-arg:QITS_DOMAIN`. Global so the
+# FROM lines below can read it.
+ARG QITS_DOMAIN=wohlben.eu
+
 # --- stage `build`: native-compile ----------------------------------------------------------------
 # The builder JDK MUST be 25: native-image cannot read bytecode newer than its own JDK, and this
 # project targets release 25.
 #
-# `mirror.dev.localhost:8080/quay/…` is qits-platform-mirror's pull-through mirror of quay.io: the
+# `mirror.qits.${QITS_DOMAIN}/quay/…` is qits-mirror's pull-through mirror of quay.io: the
 # first build fetches the image from upstream and caches it, every later build is served from local
 # disk. The tag is upstream's, unchanged — the mirror revalidates it, so `jdk-25` still moves when
 # quay moves it.
-FROM mirror.dev.localhost:8080/quay/quarkus/ubi9-quarkus-mandrel-builder-image:jdk-25 AS build
+FROM mirror.qits.${QITS_DOMAIN}/quay/quarkus/ubi9-quarkus-mandrel-builder-image:jdk-25 AS build
 USER root
 WORKDIR /src
 
@@ -186,8 +190,8 @@ FROM scratch AS sbom
 COPY --from=build /src/service/target/sbom.json /sbom.json
 
 # --- runtime --------------------------------------------------------------------------------------
-# `mirror.dev.localhost:8080/redhat/…` is the same mirror, pointed at registry.access.redhat.com.
-FROM mirror.dev.localhost:8080/redhat/ubi9/ubi-minimal:9.6
+# `mirror.qits.${QITS_DOMAIN}/redhat/…` is the same mirror, pointed at registry.access.redhat.com.
+FROM mirror.qits.${QITS_DOMAIN}/redhat/ubi9/ubi-minimal:9.6
 WORKDIR /work
 
 # TWO PACKAGES, AND BOTH ARE LOAD-BEARING AT RUNTIME.
