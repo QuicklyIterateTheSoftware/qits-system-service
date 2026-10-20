@@ -12,6 +12,18 @@
 # decommission the running service and start a stranger beside it.
 application: qits-system
 
+# WHAT THIS APPLICATION USED TO BE CALLED, and why it is spelled although nothing here is a database.
+#
+# A renamed application is a NEW application to the deployer, so qits-platform-system's last
+# DeploymentActive still owns /system and the `system` host in the edge's routing projection — and
+# every frame of this one is refused there as a conflict with it. Naming the predecessor makes every
+# cutover of this application first announce qits-platform-system with an empty snapshot, which
+# releases the route and the host before this application's own frame claims them. Ticket qits-1467.
+#
+# It moves no claim: the one claim a rename can move is a postgres one, and the idp:client below is
+# deliberately left alone by it.
+renamed_from: qits-platform-system
+
 # One route for this application's machine surface: the API at /system/api, the terminal WebSocket at
 # /system/api/terminals/{id} and the document at /system/q. The edge path-routes every application's
 # route prefix on EVERY host, so this one line keeps all three reachable wherever a reader is. The
