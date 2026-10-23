@@ -5,10 +5,18 @@ terminal lifecycle and the config keys. This file is the working conventions on 
 
 ## The rules that shape everything
 
-**This service READS; it does not act.** No scale, no restart, no rm of anything it did not itself
-create, no config or secret write. The vocabulary is reads plus `run`/`exec` of a terminal and
-`rm -f` of this service's own labelled containers. Adding a write is a decision about what this
-console IS, and it belongs in `qits-system-plan.md` before it belongs in a commit here.
+**This service READS; it does not act** — with ONE recorded exception, the `targets` module. No
+scale, no restart, no rm of anything it did not itself create, no config or secret write. The
+vocabulary is reads plus `run`/`exec` of a terminal and `rm -f` of this service's own labelled
+containers. Adding a write is a decision about what this console IS, and it belongs in
+`qits-system-plan.md` before it belongs in a commit here.
+
+**The exception is `targets/` (qits-1481), and it is confined there.** `qits-system-plan.md`
+("Execution targets (qits-1481)") amends the rule above for that module only: it writes `target`,
+`lease` and `work_volume` rows in this service's own postgres, and sends runner control over its own
+socket to a qits-system-runner. It never calls `DockerCli` — the docker on a target is the runner's,
+not this service's — and nothing in `system/` writes because of it. A write anywhere else is still
+the decision the paragraph above describes.
 
 **The contract is pinned by `qits-system-plan.md` in the qits-qits wrapper.** The route shapes, the
 wire names, the config keys and the terminal protocol are written down there and two repositories
@@ -27,6 +35,56 @@ is what gets past Maven's `external:http:*` blocker.
 
 **The gate is `./mvnw clean verify -Dquarkus.http.test-port=0`**, and it needs BOTH a node on PATH
 and `git submodule update --init`. Always `clean`. Port 0 is not optional on the deployment host.
+
+## The targets module (qits-1481)
+
+`targets/` is a library jar, package `eu.wohlben.qits.system.targets`, with its doors, its socket and
+its schedules in it; `service/` discovers them through the jar's jandex index. The dossier pages
+"Targets in qits-system: data, doors, allocation", "The runner: qits-system-runner-daemon" and
+"Leases and tokens per slot type" (epic qits-1481) are the spec; `qits-system-plan.md` pins the wire.
+
+    entity/    Target, Lease, WorkVolume — named persistence unit `system`, flyway db/system/migration
+    control/   SlotAllocator (pure), TargetAllocation (runs it, writes grants, builds estates),
+               Targets, Leases, WorkVolumes, OwnerIdentity, LeaseSpecs, TargetEvents, TargetsConfig
+    api/       TargetController (/targets), LeaseController (/leases), WorkVolumeController
+    runner/    TargetRunnerSocket, TargetRegistry, TargetHealth, TargetFrames, TargetPins,
+               TargetAddresses, TargetLoginCommand, TargetInstallScript, TargetCommissionReconcile,
+               SocketBearerLifetime
+    idp/       TargetRunnerCommissioner (kinds target-runner, target-runner-registration)
+    events/    TargetLeaseChanged, TargetLoginChanged (qits-eventstream)
+
+**The allocation rule is pure, and only `SlotAllocator` spells it.** `n_total < T and n_total + 1 +
+Σ_{u≠t} max(0, m[u] − n[u]) ≤ T`, minimums ignored when `Σ m > T`, one queue `priority desc,
+requested_at asc`, pins considered on their target only, the most free slots then the name, nothing
+for a quarantined or disconnected target, and the sign-in gate for WORKSPACE and DESK. Change it in
+`TargetAllocatorTest` first: the dossier's worked example is the first table there.
+
+**The owner is the bearer, never the body.** `OwnerIdentity` takes the caller's client id (`sub`, or
+the forwarded principal) without its `<environment>-` prefix and looks it up in
+`qits.system.targets.tenants.*`. A field in a request that names an owner is ignored.
+
+**The estate is the whole desired state, and only a successful read is sent.** The runner removes
+whatever an estate does not list, so a lease read that failed sends nothing. `workVolume` on the wire
+is the WORK KEY (the runner derives `qits-system-runner-work-<workKey>-<id8>`); `purges` and
+`inventory.volumes` are full names; an adopted lease carries `adopt` for its whole life. An EXITED
+lease stays `desired: RUNNING` (the runner never restarts one) until its owner ends it.
+
+**The wire is the protocol jars', never spelled here.** `TargetFrames` bolts Jackson onto
+qits-runner-protocol's `RunnerCodec` and qits-system-runner-protocol's `SystemRunnerCodec`; the
+runner version every `hello` is held to is `SystemRunnerBinary.VERSION` (root pom
+`qits.system-runner-protocol.version`) unless `qits.system.targets.runner-version-override` is set.
+
+**Every write is its own transaction, and nothing holds one across the network.** `Targets`,
+`Leases` and `WorkVolumes` each run `QuarkusTransaction.requiringNew()`; events go out on
+`TargetEvents`' own thread after the commit, pushes on the registry's, allocation passes on the
+allocator's (coalesced, serialised).
+
+**Tests run on zonky's embedded postgres**, `service/src/test/java/.../testdb/EmbeddedPg`, handed to
+every `@QuarkusTest` by `EmbeddedPgConfigSource` for both datasources (`system`, `eventstream`), and
+to the packaged ITs by `PackagedSurfaceIT.PackagedUnderTarget`. qits-idp is `targets/IdpStub`, a JDK
+HttpServer in qits-idp's shapes; a runner is `targets/FakeTargetRunner`, a real WebSocket speaking the
+protocol jar's frames; the bearers a consumer sends are `targets/ContractBearers` (copied from
+qits-ci). Still no mocks.
 
 ## Docker
 
@@ -111,15 +169,20 @@ on every restart of this one.
 **Anything returned as `Response.entity(...)` is invisible to the build-time Jackson analysis**,
 which is what `api/ApiWireReflection` exists for — including nested records, which registering the
 outer one does not reach. A new response type joins that list in the commit that adds it; the
-failure is a 500 in the native binary while every JVM test stays green.
+failure is a 500 in the native binary while every JVM test stays green. The targets module's
+response types are registered on their own controllers' `@RegisterForReflection`, beside them.
 
-**`{"message": "…"}` and nothing else**, plus `"code"` on the one refusal a client branches on
-(`NODE_REMOTE`). One exception mapper, so two routes failing for the same reason cannot answer
-differently.
+**`{"message": "…"}` and nothing else**, plus `"code"` on a refusal a client branches on
+(`NODE_REMOTE`, and the targets module's `TargetRefusal` codes: `MINIMUMS_EXCEED_TOTAL`,
+`TARGET_BUSY`, `TARGET_UNAVAILABLE`, `LEASE_EXISTS`, `SLOT_TYPE_NOT_YOURS`, `NOT_A_TENANT`,
+`NOT_YOUR_LEASE`, `IMAGE_NOT_ALLOWED`, `ENV_KEY_NOT_ALLOWED`, `WORK_VOLUME_IN_USE`, …). One
+exception mapper, so two routes failing for the same reason cannot answer differently.
 
 **The WebSocket path is a literal.** `@WebSocket` does not follow `quarkus.rest.path`, so
 `/system/api/terminals/{id}` is spelled in `TerminalSocket.PATH_PREFIX` and moves with that key by
 hand. `TerminalView` builds `socketPath` from the same constant so the client never spells it twice.
+The target runner socket is the protocol jar's `SystemRunnerProtocol.SOCKET_PATH`,
+`/system/targets/socket`, which `TargetAddresses` hands a runner from the same constant.
 
 **Add a literal route under `/system`, add its prefix to `quarkus.quinoa.ignored-path-prefixes` in
 the same commit.** Without an entry the SPA fallback answers the page with 200 text/html, and a

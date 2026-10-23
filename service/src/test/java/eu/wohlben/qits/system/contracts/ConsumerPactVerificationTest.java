@@ -54,13 +54,16 @@ class ConsumerPactVerificationTest {
     System.setProperty("pact_do_not_track", "true");
   }
 
-  private final ProviderStates states = new ProviderStates();
+  @jakarta.inject.Inject eu.wohlben.qits.system.targets.ContractBearers bearers;
+
+  private ProviderStates states;
 
   @TestHTTPResource("/")
   URL base;
 
   @BeforeEach
   void target(PactVerificationContext context, Pact pact, Interaction interaction) {
+    states = new ProviderStates(bearers);
     if (context == null) {
       return; // no pact to verify: @IgnoreNoPactsToVerify's single empty run
     }
@@ -106,5 +109,35 @@ class ConsumerPactVerificationTest {
   @State(ProviderStates.A_SINGLE_NODE_SWARM)
   Map<String, String> aSingleNodeSwarm() {
     return states.params(ProviderStates.A_SINGLE_NODE_SWARM);
+  }
+
+  @State(ProviderStates.NO_TARGET)
+  Map<String, String> noTarget() {
+    return states.params(ProviderStates.NO_TARGET);
+  }
+
+  @State(ProviderStates.A_DECLARED_TARGET)
+  Map<String, String> aDeclaredTarget() {
+    return states.params(ProviderStates.A_DECLARED_TARGET);
+  }
+
+  @State(ProviderStates.AN_UNREGISTERED_RUNNER)
+  Map<String, String> anUnregisteredRunner() {
+    return states.params(ProviderStates.AN_UNREGISTERED_RUNNER);
+  }
+
+  @State(ProviderStates.A_REGISTERED_RUNNER)
+  Map<String, String> aRegisteredRunner() {
+    return states.params(ProviderStates.A_REGISTERED_RUNNER);
+  }
+
+  @State(ProviderStates.A_QUEUED_LEASE)
+  Map<String, String> aQueuedLease() {
+    return states.params(ProviderStates.A_QUEUED_LEASE);
+  }
+
+  @State(ProviderStates.AN_UNUSED_WORK_VOLUME)
+  Map<String, String> anUnusedWorkVolume() {
+    return states.params(ProviderStates.AN_UNUSED_WORK_VOLUME);
   }
 }

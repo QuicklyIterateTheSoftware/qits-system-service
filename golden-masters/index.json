@@ -3,6 +3,297 @@
   "provider": "qits-system",
   "states": [
     {
+      "name": "a declared target",
+      "slug": "a-declared-target",
+      "params": {
+        "targetId": "00000000-0000-4000-8000-000000000001"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "deleteTarget",
+          "method": "DELETE",
+          "path": "/system/api/targets/{targetId}",
+          "status": 204,
+          "file": "a-declared-target/deleteTarget.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getTarget",
+          "method": "GET",
+          "path": "/system/api/targets/{targetId}",
+          "status": 200,
+          "file": "a-declared-target/getTarget.json",
+          "frozen": {
+            "ids": [
+              "$.id"
+            ],
+            "instants": [
+              "$.login.checkedAt",
+              "$.registeredAt",
+              "$.lastSeenAt",
+              "$.lastHealthCheckAt",
+              "$.createdAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getTargetHealth",
+          "method": "GET",
+          "path": "/system/api/targets/{targetId}/health",
+          "status": 200,
+          "file": "a-declared-target/getTargetHealth.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$.at"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "greenlightTarget",
+          "method": "POST",
+          "path": "/system/api/targets/{targetId}/greenlight",
+          "status": 200,
+          "file": "a-declared-target/greenlightTarget.json",
+          "frozen": {
+            "ids": [
+              "$.id"
+            ],
+            "instants": [
+              "$.login.checkedAt",
+              "$.registeredAt",
+              "$.lastSeenAt",
+              "$.lastHealthCheckAt",
+              "$.createdAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listTargets",
+          "method": "GET",
+          "path": "/system/api/targets",
+          "status": 200,
+          "file": "a-declared-target/listTargets.json",
+          "frozen": {
+            "ids": [
+              "$[*].id"
+            ],
+            "instants": [
+              "$[*].login.checkedAt",
+              "$[*].registeredAt",
+              "$[*].lastSeenAt",
+              "$[*].lastHealthCheckAt",
+              "$[*].createdAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "patchTarget",
+          "method": "PATCH",
+          "path": "/system/api/targets/{targetId}",
+          "body": {
+            "description": "the lab box, rebuilt",
+            "minimums": {
+              "desk": 0
+            }
+          },
+          "status": 200,
+          "file": "a-declared-target/patchTarget.json",
+          "frozen": {
+            "ids": [
+              "$.id"
+            ],
+            "instants": [
+              "$.login.checkedAt",
+              "$.registeredAt",
+              "$.lastSeenAt",
+              "$.lastHealthCheckAt",
+              "$.createdAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "requestTargetHealthCheck",
+          "method": "POST",
+          "path": "/system/api/targets/{targetId}/healthcheck",
+          "status": 409,
+          "file": "a-declared-target/requestTargetHealthCheck.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "requestTargetLoginCheck",
+          "method": "POST",
+          "path": "/system/api/targets/{targetId}/login-check",
+          "status": 409,
+          "file": "a-declared-target/requestTargetLoginCheck.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a queued lease",
+      "slug": "a-queued-lease",
+      "params": {
+        "authorization": "Bearer qits_tok_contract-qits-ci",
+        "leaseId": "00000000-0000-4000-8000-000000000002"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "endLease",
+          "method": "DELETE",
+          "path": "/system/api/leases/{leaseId}",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 200,
+          "file": "a-queued-lease/endLease.json",
+          "frozen": {
+            "ids": [
+              "$.id"
+            ],
+            "instants": [
+              "$.requestedAt",
+              "$.endedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getLease",
+          "method": "GET",
+          "path": "/system/api/leases/{leaseId}",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 200,
+          "file": "a-queued-lease/getLease.json",
+          "frozen": {
+            "ids": [
+              "$.id"
+            ],
+            "instants": [
+              "$.requestedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listLeases",
+          "method": "GET",
+          "path": "/system/api/leases",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 200,
+          "file": "a-queued-lease/listLeases.json",
+          "frozen": {
+            "ids": [
+              "$[*].id"
+            ],
+            "instants": [
+              "$[*].requestedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "replaceLeaseSpec",
+          "method": "PUT",
+          "path": "/system/api/leases/{leaseId}/spec",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "body": {
+            "spec": {
+              "image": "registry.qits.wohlben.eu/qits/build-images/ci-slot:2026.1",
+              "env": {
+                "QITS_TOKEN": "qits_tok_run"
+              },
+              "user": "1001",
+              "limits": {
+                "memory": "8g"
+              }
+            }
+          },
+          "status": 200,
+          "file": "a-queued-lease/replaceLeaseSpec.json",
+          "frozen": {
+            "ids": [
+              "$.id"
+            ],
+            "instants": [
+              "$.requestedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a registered runner",
+      "slug": "a-registered-runner",
+      "params": {
+        "authorization": "Bearer qits_tok_contract-registration",
+        "runnerId": "00000000-0000-4000-8000-000000000001"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "registerTarget",
+          "method": "POST",
+          "path": "/system/api/targets/{runnerId}/register",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "body": {
+            "capabilities": {
+              "arch": "amd64",
+              "docker": true
+            }
+          },
+          "status": 409,
+          "file": "a-registered-runner/registerTarget.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a single-node swarm",
       "slug": "a-single-node-swarm",
       "params": {
@@ -192,6 +483,180 @@
             "ids": [],
             "instants": [],
             "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "an unregistered runner",
+      "slug": "an-unregistered-runner",
+      "params": {
+        "authorization": "Bearer qits_tok_contract-registration",
+        "runnerId": "00000000-0000-4000-8000-000000000001"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "registerTarget",
+          "method": "POST",
+          "path": "/system/api/targets/{runnerId}/register",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "body": {
+            "capabilities": {
+              "arch": "amd64",
+              "docker": true
+            }
+          },
+          "status": 200,
+          "file": "an-unregistered-runner/registerTarget.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "rotateTargetRegistrationToken",
+          "method": "POST",
+          "path": "/system/api/targets/{runnerId}/registration-token",
+          "status": 200,
+          "file": "an-unregistered-runner/rotateTargetRegistrationToken.json",
+          "frozen": {
+            "ids": [
+              "$.target.id"
+            ],
+            "instants": [
+              "$.target.quarantinedAt",
+              "$.target.createdAt"
+            ],
+            "strings": [
+              "$.installLine"
+            ],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "an unused work volume",
+      "slug": "an-unused-work-volume",
+      "params": {
+        "authorization": "Bearer qits_tok_contract-qits-workspaces",
+        "workKey": "ws-17"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "purgeWorkVolume",
+          "method": "DELETE",
+          "path": "/system/api/work-volumes/{workKey}",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 202,
+          "file": "an-unused-work-volume/purgeWorkVolume.json",
+          "frozen": {
+            "ids": [
+              "$.targetId"
+            ],
+            "instants": [
+              "$.purgeRequestedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "no target",
+      "slug": "no-target",
+      "params": {
+        "authorization": "Bearer qits_tok_contract-qits-ci"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "createLease",
+          "method": "POST",
+          "path": "/system/api/leases",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "body": {
+            "slotType": "CI",
+            "ownerRef": "run-1",
+            "priority": 0,
+            "spec": {
+              "image": "registry.qits.wohlben.eu/qits/build-images/ci-slot:2026.1",
+              "env": {
+                "QITS_TOKEN": "qits_tok_run"
+              },
+              "user": "1001",
+              "limits": {
+                "memory": "4g",
+                "pidsLimit": 4096
+              }
+            }
+          },
+          "status": 201,
+          "file": "no-target/createLease.json",
+          "frozen": {
+            "ids": [
+              "$.id"
+            ],
+            "instants": [
+              "$.requestedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "createTarget",
+          "method": "POST",
+          "path": "/system/api/targets",
+          "body": {
+            "name": "lab",
+            "description": "the lab box",
+            "minimums": {
+              "ci": 2,
+              "workspace": 2,
+              "desk": 1
+            }
+          },
+          "status": 201,
+          "file": "no-target/createTarget.json",
+          "frozen": {
+            "ids": [
+              "$.target.id"
+            ],
+            "instants": [
+              "$.target.quarantinedAt",
+              "$.target.createdAt"
+            ],
+            "strings": [
+              "$.installLine"
+            ],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getTargetInstallScript",
+          "method": "GET",
+          "path": "/system/api/targets/install.sh",
+          "status": 200,
+          "file": "no-target/getTargetInstallScript.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [
+              "$"
+            ],
             "listFilteredTo": null
           }
         }

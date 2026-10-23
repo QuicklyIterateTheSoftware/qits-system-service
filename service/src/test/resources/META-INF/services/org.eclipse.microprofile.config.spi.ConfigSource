@@ -1,1 +1,3 @@
 eu.wohlben.qits.system.testdocker.FakeDockerConfigSource
+eu.wohlben.qits.system.testdb.EmbeddedPgConfigSource
+eu.wohlben.qits.system.targets.IdpStub

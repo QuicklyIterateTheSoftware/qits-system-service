@@ -40,21 +40,25 @@ routes: /system
 # name, so the handshake passes.
 navigation-entries: system.System:4
 
-# NO DATABASE, AND THAT IS THE DESIGN. This service is stateless: every answer is read from the
-# docker daemon at the moment it is asked, and the only state it holds is the in-memory registry of
-# live terminals — which a restart is MEANT to drop (the client reconnects and is told the session is
-# gone). A database here would be a cache of facts that are already live, and a place for them to be
-# wrong.
+# ONE DATABASE, FOR THE TARGETS MODULE ONLY (qits-1481). The docker reads stay stateless — every
+# such answer is read from the daemon at the moment it is asked, and the in-memory terminal registry
+# is MEANT to be dropped by a restart. What is stored is the execution targets: target, lease and
+# work_volume rows (flyway db/system/migration), the one exception to this service's "reads only"
+# rule that qits-system-plan.md records. `postgresql:db` has the deployer provision this
+# application's database and inject QITS_RESOURCE_DB_URL/_USERNAME/_PASSWORD; `postgresql:eventstream`
+# is the qits-eventstream outbox's own (TargetLeaseChanged, TargetLoginChanged), injected as
+# QITS_RESOURCE_EVENTSTREAM_*, named as every other service names its outbox. Both are new claims:
+# the renamed_from above moves no postgres claim, because qits-platform-system never had one.
 #
 # idp:client ASKS QITS-DEPLOYMENTS TO PROVISION THIS APPLICATION'S OWN QITS-IDP SERVICE CLIENT — id
-# `dev-qits-system` (derived from env + application), roles fixed in qits-idp code. It is NEW: the
-# live `qits-platform-system` client the bootstrap wrote into /work/config is left unclaimed here,
-# for qits-878 to collect. The deployer injects QITS_RESOURCE_IDP_URL, QITS_RESOURCE_IDP_CLIENT_ID
-# and QITS_RESOURCE_IDP_CLIENT_SECRET; at boot the service writes its own docker config.json from the
-# id and secret (the glances pull through the mirror), and points docker at it only once it exists.
+# `dev-qits-system` (derived from env + application), roles fixed in qits-idp code. The deployer
+# injects QITS_RESOURCE_IDP_URL, QITS_RESOURCE_IDP_CLIENT_ID and QITS_RESOURCE_IDP_CLIENT_SECRET; at
+# boot the service writes its own docker config.json from the id and secret (the glances pull through
+# the mirror), and the targets module commissions its runners' credentials with the same pair
+# (kinds target-runner and target-runner-registration).
 #
-# Ticket qits-879.
-resources: idp:client
+# Tickets qits-879, qits-1526.
+resources: postgresql:db, postgresql:eventstream:qits_system_eventstream, idp:client
 #
 # WHAT IT DOES NEED IS NOT DECLARED HERE EITHER, because it is not a resource this deployer
 # provisions: the host's docker socket. This is the third socket holder on the platform, after

@@ -1,0 +1,68 @@
+package eu.wohlben.qits.system.targets.control;
+
+import eu.wohlben.qits.system.error.SystemException;
+
+/**
+ * Every refusal of the targets doors: a status, and the code a client branches on where there is
+ * one. It travels through the service's one {@code SystemExceptionMapper}, so it answers {@code
+ * {"code": …, "message": …}} like every other refusal here.
+ */
+public class TargetRefusal extends SystemException {
+
+  private static final long serialVersionUID = 1L;
+
+  public static final String MINIMUMS_EXCEED_TOTAL = "MINIMUMS_EXCEED_TOTAL";
+  public static final String TARGET_BUSY = "TARGET_BUSY";
+  public static final String TARGET_UNAVAILABLE = "TARGET_UNAVAILABLE";
+  public static final String LEASE_EXISTS = "LEASE_EXISTS";
+  public static final String SLOT_TYPE_NOT_YOURS = "SLOT_TYPE_NOT_YOURS";
+  public static final String NOT_A_TENANT = "NOT_A_TENANT";
+  public static final String NOT_YOUR_LEASE = "NOT_YOUR_LEASE";
+  public static final String IMAGE_NOT_ALLOWED = "IMAGE_NOT_ALLOWED";
+  public static final String ENV_KEY_NOT_ALLOWED = "ENV_KEY_NOT_ALLOWED";
+  public static final String WORK_VOLUME_IN_USE = "WORK_VOLUME_IN_USE";
+  public static final String TARGET_NAME_TAKEN = "TARGET_NAME_TAKEN";
+  public static final String ALREADY_REGISTERED = "ALREADY_REGISTERED";
+  public static final String RUNNER_PLANE_UNCONFIGURED = "RUNNER_PLANE_UNCONFIGURED";
+  public static final String COMMISSIONING_OFF = "COMMISSIONING_OFF";
+  public static final String IDP_REFUSED = "IDP_REFUSED";
+
+  private final int status;
+  private final String code;
+
+  public TargetRefusal(int status, String code, String message) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+
+  public static TargetRefusal badRequest(String message) {
+    return new TargetRefusal(400, null, message);
+  }
+
+  public static TargetRefusal badRequest(String code, String message) {
+    return new TargetRefusal(400, code, message);
+  }
+
+  public static TargetRefusal notFound(String message) {
+    return new TargetRefusal(404, null, message);
+  }
+
+  public static TargetRefusal forbidden(String code, String message) {
+    return new TargetRefusal(403, code, message);
+  }
+
+  public static TargetRefusal conflict(String code, String message) {
+    return new TargetRefusal(409, code, message);
+  }
+
+  @Override
+  public int status() {
+    return status;
+  }
+
+  @Override
+  public String code() {
+    return code;
+  }
+}

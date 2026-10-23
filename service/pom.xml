@@ -46,6 +46,12 @@
             <artifactId>qits-platform-system-domain</artifactId>
         </dependency>
         <dependency>
+            <!-- The execution targets (qits-1481): their doors, their runner socket, their store.
+                 Jandex-indexed, so every bean, resource and endpoint in it is discovered here. -->
+            <groupId>${project.groupId}</groupId>
+            <artifactId>qits-platform-system-targets</artifactId>
+        </dependency>
+        <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-arc</artifactId>
         </dependency>
@@ -162,12 +168,36 @@
             <artifactId>qits-idp-golden-masters</artifactId>
             <scope>test</scope>
         </dependency>
-        <!-- NO ZONKY, HERE OR IN system/. This repository has no datasource at all — there is no
-             store, no Flyway and no qits-db-core, because every answer is read from the docker
-             daemon at the moment it is asked (the root pom says so at length). So the fourth
-             `-alpine` embedded-postgres architecture the userflow pipelines of qits-githost and
-             qits-platform-deployments carry has nothing to be for: no module here starts a
-             postgres, on Alpine or anywhere else. -->
+        <!-- ZONKY, FOR THE TARGETS MODULE'S STORE (qits-1481). Every @QuarkusTest here boots the
+             `system` and `eventstream` datasources, so the suite hands both a real postgres —
+             zonky spawns its binaries as a child process, no docker — through
+             wiring/testdb/EmbeddedPgConfigSource. All four architectures, the `-alpine` one
+             included, because the userflow pipelines run on Alpine. -->
+        <dependency>
+            <groupId>io.zonky.test</groupId>
+            <artifactId>embedded-postgres</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.zonky.test.postgres</groupId>
+            <artifactId>embedded-postgres-binaries-linux-amd64</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.zonky.test.postgres</groupId>
+            <artifactId>embedded-postgres-binaries-linux-arm64v8</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.zonky.test.postgres</groupId>
+            <artifactId>embedded-postgres-binaries-linux-amd64-alpine</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.zonky.test.postgres</groupId>
+            <artifactId>embedded-postgres-binaries-darwin-arm64v8</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>

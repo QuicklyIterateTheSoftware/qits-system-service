@@ -1,0 +1,32 @@
+{
+  "at": "2026-01-01T00:00:00Z",
+  "ok": true,
+  "checks": [
+    {
+      "ok": true,
+      "data": {},
+      "name": "docker",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "data": {
+        "kimi": "ABSENT",
+        "claude": "PRESENT"
+      },
+      "name": "login",
+      "detail": null
+    },
+    {
+      "ok": true,
+      "data": {
+        "total": 6,
+        "minimums": 5
+      },
+      "name": "slots",
+      "detail": null
+    }
+  ],
+  "detail": "",
+  "requestId": null
+}

@@ -14,7 +14,8 @@
          pseudo-terminal subsystem. A plain library jar — no JAX-RS, no WebSocket type — with the
          REST boundary and the sockets left to `service`, the same split every qits context carries.
 
-         IT OWNS NO STORE. There is no datasource, no persistence unit and no Flyway lineage here,
+         IT OWNS NO STORE (the targets module owns the one store this service has). There is no
+         datasource, no persistence unit and no Flyway lineage here,
          because there is nothing to persist: an answer is read from the daemon when it is asked,
          and a terminal is a live process that a restart is meant to end.
 

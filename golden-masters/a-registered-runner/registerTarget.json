@@ -1,0 +1,4 @@
+{
+  "code": "ALREADY_REGISTERED",
+  "message": "Target lab is registered already; delete and declare it again"
+}

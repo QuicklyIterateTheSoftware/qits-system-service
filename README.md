@@ -18,13 +18,16 @@ so the client's same-origin calls and its terminal socket dial are unchanged by 
 | a live view of the host | a `glances` container on a pseudo-terminal this service owns |
 | a shell in a container | `docker exec -it <id> <shell>` on the same kind of terminal |
 
-Every answer is read from the docker daemon at the moment it is asked. There is no store, no cache
-and no schema: a restart loses nothing except the live terminals, which it is meant to lose.
+Every answer about the host is read from the docker daemon at the moment it is asked: no cache and
+no schema for those, and a restart loses nothing of them except the live terminals, which it is
+meant to lose. The one store is the execution targets' (below).
 
 ## What it does NOT do
 
-- **No writes.** No scale, no restart, no rm, no config or secret create. The whole surface is read
-  plus a shell.
+- **No writes — except the `targets` module's.** No scale, no restart, no rm, no config or secret
+  create: the docker surface is read plus a shell. The one exception, recorded in the wrapper's
+  `qits-system-plan.md` ("Execution targets (qits-1481)"), is the targets module's own rows and the
+  control it sends its runners (see "Execution targets").
 - **No secret values.** Swarm does not return them to anybody, including a manager. Config data IS
   shown, decoded — that is what a config is for.
 - **No environment values.** A service's and a container's environment is shown as KEYS only. That
@@ -65,6 +68,7 @@ should refuse to come up.
 ## Modules
 
     system/    the domain: docker argv builders, the process runner, the parsers, the PTY subsystem
+    targets/   the execution targets (qits-1481): their store, doors, allocator and runner socket
     service/   the deployable: JAX-RS routes, the terminal WebSocket, the boot sweep, Quinoa
 
 `system/` is a library jar with no JAX-RS in it. `service/` is `<packaging>quarkus</packaging>` and
@@ -130,6 +134,41 @@ the host's shape is something a machine may do; holding a shell on the platform 
 `qits:admin-agent` — an ADMIN workspace's own commissioned agent — is admitted everywhere
 `qits:admin` is, including the socket (qits-628 follow-up).
 
+## Execution targets
+
+The machines a `qits-system-runner` (components/qits-system/qits-system-runner-daemon) holds a docker
+socket on, each with a number of typed slots — CI, WORKSPACE, DESK — that qits-ci, qits-workspaces and
+qits-projects lease. This service decides which lease runs where (`SlotAllocator`) and pushes each
+runner its whole desired `estate`; the runner answers with an `inventory`.
+
+    POST   /system/api/targets                       declare one; answers its install line, once
+    GET    /system/api/targets[/{id}[/health]]       slots, minimums, used, login, connected, ...
+    PATCH  /system/api/targets/{id}                  description, minimums (409 MINIMUMS_EXCEED_TOTAL)
+    DELETE /system/api/targets/{id}                  409 TARGET_BUSY while a lease is live; else Retire
+    POST   /system/api/targets/{id}/registration-token | greenlight | healthcheck | login-check
+    GET    /system/api/targets/install.sh            the toolkit's InstallScript
+    POST   /system/api/targets/{id}/register         operationId registerTarget; the runner's client
+    POST   /system/api/leases                        operationId createLease; 201 QUEUED
+    GET    /system/api/leases[/{id}]                 listLeases / getLease; a service sees its own
+    PUT    /system/api/leases/{id}/spec              replaceLeaseSpec: a roll
+    DELETE /system/api/leases/{id}                   endLease: ENDING, then ENDED
+    DELETE /system/api/work-volumes/{workKey}        purgeWorkVolume
+    WS     /system/targets/socket                    qits:target-runner; sub is target.client_id
+
+- **The owner of a lease is the caller**: its bearer's client id without `<environment>-`, checked
+  against `qits.system.targets.tenants.<app>=<TYPE>` (qits-ci CI, qits-workspaces WORKSPACE,
+  qits-projects DESK). Anyone else is 403; another type is 403 `SLOT_TYPE_NOT_YOURS`.
+- **A slot runs only its type's images** (`qits.system.targets.slot-images.<type>`, 400
+  `IMAGE_NOT_ALLOWED`), never as root, and never with a policy-owned env key (`HOME`,
+  `CLAUDE_CONFIG_DIR`, `BUILDKIT_HOST`; 400 `ENV_KEY_NOT_ALLOWED`).
+- **A WORKSPACE or DESK lease waits on a target nobody signed in** — `detail` names the command:
+  `qits targets sign-in --target <name>`. `loginCommand`/`kimiLoginCommand` are rendered from the
+  volume the runner reported, once its `loginState` arrived on the current connection.
+- **Events**: `TargetLeaseChanged` on every state change, `TargetLoginChanged` on every sign-in
+  change. Owners also reconcile from `GET /leases`.
+- **Store**: postgres (`resources: postgresql:db, postgresql:eventstream:…` in deployments.yml),
+  flyway `db/system/migration`, named persistence unit `system`.
+
 ## Config
 
 All under `qits.system.*`, defaulted in the domain jar at ordinal 100 and overridable per
@@ -145,6 +184,13 @@ deployment as `QITS_SYSTEM_*`. The defaults and the reasoning are in
     terminals.max-sessions=8
     terminals.scrollback-bytes=262144     terminals.write-timeout=PT5S
     terminals.owner=${quarkus.application.name}
+
+The targets module's keys are `qits.system.targets.*`, defaulted in
+`targets/src/main/resources/META-INF/microprofile-config.properties`: `tenants.<app>`,
+`slot-images.{ci,workspace,desk}`, `probe-image`, `registry-mirrors.{registry-hosts,mirror-hosts,
+upstreams}`, `runner-version-override`, `reconnect-grace=PT2M`, `commission-reconcile-interval=1h`,
+`public-url` (wss base), `estate-interval=PT1M`, `healthcheck.schedule`, `healthcheck.timeout=PT5M`,
+`idp.{url,client-id,client-secret}`.
 
 ## Building
 

@@ -1,0 +1,30 @@
+{
+  "id": "00000000-0000-4000-8000-000000000002",
+  "slotType": "CI",
+  "ownerApp": "qits-ci",
+  "ownerRef": "run-1",
+  "projectId": null,
+  "workKey": null,
+  "pinTargetId": null,
+  "targetId": null,
+  "priority": 0,
+  "state": "QUEUED",
+  "spec": {
+    "env": {
+      "QITS_TOKEN": "qits_tok_run"
+    },
+    "image": "registry.qits.wohlben.eu/qits/build-images/ci-slot:2026.1",
+    "limits": {
+      "memory": "8g"
+    },
+    "user": "1001"
+  },
+  "specHash": "6b79c02e9a7f899e57c360fc5f390f1796e1eda2fa533c722d820f0b7173401f",
+  "adopt": null,
+  "exitCode": null,
+  "detail": "no target has a free CI slot",
+  "requestedAt": "2026-01-01T00:00:00Z",
+  "grantedAt": null,
+  "startedAt": null,
+  "endedAt": null
+}

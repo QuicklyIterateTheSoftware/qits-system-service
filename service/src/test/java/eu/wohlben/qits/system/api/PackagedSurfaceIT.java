@@ -4,6 +4,7 @@ import static io.restassured.RestAssured.given;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
+import eu.wohlben.qits.system.testdb.EmbeddedPg;
 import eu.wohlben.qits.system.testdocker.FakeDocker;
 import eu.wohlben.qits.system.testdocker.TerminalClient;
 import io.quarkus.test.common.http.TestHTTPResource;
@@ -81,11 +82,24 @@ public class PackagedSurfaceIT {
 
     @Override
     public Map<String, String> getConfigOverrides() {
-      return Map.of(
-          "qits.system.docker.binary", FakeDocker.binaryPath(),
-          // The boot sweep would run its three calls against the fake on every launch; the sweep
-          // has its own coverage and this IT is about the surface.
-          "qits.system.glances.pull-at-startup", "false");
+      Map<String, String> overrides = new java.util.LinkedHashMap<>();
+      overrides.put("qits.system.docker.binary", FakeDocker.binaryPath());
+      // The boot sweep would run its three calls against the fake on every launch; the sweep
+      // has its own coverage and this IT is about the surface.
+      overrides.put("qits.system.glances.pull-at-startup", "false");
+      // THE TARGETS MODULE'S TWO DATABASES (qits-1481), as the deployer injects them: the packaged
+      // artifact opens both and runs Flyway at boot, so it gets the suite's embedded postgres.
+      overrides.put("QITS_RESOURCE_DB_URL", EmbeddedPg.url("qits_system_packaged_it"));
+      overrides.put("QITS_RESOURCE_DB_USERNAME", EmbeddedPg.USER);
+      overrides.put("QITS_RESOURCE_DB_PASSWORD", EmbeddedPg.PASSWORD);
+      overrides.put("QITS_RESOURCE_EVENTSTREAM_URL", EmbeddedPg.url("qits_system_eventstream_packaged_it"));
+      overrides.put("QITS_RESOURCE_EVENTSTREAM_USERNAME", EmbeddedPg.USER);
+      overrides.put("QITS_RESOURCE_EVENTSTREAM_PASSWORD", EmbeddedPg.PASSWORD);
+      // No qits-events to publish to: the outbox stays dark, so no story draws a dial to it.
+      overrides.put("qits.eventstream.enabled", "false");
+      overrides.put("quarkus.flyway.system.clean-at-start", "true");
+      overrides.put("quarkus.flyway.system.clean-disabled", "false");
+      return Map.copyOf(overrides);
     }
   }
 

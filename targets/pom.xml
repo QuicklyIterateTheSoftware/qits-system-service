@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>eu.wohlben.qits</groupId>
+        <artifactId>qits-platform-system</artifactId>
+        <version>2026.1023.1011</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <!-- EXECUTION TARGETS (epic qits-1481): the machines a qits-system-runner holds a docker socket
+         on, the typed slots they offer (CI, WORKSPACE, DESK), the leases qits-ci, qits-workspaces
+         and qits-projects take on those slots, and the work volumes a lease keeps between runs.
+
+         THE ONE MODULE THAT WRITES. qits-system-plan.md amends this service's "reads only" rule for
+         this module and nothing else: target, lease and work_volume rows in this service's own
+         postgres (flyway `db/system/migration`), plus the runner control it sends over its own
+         socket. The docker reads in `system/` are untouched by it and stay read-only.
+
+         It is a library jar with its doors, its socket and its schedules in it, jandex-indexed so
+         `service` discovers every bean, resource and endpoint without an index-dependency entry.
+         The allocation rule (`control/SlotAllocator`) is pure and table-tested here; everything that
+         needs a database is tested in `service`, on the embedded postgres. -->
+    <artifactId>qits-platform-system-targets</artifactId>
+    <name>qits-platform-system :: targets</name>
+
+    <dependencies>
+        <dependency>
+            <!-- The error hierarchy the service's one exception mapper answers. -->
+            <groupId>${project.groupId}</groupId>
+            <artifactId>qits-platform-system-domain</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-arc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-hibernate-orm-panache</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-jdbc-postgresql</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-flyway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
+        <dependency>
+            <!-- PatientPgDriver: a datasource that waits out a postgres restart instead of failing
+                 the boot. -->
+            <groupId>${project.groupId}</groupId>
+            <artifactId>qits-db-core</artifactId>
+        </dependency>
+        <dependency>
+            <!-- TargetLeaseChanged and TargetLoginChanged, through the outbox; and CausationStamp
+                 for the rows' causation_id. Its own datasource (`eventstream`) comes with the jar. -->
+            <groupId>${project.groupId}</groupId>
+            <artifactId>qits-eventstream</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-rest-jackson</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-websockets-next</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-scheduler</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-smallrye-openapi</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-oidc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>qits-auth-core</artifactId>
+        </dependency>
+        <dependency>
+            <!-- QitsHttpClients.wrap for the one HttpClient here, the commissioner's. -->
+            <groupId>${project.groupId}</groupId>
+            <artifactId>qits-http-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>qits-runner-protocol</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>qits-system-runner-protocol</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>qits-runner-toolkit</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <artifactId>maven-compiler-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <artifactId>maven-surefire-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>io.smallrye</groupId>
+                <artifactId>jandex-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

@@ -1,0 +1,7 @@
+{
+  "clientId": "target-runner-client-1",
+  "secret": "target-runner-s3cr3t-1",
+  "tokenUrl": "https://idp.qits.wohlben.eu/idp/token",
+  "audience": "qits-platform",
+  "socketUrl": "wss://system.qits.wohlben.eu/system/targets/socket"
+}

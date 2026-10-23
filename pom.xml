@@ -17,10 +17,13 @@
          create — the surface is read plus a shell. It also reaches exactly ONE node, the one it
          runs on; a node-scoped read for another node is a 409, not a guess.
 
-         STATELESS, AND THAT IS THE SHAPE. There is no postgres, no Flyway, no zonky embedded
-         server and no qits-db-core here, because there is nothing to store: every answer is read
-         from the daemon at the moment it is asked, and the only state is the in-memory registry of
-         live terminals, which a restart is meant to drop.
+         THE DOCKER READS ARE STATELESS, AND THE TARGETS ARE NOT. Everything `system/` answers is
+         read from the daemon at the moment it is asked, and the only state there is the in-memory
+         registry of live terminals, which a restart is meant to drop. The `targets/` module
+         (qits-1481) is the one exception, recorded in qits-system-plan.md: execution targets,
+         their slot leases and their work volumes live in this service's own postgres (flyway
+         `db/system/migration`, tests on zonky's embedded server), and it is the only module that
+         writes anything.
 
          DELIBERATELY ITS OWN GAV, the qits-platform-maintenance case: the child directories are
          `system` and `service`, and `eu.wohlben:service` would collide in the shared ~/.m2 every
@@ -44,8 +47,11 @@
     <name>qits-platform-system</name>
 
     <modules>
-        <!-- Listed first: `service` depends on it. -->
+        <!-- Listed first: `targets` and `service` depend on it. -->
         <module>system</module>
+        <!-- The execution targets (qits-1481): this service's first store, its first writes and the
+             socket a qits-system-runner holds. See targets/pom.xml and qits-system-plan.md. -->
+        <module>targets</module>
         <module>service</module>
     </modules>
 
@@ -55,7 +61,7 @@
              platform's shared test rules), and — test scope, service/ only — qits-userflows and
              qits-service-mock, the story framework and the recording mocks its far side is. All
              four come from qits-integrations-quarkus except qits-userflows, which publishes itself.
-             There is no qits-db-core here — this service has no datasource to open. The url is a
+             qits-db-core, qits-eventstream and the runner jars are the targets module's, below. The url is a
              property so the image build can point it at the address the builder container can
              actually reach — see docker/Dockerfile and .qits-maven-settings.xml. -->
         <qits.auth-core.version>2026.1012.173247</qits.auth-core.version>
@@ -90,6 +96,20 @@
              nowhere else, and only a server that serves a real JWKS for a real keypair exercises
              it. -->
         <qits.service-mock.version>2026.1002.70617</qits.service-mock.version>
+        <!-- The targets module (qits-1481): its store, its outbox and the runner wire.
+             qits-runner-protocol is the lifecycle frames and RunnerCodec; qits-runner-toolkit is
+             linked for its pure-java install package only (RunnerIdentity, InstallScript), both
+             with a *:* exclusion so neither Vert.x nor a containers driver reaches this service.
+             One version for both: they are released together from qits-runner-javalib. -->
+        <qits.eventstream.version>2026.1019.123026</qits.eventstream.version>
+        <qits.db-core.version>2026.1002.70617</qits.db-core.version>
+        <qits.runner.version>2026.1023.80958</qits.runner.version>
+        <!-- The qits-system-runner's own frames (qits-1481): SystemRunnerProtocol, SystemRunnerCodec
+             and SystemRunnerBinary, whose VERSION is the runner image every target is pinned to.
+             Published by qits-system-runner-daemon. -->
+        <qits.system-runner-protocol.version>2026.1023.84005</qits.system-runner-protocol.version>
+        <zonky.embedded-postgres.version>2.2.2</zonky.embedded-postgres.version>
+        <zonky.postgres-binaries.version>18.6.0</zonky.postgres-binaries.version>
         <qits.maven.repository.url>https://registry.qits.wohlben.eu/artifacts/maven/maven</qits.maven.repository.url>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -152,11 +172,72 @@
                 <artifactId>mapstruct</artifactId>
                 <version>${mapstruct.version}</version>
             </dependency>
-            <!-- The reactor's own module, so `service` depends on it version-less. -->
+            <!-- The reactor's own modules, so `targets` and `service` depend on them version-less. -->
             <dependency>
                 <groupId>${project.groupId}</groupId>
                 <artifactId>qits-platform-system-domain</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>qits-platform-system-targets</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.zonky.test.postgres</groupId>
+                <artifactId>embedded-postgres-binaries-bom</artifactId>
+                <version>${zonky.postgres-binaries.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>io.zonky.test</groupId>
+                <artifactId>embedded-postgres</artifactId>
+                <version>${zonky.embedded-postgres.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>qits-eventstream</artifactId>
+                <version>${qits.eventstream.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>qits-db-core</artifactId>
+                <version>${qits.db-core.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>qits-runner-protocol</artifactId>
+                <version>${qits.runner.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>*</groupId>
+                        <artifactId>*</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>qits-system-runner-protocol</artifactId>
+                <version>${qits.system-runner-protocol.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>*</groupId>
+                        <artifactId>*</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>qits-runner-toolkit</artifactId>
+                <version>${qits.runner.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>*</groupId>
+                        <artifactId>*</artifactId>
+                    </exclusion>
+                </exclusions>
             </dependency>
             <dependency>
                 <!-- Published by qits-integrations-quarkus into the platform Maven repository. The
