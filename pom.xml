@@ -107,7 +107,7 @@
         <!-- The qits-system-runner's own frames (qits-1481): SystemRunnerProtocol, SystemRunnerCodec
              and SystemRunnerBinary, whose VERSION is the runner image every target is pinned to.
              Published by qits-system-runner-daemon. -->
-        <qits.system-runner-protocol.version>2026.1023.84005</qits.system-runner-protocol.version>
+        <qits.system-runner-protocol.version>2026.1023.93949</qits.system-runner-protocol.version>
         <zonky.embedded-postgres.version>2.2.2</zonky.embedded-postgres.version>
         <zonky.postgres-binaries.version>18.6.0</zonky.postgres-binaries.version>
         <qits.maven.repository.url>https://registry.qits.wohlben.eu/artifacts/maven/maven</qits.maven.repository.url>
