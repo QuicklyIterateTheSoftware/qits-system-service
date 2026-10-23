@@ -14,6 +14,7 @@ import io.quarkus.scheduler.Scheduled;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -132,7 +133,13 @@ public class TargetAllocation {
   record Outcome(List<Decision> decisions, List<Lease> changed, Set<UUID> granted) {}
 
   private Outcome decideAndWrite() {
-    List<Lease> queue = Lease.<Lease>find("state", LeaseState.QUEUED).list();
+    // FOR UPDATE, in id order: an owner's end or an inventory of the same lease waits for this pass
+    // (or this pass for it, and a lease it ended is then no longer QUEUED and skipped), so a grant
+    // can never overwrite an ENDED, nor an ENDED be lost under a grant. See Leases.
+    List<Lease> queue =
+        Lease.<Lease>find("state = ?1 order by id", LeaseState.QUEUED)
+            .withLock(LockModeType.PESSIMISTIC_WRITE)
+            .list();
     if (queue.isEmpty()) {
       return new Outcome(List.of(), List.of(), Set.of());
     }

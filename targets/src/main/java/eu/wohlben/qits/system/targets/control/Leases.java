@@ -9,6 +9,7 @@ import eu.wohlben.qits.system.targets.entity.SlotType;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -26,6 +27,14 @@ import org.jboss.logging.Logger;
  * method is its own {@code requiringNew} transaction; every state change is announced ({@link
  * TargetEvents#leaseChanged}) after it committed, and every change that can move a grant asks
  * {@link TargetAllocation} for a pass.
+ *
+ * <p><b>One writer at a time per lease row.</b> Every transaction here that changes a lease reads
+ * it {@code SELECT … FOR UPDATE} first — an owner's end or roll by id, a runner's inventory every
+ * lease of its target in id order — and {@link TargetAllocation} locks the queue the same way, so two
+ * writers never both read a row and the later commit silently undo the earlier's transition: the
+ * second waits, then decides on what the first wrote (the rows carry no version column, so without
+ * the lock the last writer would win). A row a concurrent writer moved out of the query's states is
+ * skipped once the lock is granted, which is postgres' read-committed re-check.
  *
  * <p><b>The owner is the caller's application</b>, resolved by {@link OwnerIdentity} before any of
  * this is reached; a lease of another owner is 403 {@link TargetRefusal#NOT_YOUR_LEASE} to every
@@ -177,7 +186,7 @@ public class Leases {
         QuarkusTransaction.requiringNew()
             .call(
                 () -> {
-                  Lease lease = Lease.findById(id);
+                  Lease lease = Lease.findById(id, LockModeType.PESSIMISTIC_WRITE);
                   if (lease == null) {
                     throw TargetRefusal.notFound("No lease " + id);
                   }
@@ -206,7 +215,7 @@ public class Leases {
         QuarkusTransaction.requiringNew()
             .call(
                 () -> {
-                  Lease lease = Lease.findById(id);
+                  Lease lease = Lease.findById(id, LockModeType.PESSIMISTIC_WRITE);
                   if (lease == null) {
                     throw TargetRefusal.notFound("No lease " + id);
                   }
@@ -274,12 +283,13 @@ public class Leases {
                   List<Lease> moved = new ArrayList<>();
                   List<Lease> mine =
                       Lease.<Lease>find(
-                              "targetId = ?1 and state in ?2",
+                              "targetId = ?1 and state in ?2 order by id",
                               targetId,
                               Set.of(
                                   LeaseState.GRANTED,
                                   LeaseState.RUNNING,
                                   LeaseState.ENDING))
+                          .withLock(LockModeType.PESSIMISTIC_WRITE)
                           .list();
                   Instant now = Instant.now();
                   for (Lease lease : mine) {
