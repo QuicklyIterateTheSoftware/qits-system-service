@@ -1,0 +1,30 @@
+{
+  "id": "00000000-0000-4000-8000-000000000002",
+  "slotType": "WORKSPACE",
+  "ownerApp": "qits-workspaces",
+  "ownerRef": "17",
+  "projectId": null,
+  "workKey": "ws-17",
+  "pinTargetId": null,
+  "targetId": null,
+  "priority": 0,
+  "state": "QUEUED",
+  "spec": {
+    "env": {
+      "QITS_TOKEN": "qits_tok_lease"
+    },
+    "image": "registry.qits.wohlben.eu/qits/workspace:2026.1",
+    "limits": {
+      "memory": "8g"
+    },
+    "user": "1000"
+  },
+  "specHash": "c3a910c7b2057a1fb1d589874b7d32d9a2f93d8231dfb756aa643659891d146e",
+  "adopt": null,
+  "exitCode": null,
+  "detail": "target lab is not signed in: qits targets sign-in --target lab",
+  "requestedAt": "2026-01-01T00:00:00Z",
+  "grantedAt": null,
+  "startedAt": null,
+  "endedAt": null
+}

@@ -157,6 +157,163 @@
       ]
     },
     {
+      "name": "a queued desk lease",
+      "slug": "a-queued-desk-lease",
+      "params": {
+        "authorization": "Bearer qits_tok_contract-qits-projects",
+        "leaseId": "00000000-0000-4000-8000-000000000002",
+        "ownerRef": "00000000-0000-4000-8000-000000000003",
+        "workKey": "desk-00000000-0000-4000-8000-000000000003"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "createLease",
+          "method": "POST",
+          "path": "/system/api/leases",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "body": {
+            "slotType": "DESK",
+            "ownerRef": "00000000-0000-4000-8000-000000000004",
+            "workKey": "desk-00000000-0000-4000-8000-000000000004",
+            "priority": 0,
+            "spec": {
+              "image": "registry.qits.wohlben.eu/qits/project-agent:2026.1",
+              "env": {
+                "QITS_TOKEN": "qits_tok_lease"
+              },
+              "user": "1000",
+              "limits": {
+                "memory": "8g"
+              }
+            }
+          },
+          "status": 201,
+          "file": "a-queued-desk-lease/createLease.json",
+          "frozen": {
+            "ids": [
+              "$.id",
+              "$.ownerRef"
+            ],
+            "instants": [
+              "$.requestedAt"
+            ],
+            "strings": [
+              "$.workKey"
+            ],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "endLease",
+          "method": "DELETE",
+          "path": "/system/api/leases/{leaseId}",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 200,
+          "file": "a-queued-desk-lease/endLease.json",
+          "frozen": {
+            "ids": [
+              "$.id",
+              "$.ownerRef"
+            ],
+            "instants": [
+              "$.requestedAt",
+              "$.endedAt"
+            ],
+            "strings": [
+              "$.workKey"
+            ],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getLease",
+          "method": "GET",
+          "path": "/system/api/leases/{leaseId}",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 200,
+          "file": "a-queued-desk-lease/getLease.json",
+          "frozen": {
+            "ids": [
+              "$.id",
+              "$.ownerRef"
+            ],
+            "instants": [
+              "$.requestedAt"
+            ],
+            "strings": [
+              "$.workKey"
+            ],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listLeases",
+          "method": "GET",
+          "path": "/system/api/leases",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 200,
+          "file": "a-queued-desk-lease/listLeases.json",
+          "frozen": {
+            "ids": [
+              "$[*].id",
+              "$[*].ownerRef"
+            ],
+            "instants": [
+              "$[*].requestedAt"
+            ],
+            "strings": [
+              "$[*].workKey"
+            ],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "replaceLeaseSpec",
+          "method": "PUT",
+          "path": "/system/api/leases/{leaseId}/spec",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "body": {
+            "spec": {
+              "image": "registry.qits.wohlben.eu/qits/project-agent:2026.1",
+              "env": {
+                "QITS_TOKEN": "qits_tok_lease"
+              },
+              "user": "1000",
+              "limits": {
+                "memory": "8g"
+              }
+            }
+          },
+          "status": 200,
+          "file": "a-queued-desk-lease/replaceLeaseSpec.json",
+          "frozen": {
+            "ids": [
+              "$.id",
+              "$.ownerRef"
+            ],
+            "instants": [
+              "$.requestedAt"
+            ],
+            "strings": [
+              "$.workKey"
+            ],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a queued lease",
       "slug": "a-queued-lease",
       "params": {
@@ -261,6 +418,148 @@
       ]
     },
     {
+      "name": "a queued workspace lease",
+      "slug": "a-queued-workspace-lease",
+      "params": {
+        "authorization": "Bearer qits_tok_contract-qits-workspaces",
+        "leaseId": "00000000-0000-4000-8000-000000000002",
+        "ownerRef": "17",
+        "workKey": "ws-17"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "createLease",
+          "method": "POST",
+          "path": "/system/api/leases",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "body": {
+            "slotType": "WORKSPACE",
+            "ownerRef": "18",
+            "workKey": "ws-18",
+            "priority": 0,
+            "spec": {
+              "image": "registry.qits.wohlben.eu/qits/workspace:2026.1",
+              "env": {
+                "QITS_TOKEN": "qits_tok_lease"
+              },
+              "user": "1000",
+              "limits": {
+                "memory": "8g"
+              }
+            }
+          },
+          "status": 201,
+          "file": "a-queued-workspace-lease/createLease.json",
+          "frozen": {
+            "ids": [
+              "$.id"
+            ],
+            "instants": [
+              "$.requestedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "endLease",
+          "method": "DELETE",
+          "path": "/system/api/leases/{leaseId}",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 200,
+          "file": "a-queued-workspace-lease/endLease.json",
+          "frozen": {
+            "ids": [
+              "$.id"
+            ],
+            "instants": [
+              "$.requestedAt",
+              "$.endedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getLease",
+          "method": "GET",
+          "path": "/system/api/leases/{leaseId}",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 200,
+          "file": "a-queued-workspace-lease/getLease.json",
+          "frozen": {
+            "ids": [
+              "$.id"
+            ],
+            "instants": [
+              "$.requestedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listLeases",
+          "method": "GET",
+          "path": "/system/api/leases",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 200,
+          "file": "a-queued-workspace-lease/listLeases.json",
+          "frozen": {
+            "ids": [
+              "$[*].id"
+            ],
+            "instants": [
+              "$[*].requestedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "replaceLeaseSpec",
+          "method": "PUT",
+          "path": "/system/api/leases/{leaseId}/spec",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "body": {
+            "spec": {
+              "image": "registry.qits.wohlben.eu/qits/workspace:2026.1",
+              "env": {
+                "QITS_TOKEN": "qits_tok_lease"
+              },
+              "user": "1000",
+              "limits": {
+                "memory": "8g"
+              }
+            }
+          },
+          "status": 200,
+          "file": "a-queued-workspace-lease/replaceLeaseSpec.json",
+          "frozen": {
+            "ids": [
+              "$.id"
+            ],
+            "instants": [
+              "$.requestedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a registered runner",
       "slug": "a-registered-runner",
       "params": {
@@ -287,6 +586,254 @@
           "frozen": {
             "ids": [],
             "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a running desk lease",
+      "slug": "a-running-desk-lease",
+      "params": {
+        "authorization": "Bearer qits_tok_contract-qits-projects",
+        "leaseId": "00000000-0000-4000-8000-000000000002",
+        "ownerRef": "00000000-0000-4000-8000-000000000003",
+        "targetId": "00000000-0000-4000-8000-000000000001",
+        "workKey": "desk-00000000-0000-4000-8000-000000000003"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "endLease",
+          "method": "DELETE",
+          "path": "/system/api/leases/{leaseId}",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 200,
+          "file": "a-running-desk-lease/endLease.json",
+          "frozen": {
+            "ids": [
+              "$.id",
+              "$.ownerRef",
+              "$.targetId"
+            ],
+            "instants": [
+              "$.requestedAt",
+              "$.grantedAt",
+              "$.startedAt"
+            ],
+            "strings": [
+              "$.workKey"
+            ],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getLease",
+          "method": "GET",
+          "path": "/system/api/leases/{leaseId}",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 200,
+          "file": "a-running-desk-lease/getLease.json",
+          "frozen": {
+            "ids": [
+              "$.id",
+              "$.ownerRef",
+              "$.targetId"
+            ],
+            "instants": [
+              "$.requestedAt",
+              "$.grantedAt",
+              "$.startedAt"
+            ],
+            "strings": [
+              "$.workKey"
+            ],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listLeases",
+          "method": "GET",
+          "path": "/system/api/leases",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 200,
+          "file": "a-running-desk-lease/listLeases.json",
+          "frozen": {
+            "ids": [
+              "$[*].id",
+              "$[*].ownerRef",
+              "$[*].targetId"
+            ],
+            "instants": [
+              "$[*].requestedAt",
+              "$[*].grantedAt",
+              "$[*].startedAt"
+            ],
+            "strings": [
+              "$[*].workKey"
+            ],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "replaceLeaseSpec",
+          "method": "PUT",
+          "path": "/system/api/leases/{leaseId}/spec",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "body": {
+            "spec": {
+              "image": "registry.qits.wohlben.eu/qits/project-agent:2026.1",
+              "env": {
+                "QITS_TOKEN": "qits_tok_lease"
+              },
+              "user": "1000",
+              "limits": {
+                "memory": "8g"
+              }
+            }
+          },
+          "status": 200,
+          "file": "a-running-desk-lease/replaceLeaseSpec.json",
+          "frozen": {
+            "ids": [
+              "$.id",
+              "$.ownerRef",
+              "$.targetId"
+            ],
+            "instants": [
+              "$.requestedAt",
+              "$.grantedAt",
+              "$.startedAt"
+            ],
+            "strings": [
+              "$.workKey"
+            ],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a running workspace lease",
+      "slug": "a-running-workspace-lease",
+      "params": {
+        "authorization": "Bearer qits_tok_contract-qits-workspaces",
+        "leaseId": "00000000-0000-4000-8000-000000000002",
+        "ownerRef": "17",
+        "targetId": "00000000-0000-4000-8000-000000000001",
+        "workKey": "ws-17"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "endLease",
+          "method": "DELETE",
+          "path": "/system/api/leases/{leaseId}",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 200,
+          "file": "a-running-workspace-lease/endLease.json",
+          "frozen": {
+            "ids": [
+              "$.id",
+              "$.targetId"
+            ],
+            "instants": [
+              "$.requestedAt",
+              "$.grantedAt",
+              "$.startedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getLease",
+          "method": "GET",
+          "path": "/system/api/leases/{leaseId}",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 200,
+          "file": "a-running-workspace-lease/getLease.json",
+          "frozen": {
+            "ids": [
+              "$.id",
+              "$.targetId"
+            ],
+            "instants": [
+              "$.requestedAt",
+              "$.grantedAt",
+              "$.startedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listLeases",
+          "method": "GET",
+          "path": "/system/api/leases",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 200,
+          "file": "a-running-workspace-lease/listLeases.json",
+          "frozen": {
+            "ids": [
+              "$[*].id",
+              "$[*].targetId"
+            ],
+            "instants": [
+              "$[*].requestedAt",
+              "$[*].grantedAt",
+              "$[*].startedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "replaceLeaseSpec",
+          "method": "PUT",
+          "path": "/system/api/leases/{leaseId}/spec",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "body": {
+            "spec": {
+              "image": "registry.qits.wohlben.eu/qits/workspace:2026.1",
+              "env": {
+                "QITS_TOKEN": "qits_tok_lease"
+              },
+              "user": "1000",
+              "limits": {
+                "memory": "8g"
+              }
+            }
+          },
+          "status": 200,
+          "file": "a-running-workspace-lease/replaceLeaseSpec.json",
+          "frozen": {
+            "ids": [
+              "$.id",
+              "$.targetId"
+            ],
+            "instants": [
+              "$.requestedAt",
+              "$.grantedAt",
+              "$.startedAt"
+            ],
             "strings": [],
             "listFilteredTo": null
           }
@@ -542,6 +1089,43 @@
       ]
     },
     {
+      "name": "an unused desk work volume",
+      "slug": "an-unused-desk-work-volume",
+      "params": {
+        "authorization": "Bearer qits_tok_contract-qits-projects",
+        "leaseId": "00000000-0000-4000-8000-000000000002",
+        "ownerRef": "00000000-0000-4000-8000-000000000003",
+        "targetId": "00000000-0000-4000-8000-000000000001",
+        "workKey": "desk-00000000-0000-4000-8000-000000000003"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "purgeWorkVolume",
+          "method": "DELETE",
+          "path": "/system/api/work-volumes/{workKey}",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 202,
+          "file": "an-unused-desk-work-volume/purgeWorkVolume.json",
+          "frozen": {
+            "ids": [
+              "$.targetId"
+            ],
+            "instants": [
+              "$.purgeRequestedAt"
+            ],
+            "strings": [
+              "$.workKey",
+              "$.volumeName"
+            ],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "an unused work volume",
       "slug": "an-unused-work-volume",
       "params": {
@@ -559,6 +1143,40 @@
           },
           "status": 202,
           "file": "an-unused-work-volume/purgeWorkVolume.json",
+          "frozen": {
+            "ids": [
+              "$.targetId"
+            ],
+            "instants": [
+              "$.purgeRequestedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "an unused workspace work volume",
+      "slug": "an-unused-workspace-work-volume",
+      "params": {
+        "authorization": "Bearer qits_tok_contract-qits-workspaces",
+        "leaseId": "00000000-0000-4000-8000-000000000002",
+        "ownerRef": "17",
+        "targetId": "00000000-0000-4000-8000-000000000001",
+        "workKey": "ws-17"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "purgeWorkVolume",
+          "method": "DELETE",
+          "path": "/system/api/work-volumes/{workKey}",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 202,
+          "file": "an-unused-workspace-work-volume/purgeWorkVolume.json",
           "frozen": {
             "ids": [
               "$.targetId"

@@ -61,8 +61,47 @@ public class ProviderStates {
   /** qits-ci's CI lease {@code run-1}, QUEUED, and the bearer qits-ci calls with. */
   public static final String A_QUEUED_LEASE = "a queued lease";
 
-  /** qits-workspaces' work volume {@code ws-17} on target {@code lab}, its last lease ENDED. */
+  /**
+   * qits-workspaces' work volume {@code ws-17} on target {@code lab}, its last lease ENDED. The
+   * same as {@link #AN_UNUSED_WORKSPACE_WORK_VOLUME}, kept by this name because qits-workspaces'
+   * SystemContract pins it.
+   */
   public static final String AN_UNUSED_WORK_VOLUME = "an unused work volume";
+
+  // --- the same lease states per tenant, each recorded with its own bearer ------------------------
+
+  /** qits-workspaces' WORKSPACE lease {@code 17} (work key {@code ws-17}), QUEUED. */
+  public static final String A_QUEUED_WORKSPACE_LEASE = "a queued workspace lease";
+
+  /** The same lease RUNNING on target {@code lab}, its work volume there. */
+  public static final String A_RUNNING_WORKSPACE_LEASE = "a running workspace lease";
+
+  /** qits-workspaces' work volume {@code ws-17} on target {@code lab}, its last lease ENDED. */
+  public static final String AN_UNUSED_WORKSPACE_WORK_VOLUME = "an unused workspace work volume";
+
+  /** qits-projects' DESK lease for the front desk of project {@link #PROJECT_ID}, QUEUED. */
+  public static final String A_QUEUED_DESK_LEASE = "a queued desk lease";
+
+  /** The same lease RUNNING on target {@code lab}, its work volume there. */
+  public static final String A_RUNNING_DESK_LEASE = "a running desk lease";
+
+  /** qits-projects' work volume {@code desk-<project>} on target {@code lab}, its lease ENDED. */
+  public static final String AN_UNUSED_DESK_WORK_VOLUME = "an unused desk work volume";
+
+  /** Not seeded into the freezer: it freezes to the next free id, in the params and the body alike. */
+  static final String PROJECT_ID = Freezer.frozenId(0x10);
+
+  static final String PROJECTS_BEARER = "Bearer qits_tok_contract-qits-projects";
+
+  static final String WORKSPACE_IMAGE = "registry.qits.wohlben.eu/qits/workspace:2026.1";
+
+  static final String DESK_IMAGE = "registry.qits.wohlben.eu/qits/project-agent:2026.1";
+
+  /** A tenant's lease, as the per-tenant states stand it up. */
+  record Tenant(
+      String app, String client, String bearer, SlotType type, String image, String ownerRef,
+      String workKey) {}
+
 
   static final String TARGET_ID = Freezer.frozenId(1);
 
@@ -77,6 +116,26 @@ public class ProviderStates {
   static final String WORKSPACES_BEARER = "Bearer qits_tok_contract-qits-workspaces";
 
   static final String CI_IMAGE = "registry.qits.wohlben.eu/qits/build-images/ci-slot:2026.1";
+
+  static final Tenant WORKSPACES =
+      new Tenant(
+          "qits-workspaces",
+          "dev-qits-workspaces",
+          WORKSPACES_BEARER,
+          SlotType.WORKSPACE,
+          WORKSPACE_IMAGE,
+          "17",
+          "ws-17");
+
+  static final Tenant PROJECTS =
+      new Tenant(
+          "qits-projects",
+          "dev-qits-projects",
+          PROJECTS_BEARER,
+          SlotType.DESK,
+          DESK_IMAGE,
+          PROJECT_ID,
+          "desk-" + PROJECT_ID);
 
   public record Setup(Map<String, String> params, Set<String> uniqueTokens) {
     Setup(Map<String, String> params) {
@@ -97,6 +156,12 @@ public class ProviderStates {
     states.put(A_REGISTERED_RUNNER, this::aRegisteredRunner);
     states.put(A_QUEUED_LEASE, this::aQueuedLease);
     states.put(AN_UNUSED_WORK_VOLUME, this::anUnusedWorkVolume);
+    states.put(A_QUEUED_WORKSPACE_LEASE, () -> tenantLease(WORKSPACES, LeaseState.QUEUED));
+    states.put(A_RUNNING_WORKSPACE_LEASE, () -> tenantLease(WORKSPACES, LeaseState.RUNNING));
+    states.put(AN_UNUSED_WORKSPACE_WORK_VOLUME, () -> tenantLease(WORKSPACES, LeaseState.ENDED));
+    states.put(A_QUEUED_DESK_LEASE, () -> tenantLease(PROJECTS, LeaseState.QUEUED));
+    states.put(A_RUNNING_DESK_LEASE, () -> tenantLease(PROJECTS, LeaseState.RUNNING));
+    states.put(AN_UNUSED_DESK_WORK_VOLUME, () -> tenantLease(PROJECTS, LeaseState.ENDED));
   }
 
   public Set<String> names() {
@@ -161,6 +226,11 @@ public class ProviderStates {
               target.loginCheckedAt = TargetRows.T0;
               target.credentialVolume = "qits-system-runner-dot-claude-00000000";
               target.runnerVersion = "2026.1023.1";
+              target.capabilities =
+                  "{\"runnerVersion\":\"2026.1023.1\",\"docker\":true,\"arch\":\"amd64\","
+                      + "\"os\":\"linux\",\"slots\":6,\"engineId\":\"ENGINE-LAB\","
+                      + "\"hostname\":\"lab-host\",\"credentialVolume\":"
+                      + "\"qits-system-runner-dot-claude-00000000\",\"buildkit\":true}";
               target.lastSeenAt = TargetRows.T0;
               target.lastHealthCheckAt = TargetRows.T0;
               target.lastHealthCheckOk = true;
@@ -237,6 +307,64 @@ public class ProviderStates {
             });
     bearers.grant(WORKSPACES_BEARER, "dev-qits-workspaces", "qits:system");
     return new Setup(Map.of("authorization", WORKSPACES_BEARER, "workKey", "ws-17"));
+  }
+
+  /**
+   * {@code tenant}'s lease {@link #LEASE_ID} in {@code state}: QUEUED on no target; RUNNING on
+   * target {@code lab} ({@link #TARGET_ID}) with its work volume there; ENDED on {@code lab} with the
+   * volume left unused. The tenant's bearer is armed; params {@code authorization}, {@code leaseId},
+   * {@code workKey}, {@code ownerRef} (and {@code targetId} once placed).
+   */
+  private Setup tenantLease(Tenant tenant, LeaseState state) {
+    fresh();
+    UUID target = UUID.fromString(TARGET_ID);
+    UUID id = UUID.fromString(LEASE_ID);
+    boolean placed = state != LeaseState.QUEUED;
+    if (placed) {
+      TargetRows.target(target, "lab", 6, "target-runner-client-lab", false);
+    }
+    TargetRows.lease(id, tenant.type(), tenant.app(), tenant.ownerRef(), state, placed ? target : null);
+    QuarkusTransaction.requiringNew()
+        .run(
+            () -> {
+              Lease lease = Lease.findById(id);
+              lease.workKey = tenant.workKey();
+              lease.spec =
+                  "{\"env\":{\"QITS_TOKEN\":\"qits_tok_lease\"},\"image\":\""
+                      + tenant.image()
+                      + "\",\"limits\":{\"memory\":\"4g\"},\"user\":\"1000\"}";
+              lease.specHash = "spec-hash-1";
+              if (state == LeaseState.QUEUED) {
+                lease.detail =
+                    "target lab is not signed in: qits targets sign-in --target lab";
+              }
+              if (state == LeaseState.RUNNING) {
+                lease.startedAt = TargetRows.T0;
+              }
+              if (state == LeaseState.ENDED) {
+                lease.endedAt = TargetRows.T0;
+              }
+              if (placed) {
+                WorkVolume volume = new WorkVolume();
+                volume.ownerApp = tenant.app();
+                volume.workKey = tenant.workKey();
+                volume.targetId = target;
+                volume.volumeName =
+                    "qits-system-runner-work-" + tenant.workKey() + "-00000000";
+                volume.createdAt = TargetRows.T0;
+                volume.persist();
+              }
+            });
+    bearers.grant(tenant.bearer(), tenant.client(), "qits:system");
+    Map<String, String> params = new TreeMap<>();
+    params.put("authorization", tenant.bearer());
+    params.put("leaseId", LEASE_ID);
+    params.put("workKey", tenant.workKey());
+    params.put("ownerRef", tenant.ownerRef());
+    if (placed) {
+      params.put("targetId", TARGET_ID);
+    }
+    return new Setup(params);
   }
 
   /** The states' fixed ids, for a recording's freezer to keep as they are. */

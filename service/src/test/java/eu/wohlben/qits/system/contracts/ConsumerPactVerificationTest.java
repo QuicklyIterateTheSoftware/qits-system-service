@@ -140,4 +140,34 @@ class ConsumerPactVerificationTest {
   Map<String, String> anUnusedWorkVolume() {
     return states.params(ProviderStates.AN_UNUSED_WORK_VOLUME);
   }
+
+  @State(ProviderStates.A_QUEUED_WORKSPACE_LEASE)
+  Map<String, String> aQueuedWorkspaceLease() {
+    return states.params(ProviderStates.A_QUEUED_WORKSPACE_LEASE);
+  }
+
+  @State(ProviderStates.A_RUNNING_WORKSPACE_LEASE)
+  Map<String, String> aRunningWorkspaceLease() {
+    return states.params(ProviderStates.A_RUNNING_WORKSPACE_LEASE);
+  }
+
+  @State(ProviderStates.AN_UNUSED_WORKSPACE_WORK_VOLUME)
+  Map<String, String> anUnusedWorkspaceWorkVolume() {
+    return states.params(ProviderStates.AN_UNUSED_WORKSPACE_WORK_VOLUME);
+  }
+
+  @State(ProviderStates.A_QUEUED_DESK_LEASE)
+  Map<String, String> aQueuedDeskLease() {
+    return states.params(ProviderStates.A_QUEUED_DESK_LEASE);
+  }
+
+  @State(ProviderStates.A_RUNNING_DESK_LEASE)
+  Map<String, String> aRunningDeskLease() {
+    return states.params(ProviderStates.A_RUNNING_DESK_LEASE);
+  }
+
+  @State(ProviderStates.AN_UNUSED_DESK_WORK_VOLUME)
+  Map<String, String> anUnusedDeskWorkVolume() {
+    return states.params(ProviderStates.AN_UNUSED_DESK_WORK_VOLUME);
+  }
 }

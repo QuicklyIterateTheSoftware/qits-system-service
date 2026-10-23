@@ -63,6 +63,9 @@ public class TargetViews {
       String quarantineReason,
       Instant quarantinedAt,
       String runnerVersion,
+      @Schema(description = "The runner's hostname, from its hello; null before one") String hostname,
+      @Schema(description = "docker info's engine ID, from the runner's hello; null before one")
+          String engineId,
       boolean registered,
       Instant registeredAt,
       Instant lastSeenAt,
@@ -148,12 +151,21 @@ public class TargetViews {
         target.quarantineReason,
         target.quarantinedAt,
         target.runnerVersion,
+        capability(target, "hostname"),
+        capability(target, "engineId"),
         target.registered(),
         target.registeredAt,
         target.lastSeenAt,
         target.lastHealthCheckAt,
         target.lastHealthCheckOk,
         target.createdAt);
+  }
+
+  /** One text member of the target's recorded {@code hello} capabilities, or null. */
+  static String capability(Target target, String name) {
+    JsonNode capabilities = LeaseSpecs.parse(target.capabilities);
+    JsonNode value = capabilities == null ? null : capabilities.get(name);
+    return value == null || value.isNull() || !value.isValueNode() ? null : value.asText();
   }
 
   public TargetDto view(Target target) {

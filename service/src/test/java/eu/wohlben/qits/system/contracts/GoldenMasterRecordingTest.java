@@ -93,7 +93,79 @@ class GoldenMasterRecordingTest {
    * their names are this table's; the targets doors name theirs in their {@code @Operation}.
    * Renaming one is a contract change all the same.
    */
-  static final List<Interaction> INTERACTIONS =
+
+  private static List<Interaction> interactions() {
+    List<Interaction> all = new java.util.ArrayList<>(BASE);
+    all.addAll(
+        tenant(
+            ProviderStates.A_QUEUED_WORKSPACE_LEASE,
+            ProviderStates.A_RUNNING_WORKSPACE_LEASE,
+            ProviderStates.AN_UNUSED_WORKSPACE_WORK_VOLUME,
+            "WORKSPACE",
+            "18",
+            "ws-18",
+            ProviderStates.WORKSPACE_IMAGE));
+    all.addAll(
+        tenant(
+            ProviderStates.A_QUEUED_DESK_LEASE,
+            ProviderStates.A_RUNNING_DESK_LEASE,
+            ProviderStates.AN_UNUSED_DESK_WORK_VOLUME,
+            "DESK",
+            "00000000-0000-4000-8000-000000000004",
+            "desk-00000000-0000-4000-8000-000000000004",
+            ProviderStates.DESK_IMAGE));
+    return List.copyOf(all);
+  }
+
+  /**
+   * One tenant's lease doors over its three states, every call with its bearer: a create (beside
+   * the queued lease, for another ownerRef), the reads, a roll and an end of the queued and of the
+   * running lease, and the purge of the unused work volume.
+   */
+  private static List<Interaction> tenant(
+      String queued,
+      String running,
+      String unused,
+      String type,
+      String newRef,
+      String newWorkKey,
+      String image) {
+    String spec =
+        "{\"image\":\""
+            + image
+            + "\",\"env\":{\"QITS_TOKEN\":\"qits_tok_lease\"},\"user\":\"1000\","
+            + "\"limits\":{\"memory\":\"8g\"}}";
+    List<Interaction> rows = new java.util.ArrayList<>();
+    rows.add(
+        call(
+            queued,
+            "createLease",
+            "POST",
+            API + "/leases",
+            201,
+            "{\"slotType\":\""
+                + type
+                + "\",\"ownerRef\":\""
+                + newRef
+                + "\",\"workKey\":\""
+                + newWorkKey
+                + "\",\"priority\":0,\"spec\":"
+                + spec
+                + "}",
+            BEARER));
+    for (String state : List.of(queued, running)) {
+      rows.add(call(state, "getLease", "GET", LEASE, 200, null, BEARER));
+      rows.add(call(state, "listLeases", "GET", API + "/leases", 200, null, BEARER));
+      rows.add(
+          call(state, "replaceLeaseSpec", "PUT", LEASE + "/spec", 200, "{\"spec\":" + spec + "}", BEARER));
+      rows.add(call(state, "endLease", "DELETE", LEASE, 200, null, BEARER));
+    }
+    rows.add(
+        call(unused, "purgeWorkVolume", "DELETE", API + "/work-volumes/{workKey}", 202, null, BEARER));
+    return rows;
+  }
+
+  private static final List<Interaction> BASE =
       List.of(
           get("getOverview", API + "/overview"),
           get("listSwarmNodes", API + "/swarm/nodes"),
@@ -227,6 +299,8 @@ class GoldenMasterRecordingTest {
               202,
               null,
               BEARER));
+
+  static final List<Interaction> INTERACTIONS = interactions();
 
   private static Interaction get(String operationId, String path) {
     return new Interaction(STATE, operationId, "GET", path, 200, null, Map.of());

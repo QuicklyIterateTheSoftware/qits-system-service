@@ -28,6 +28,8 @@
     "quarantineReason": null,
     "quarantinedAt": null,
     "runnerVersion": "2026.1023.1",
+    "hostname": "lab-host",
+    "engineId": "ENGINE-LAB",
     "registered": true,
     "registeredAt": "2026-01-01T00:00:00Z",
     "lastSeenAt": "2026-01-01T00:00:00Z",

@@ -1,0 +1,30 @@
+{
+  "id": "00000000-0000-4000-8000-000000000002",
+  "slotType": "DESK",
+  "ownerApp": "qits-projects",
+  "ownerRef": "00000000-0000-4000-8000-000000000003",
+  "projectId": null,
+  "workKey": "desk-00000000-0000-4000-8000-000000000003",
+  "pinTargetId": null,
+  "targetId": "00000000-0000-4000-8000-000000000001",
+  "priority": 0,
+  "state": "ENDING",
+  "spec": {
+    "env": {
+      "QITS_TOKEN": "qits_tok_lease"
+    },
+    "user": "1000",
+    "image": "registry.qits.wohlben.eu/qits/project-agent:2026.1",
+    "limits": {
+      "memory": "4g"
+    }
+  },
+  "specHash": "spec-hash-1",
+  "adopt": null,
+  "exitCode": null,
+  "detail": null,
+  "requestedAt": "2026-01-01T00:00:00Z",
+  "grantedAt": "2026-01-01T00:00:00Z",
+  "startedAt": "2026-01-01T00:00:00Z",
+  "endedAt": null
+}
