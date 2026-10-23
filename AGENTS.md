@@ -69,6 +69,12 @@ is the WORK KEY (the runner derives `qits-system-runner-work-<workKey>-<id8>`); 
 `inventory.volumes` are full names; an adopted lease carries `adopt` for its whole life. An EXITED
 lease stays `desired: RUNNING` (the runner never restarts one) until its owner ends it.
 
+**The login probe's image is chosen from the leases, never a `:latest`** (`runner/ProbeImages`):
+the newest non-ENDED WORKSPACE lease's image (QUEUED counts), else the newest DESK lease's, else
+`qits.system.targets.probe-image` when set, else none. The runner reads it from every `ack` and
+probes at once, so `TargetRegistry.probeImageMayHaveChanged` (after every allocation pass) re-acks a
+serving connection whose ack named another image. The login commands name the image last acked.
+
 **The wire is the protocol jars', never spelled here.** `TargetFrames` bolts Jackson onto
 qits-runner-protocol's `RunnerCodec` and qits-system-runner-protocol's `SystemRunnerCodec`; the
 runner version every `hello` is held to is `SystemRunnerBinary.VERSION` (root pom

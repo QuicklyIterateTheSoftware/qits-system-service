@@ -22,8 +22,8 @@ public interface TargetsConfig {
   /** {@code ci|workspace|desk} → the prefix a lease's {@code spec.image} must start with. */
   Map<String, String> slotImages();
 
-  /** The image the login probe runs and the login commands name. */
-  String probeImage();
+  /** The login probe's image when no WORKSPACE or DESK lease names one; see {@code ProbeImages}. */
+  Optional<String> probeImage();
 
   /** The platform's public domain; blank or dotless is none. */
   Optional<String> domain();

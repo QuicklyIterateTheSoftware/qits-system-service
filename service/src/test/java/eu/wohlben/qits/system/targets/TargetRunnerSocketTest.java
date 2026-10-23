@@ -101,7 +101,7 @@ class TargetRunnerSocketTest {
       assertEquals("registry.qits.wohlben.eu/qits/build-images/ci-slot", extension.slotImages().ci());
       assertEquals("registry.qits.wohlben.eu/qits/workspace", extension.slotImages().workspace());
       assertEquals("registry.qits.wohlben.eu/qits/project-agent", extension.slotImages().desk());
-      assertEquals("registry.qits.wohlben.eu/qits/workspace:latest", extension.probeImage());
+      assertNull(extension.probeImage(), "no lease names an image, and none is configured");
       assertEquals("mirror.qits.wohlben.eu/hub", extension.registryMirrors().get("docker.io"));
       Target row = TargetRows.reloadTarget(target);
       assertEquals(4, row.slotsTotal);
@@ -185,8 +185,39 @@ class TargetRunnerSocketTest {
                   "docker run --rm -it --user 1000 --entrypoint claude -v"
                       + " qits-system-runner-dot-claude-lab:/claude-home -e HOME=/claude-home -e"
                       + " CLAUDE_CONFIG_DIR=/claude-home/.claude"
-                      + " registry.qits.wohlben.eu/qits/workspace:latest"))
+                      + " "
+                      + WORKSPACE_IMAGE))
           .body("kimiLoginCommand", startsWith("docker run --rm -it --user 1000 --entrypoint kimi"));
+    }
+  }
+
+  @Test
+  void theProbeImageIsTheNewestWorkspaceLeasesElseTheNewestDesksAndARunnerIsReAcked()
+      throws Exception {
+    try (FakeTargetRunner runner = greetedRunner()) {
+      String desk = "registry.qits.wohlben.eu/qits/project-agent:2026.7";
+      LeaseDoorsTest.lease("dev-qits-projects", "DESK", "d1", desk, "").then().statusCode(201);
+      assertEquals(desk, SystemRunnerAck.of(runner.await(Ack.class, a -> desk.equals(SystemRunnerAck.of(a).probeImage()))).probeImage());
+
+      String older = "registry.qits.wohlben.eu/qits/workspace:2026.8";
+      LeaseDoorsTest.lease("dev-qits-workspaces", "WORKSPACE", "w1", older, "").then().statusCode(201);
+      runner.await(Ack.class, a -> older.equals(SystemRunnerAck.of(a).probeImage()));
+
+      String newer = "registry.qits.wohlben.eu/qits/workspace:2026.9";
+      LeaseDoorsTest.lease("dev-qits-workspaces", "WORKSPACE", "w2", newer, "").then().statusCode(201);
+      runner.await(Ack.class, a -> newer.equals(SystemRunnerAck.of(a).probeImage()));
+
+      // A newer DESK lease does not outrank a WORKSPACE one.
+      LeaseDoorsTest.lease("dev-qits-projects", "DESK", "d2", desk + "1", "").then().statusCode(201);
+      String w2 =
+          LeaseDoorsTest.service("dev-qits-workspaces")
+              .get("/system/api/leases?slotType=WORKSPACE")
+              .then()
+              .extract()
+              .path("find { it.ownerRef == 'w2' }.id");
+      // Ending the newest WORKSPACE lease falls back to the next newest one.
+      LeaseDoorsTest.service("dev-qits-workspaces").delete("/system/api/leases/" + w2).then().statusCode(200);
+      runner.await(Ack.class, a -> older.equals(SystemRunnerAck.of(a).probeImage()));
     }
   }
 

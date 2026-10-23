@@ -15,4 +15,10 @@ public interface TargetPresence {
 
   /** The target's leases or purges changed: push its estate, off the caller's thread. */
   void estateChanged(UUID targetId);
+
+  /**
+   * The leases changed, so the login probe's image may have: every serving connection whose
+   * {@code ack} named another one is acked again, off the caller's thread.
+   */
+  void probeImageMayHaveChanged();
 }

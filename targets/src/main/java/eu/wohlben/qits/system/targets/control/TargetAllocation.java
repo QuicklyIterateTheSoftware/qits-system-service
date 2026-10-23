@@ -125,6 +125,7 @@ public class TargetAllocation {
     for (UUID target : outcome.granted()) {
       presence.estateChanged(target);
     }
+    presence.probeImageMayHaveChanged();
     return outcome.decisions();
   }
 

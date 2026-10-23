@@ -122,6 +122,8 @@ public class TargetRegistry implements TargetPresence {
 
   @Inject TargetHealth health;
 
+  @Inject ProbeImages probeImages;
+
   @Inject ObjectMapper objectMapper;
 
   private final ConcurrentHashMap<UUID, List<Session>> sessions = new ConcurrentHashMap<>();
@@ -154,6 +156,8 @@ public class TargetRegistry implements TargetPresence {
     private volatile boolean loginSeen;
     private volatile String runnerVersion;
     private volatile Instant seenWrittenAt;
+    /** The probe image this connection's newest {@code ack} named; null for none. */
+    private volatile String probeImage;
 
     Session(Target target, WebSocketConnection connection, long order) {
       this.targetId = target.id;
@@ -263,7 +267,7 @@ public class TargetRegistry implements TargetPresence {
             "Target %s said hello as %s and the pin is %s, and it cannot be upgraded: %s",
             row.name, hello.runnerVersion(), pin.orElseThrow(), unconfigured.getMessage());
         if (speaks) {
-          send(session, ack(0));
+          send(session, ack(session, 0));
         }
         return Greeting.GREETED;
       }
@@ -272,7 +276,7 @@ public class TargetRegistry implements TargetPresence {
           row.name, hello.runnerVersion(), pin.orElseThrow(), image);
       send(session, new Upgrade(pin.orElseThrow(), image, null));
       if (speaks) {
-        send(session, ack(0));
+        send(session, ack(session, 0));
       }
       return Greeting.GREETED;
     }
@@ -283,7 +287,7 @@ public class TargetRegistry implements TargetPresence {
         hello.runnerVersion(),
         row.slotsTotal,
         row.quarantined() ? "; quarantined: " + row.quarantineReason : "");
-    send(session, ack(slots));
+    send(session, ack(session, slots));
     if (row.quarantined()) {
       send(session, quarantinedFrame(row.quarantineReason, row.quarantinedAt));
     }
@@ -467,6 +471,12 @@ public class TargetRegistry implements TargetPresence {
     return session != null && session.loginSeen;
   }
 
+  /** The probe image the target's serving connection was last acked with, or null. */
+  public String ackedProbeImage(UUID targetId) {
+    Session session = serving(targetId);
+    return session == null ? null : session.probeImage;
+  }
+
   /** The runner version the target's serving connection said, or null. */
   public String connectedVersion(UUID targetId) {
     Session session = serving(targetId);
@@ -515,6 +525,30 @@ public class TargetRegistry implements TargetPresence {
           }
         },
         "the estate of target " + targetId);
+  }
+
+  /**
+   * The probe image is chosen from the leases ({@link ProbeImages}); every serving connection whose
+   * {@code ack} named another one is acked again. The runner takes the probe image from every
+   * {@code ack} and probes at once, so a fresh target re-probes as soon as the first WORKSPACE (or
+   * DESK) lease is asked for.
+   */
+  @Override
+  public void probeImageMayHaveChanged() {
+    async(
+        () -> {
+          String image = probeImages.current();
+          for (UUID targetId : List.copyOf(sessions.keySet())) {
+            Session session = serving(targetId);
+            if (session != null && !java.util.Objects.equals(session.probeImage, image)) {
+              LOG.infof(
+                  "Target %s's login probe image is now %s; re-sending its ack",
+                  session.targetName, image);
+              reAck(session);
+            }
+          }
+        },
+        "the login probe image");
   }
 
   /** {@code probeLogin} to the target's serving connection; false when none took it. */
@@ -580,7 +614,7 @@ public class TargetRegistry implements TargetPresence {
   private void reAck(Session session) {
     Target row = targets.find(session.targetId);
     if (row != null) {
-      send(session, ack(slots(row)));
+      send(session, ack(session, slots(row)));
     }
   }
 
@@ -589,7 +623,9 @@ public class TargetRegistry implements TargetPresence {
   }
 
   /** {@code ack} with the system runner's extension: slot images, probe image, registry mirrors. */
-  Ack ack(int slots) {
+  Ack ack(Session session, int slots) {
+    String probe = probeImages.current();
+    session.probeImage = probe;
     Map<String, String> images = config.slotImages();
     SystemRunnerAck extension =
         new SystemRunnerAck(
@@ -597,7 +633,7 @@ public class TargetRegistry implements TargetPresence {
                 images.get(SlotType.CI.key()),
                 images.get(SlotType.WORKSPACE.key()),
                 images.get(SlotType.DESK.key())),
-            config.probeImage(),
+            probe,
             addresses.registryMirrors());
     return new Ack(SystemRunnerProtocol.CAPABILITY_VERSION, slots, null, extension.extensions());
   }

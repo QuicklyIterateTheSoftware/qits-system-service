@@ -190,6 +190,8 @@ public class Leases {
                   return lease;
                 });
     allocation.estateChanged(rolled.targetId);
+    // A rolled image may be the newest WORKSPACE or DESK one, which is the login probe's.
+    allocation.requestPass();
     return rolled;
   }
 
@@ -226,6 +228,25 @@ public class Leases {
       allocation.requestPass();
     }
     return ended;
+  }
+
+  /**
+   * The image of the newest lease of {@code type} that has not ENDED — QUEUED included, since a
+   * queued lease already carries the owner's real, pinned image — or empty.
+   */
+  public java.util.Optional<String> newestImage(SlotType type) {
+    return QuarkusTransaction.requiringNew()
+        .call(
+            () ->
+                Lease.<Lease>find(
+                        "slotType = ?1 and state <> ?2 order by requestedAt desc, id desc",
+                        type,
+                        LeaseState.ENDED)
+                    .stream()
+                    .map(lease -> LeaseSpecs.parse(lease.spec))
+                    .filter(spec -> spec != null && spec.hasNonNull("image"))
+                    .map(spec -> spec.get("image").asText())
+                    .findFirst());
   }
 
   // --- the runner's reports ---------------------------------------------------------------------

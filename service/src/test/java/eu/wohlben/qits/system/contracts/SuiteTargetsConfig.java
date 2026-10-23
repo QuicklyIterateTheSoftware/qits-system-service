@@ -25,8 +25,8 @@ record SuiteTargetsConfig(String idpUrl, String clientId, String secret) impleme
   }
 
   @Override
-  public String probeImage() {
-    return "probe";
+  public Optional<String> probeImage() {
+    return Optional.empty();
   }
 
   @Override

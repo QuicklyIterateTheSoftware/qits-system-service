@@ -187,7 +187,8 @@ deployment as `QITS_SYSTEM_*`. The defaults and the reasoning are in
 
 The targets module's keys are `qits.system.targets.*`, defaulted in
 `targets/src/main/resources/META-INF/microprofile-config.properties`: `tenants.<app>`,
-`slot-images.{ci,workspace,desk}`, `probe-image`, `registry-mirrors.{registry-hosts,mirror-hosts,
+`slot-images.{ci,workspace,desk}`, `probe-image` (optional: the probe runs the newest WORKSPACE, else
+DESK, lease's image first), `registry-mirrors.{registry-hosts,mirror-hosts,
 upstreams}`, `runner-version-override`, `reconnect-grace=PT2M`, `commission-reconcile-interval=1h`,
 `public-url` (wss base), `estate-interval=PT1M`, `healthcheck.schedule`, `healthcheck.timeout=PT5M`,
 `idp.{url,client-id,client-secret}`.

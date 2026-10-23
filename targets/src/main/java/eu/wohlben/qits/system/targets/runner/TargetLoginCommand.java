@@ -1,6 +1,5 @@
 package eu.wohlben.qits.system.targets.runner;
 
-import eu.wohlben.qits.system.targets.control.TargetsConfig;
 import eu.wohlben.qits.system.targets.entity.Target;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -18,6 +17,9 @@ import java.util.regex.Pattern;
  * </pre>
  *
  * and the same with {@code --entrypoint kimi … login} (one line each).
+ *
+ * <p><b>The image is the one the runner was last acked with</b> ({@link ProbeImages}), the image
+ * its probe runs; with none there is no command.
  *
  * <p><b>The volume is the one the runner reported</b> in its last {@code loginState} ({@code
  * target.credential_volume}), so the command can never name another volume; it is spliced in only
@@ -37,8 +39,6 @@ public class TargetLoginCommand {
 
   private static final Pattern IMAGE = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._/:@-]{0,511}");
 
-  @Inject TargetsConfig config;
-
   @Inject TargetRegistry registry;
 
   /** {@code loginCommand}, or null until a {@code loginState} arrived on the current connection. */
@@ -55,7 +55,8 @@ public class TargetLoginCommand {
     if (target == null || !registry.loginStateSeen(target.id)) {
       return null;
     }
-    return command(target.credentialVolume, config.probeImage(), entrypoint, tail);
+    return command(
+        target.credentialVolume, registry.ackedProbeImage(target.id), entrypoint, tail);
   }
 
   /** The command's one shape; null when the volume or the image is not shell-safe. */
