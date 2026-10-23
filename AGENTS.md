@@ -59,6 +59,11 @@ requested_at asc`, pins considered on their target only, the most free slots the
 for a quarantined or disconnected target, and the sign-in gate for WORKSPACE and DESK. Change it in
 `TargetAllocatorTest` first: the dossier's worked example is the first table there.
 
+**`login` and `slots` are reported, never a quarantine** (`TargetHealth.REPORT_ONLY`). They fail
+the recorded health and its detail; quarantine and reinstatement decide on every other check. A
+signed-out target keeps running CI — the allocator's sign-in gate holds only its WORKSPACE and DESK
+leases — and minimums that do not fit the total are already ignored by the allocator.
+
 **The owner is the bearer, never the body.** `OwnerIdentity` takes the caller's client id (`sub`, or
 the forwarded principal) without its `<environment>-` prefix and looks it up in
 `qits.system.targets.tenants.*`. A field in a request that names an owner is ignored.

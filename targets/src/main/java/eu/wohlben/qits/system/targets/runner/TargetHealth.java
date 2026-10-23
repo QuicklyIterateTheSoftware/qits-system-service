@@ -38,7 +38,9 @@ import org.jboss.logging.Logger;
  *   <li>{@code slots} fails when the minimums do not fit the total, naming the sum and the total.
  * </ul>
  *
- * And {@code buildkit} counts only when the target has {@code min_ci > 0} or runs a CI lease; a
+ * <b>Both are reported and never quarantine</b> ({@link #REPORT_ONLY}): they fail the recorded
+ * health and its detail, and are left out of the quarantine decision, so a signed-out target still
+ * runs CI. And {@code buildkit} counts only when the target has {@code min_ci > 0} or runs a CI lease; a
  * failing one on any other target is kept in the report and does not fail it.
  *
  * <p><b>Quarantine.</b> A quarantined target's {@code ack} carries 0 slots and it is granted
@@ -139,24 +141,56 @@ public class TargetHealth {
     boolean runnerNamedNone = checks.isEmpty();
     checks.addAll(serverChecks(row));
     boolean buildkitCounts = row.minCi > 0 || targets.runsCi(targetId);
-    boolean ok = true;
+    Verdict verdict = verdict(checks, buildkitCounts, report, runnerNamedNone);
+    settle(
+        targetId,
+        verdict.ok(),
+        verdict.admitted(),
+        verdict.detail(),
+        verdict.gateDetail(),
+        report(now, verdict.ok(), verdict.detail(), id, checks),
+        now);
+  }
+
+  /** The checks that are REPORTED and never quarantine a target: the gate decides on the rest. */
+  static final java.util.Set<String> REPORT_ONLY = java.util.Set.of(LOGIN, SLOTS);
+
+  /**
+   * A settled check's two answers. {@code ok} is the reported health: every check that counts,
+   * {@code login} and {@code slots} included. {@code admitted} is what quarantine and reinstatement
+   * decide on, and it leaves {@link #REPORT_ONLY} out: a signed-out target must never stop CI (the
+   * allocator's sign-in gate already holds its WORKSPACE and DESK leases), nor must minimums that do
+   * not fit the total (the allocator already ignores them).
+   */
+  record Verdict(boolean ok, boolean admitted, String detail, String gateDetail) {}
+
+  /** The verdict over {@code checks}; pure. */
+  static Verdict verdict(
+      List<CheckResult> checks, boolean buildkitCounts, HealthReport report, boolean runnerNamedNone) {
     List<String> failed = new ArrayList<>();
+    List<String> gating = new ArrayList<>();
     for (CheckResult check : checks) {
-      if (!check.ok() && (buildkitCounts || !BUILDKIT.equals(check.name()))) {
-        ok = false;
-        failed.add(check.name() + (check.detail() == null ? "" : ": " + check.detail()));
+      if (check.ok() || (!buildkitCounts && BUILDKIT.equals(check.name()))) {
+        continue;
+      }
+      String line = check.name() + (check.detail() == null ? "" : ": " + check.detail());
+      failed.add(line);
+      if (!REPORT_ONLY.contains(check.name())) {
+        gating.add(line);
       }
     }
     if (report != null && !report.ok() && runnerNamedNone) {
       // A runner that failed without naming a check still failed.
-      ok = false;
-      failed.add(report.detail() == null ? FAILED : report.detail());
+      String line = report.detail() == null ? FAILED : report.detail();
+      failed.add(line);
+      gating.add(line);
     }
-    String detail =
-        ok
-            ? (report == null || report.detail() == null ? "" : report.detail())
-            : String.join("; ", failed);
-    settle(targetId, ok, detail, report(now, ok, detail, id, checks), now);
+    String passed = report == null || report.detail() == null ? "" : report.detail();
+    return new Verdict(
+        failed.isEmpty(),
+        gating.isEmpty(),
+        failed.isEmpty() ? passed : String.join("; ", failed),
+        gating.isEmpty() ? passed : String.join("; ", gating));
   }
 
   /** The checks this service judges, from the row alone. Pure. */
@@ -214,14 +248,30 @@ public class TargetHealth {
     return claimed[0];
   }
 
-  private void settle(UUID targetId, boolean ok, String detail, ObjectNode report, Instant at) {
+  /**
+   * A check's verdict reached its row: the REPORTED health ({@code ok}, {@code detail}) is recorded
+   * first, whatever follows; then the gate ({@code admitted}, {@code gateDetail}) lifts or begins a
+   * quarantine. A target whose only failures are {@link #REPORT_ONLY} is recorded unhealthy and
+   * neither quarantined nor kept in one. Never throws.
+   */
+  private void settle(
+      UUID targetId,
+      boolean ok,
+      boolean admitted,
+      String detail,
+      String gateDetail,
+      ObjectNode report,
+      Instant at) {
     try {
       Target row = targets.recordHealthCheck(targetId, ok, at, LeaseSpecs.text(report));
       if (row == null) {
         return;
       }
-      if (ok) {
-        LOG.infof("Health check of target %s passed", row.name);
+      if (!ok) {
+        LOG.warnf("Health check of target %s reports: %s", row.name, detail);
+      }
+      if (admitted) {
+        LOG.infof("Health check of target %s admits it", row.name);
         if (row.quarantined()) {
           targets.greenlight(targetId);
           LOG.infof("Target %s passed its health check; it is granted leases now", row.name);
@@ -229,8 +279,8 @@ public class TargetHealth {
         }
         return;
       }
-      String reason = truncate(detail.isBlank() ? FAILED : FAILED + ": " + detail);
-      LOG.warnf("Health check of target %s failed: %s", row.name, detail);
+      String reason = truncate(gateDetail.isBlank() ? FAILED : FAILED + ": " + gateDetail);
+      LOG.warnf("Health check of target %s failed: %s", row.name, gateDetail);
       Targets.Quarantine out = targets.quarantineFor(targetId, reason);
       if (out.target() != null && (out.began() || out.reasonChanged())) {
         registry.quarantined(targetId, out.target().quarantineReason, out.target().quarantinedAt);
@@ -338,6 +388,8 @@ public class TargetHealth {
       settle(
           entry.getKey(),
           false,
+          false,
+          NO_ANSWER,
           NO_ANSWER,
           report(now, false, NO_ANSWER, waiting.requestId(), List.of()),
           now);

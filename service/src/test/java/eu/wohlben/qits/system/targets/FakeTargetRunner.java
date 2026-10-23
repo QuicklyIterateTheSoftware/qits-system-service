@@ -103,6 +103,13 @@ public final class FakeTargetRunner implements AutoCloseable {
     send(HealthChecked.of(new HealthReport(ok, ok ? "" : "docker is gone", requestId, List.of())));
   }
 
+  /** A report naming its checks, as the toolkit's {@code HealthChecks} send it. */
+  public void healthChecked(
+      String requestId, List<eu.wohlben.qits.runner.protocol.health.CheckResult> checks) {
+    boolean ok = checks.stream().allMatch(eu.wohlben.qits.runner.protocol.health.CheckResult::ok);
+    send(HealthChecked.of(new HealthReport(ok, ok ? "" : "a check failed", requestId, checks)));
+  }
+
   public void send(RunnerMessage message) {
     try {
       socket.sendText(JSON.writeValueAsString(CODEC.encode(message)), true).join();

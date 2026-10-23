@@ -141,6 +141,78 @@ class TargetRunnerSocketTest {
   }
 
   @Test
+  void aSignedOutTargetReservedForAgentsIsNeverQuarantinedAndStillRunsCi() throws Exception {
+    io.quarkus.narayana.jta.QuarkusTransaction.requiringNew()
+        .run(() -> Target.<Target>findById(target).minWorkspace = 1);
+    // Its first check fails `login` (min_workspace 1, nobody signed in) and admits it all the same.
+    try (FakeTargetRunner runner = greetedRunner()) {
+      Target row = TargetRows.reloadTarget(target);
+      assertFalse(row.quarantined(), "login is reported, never a quarantine");
+      assertFalse(row.lastHealthCheckOk, "the reported health still fails on login");
+      assertTrue(row.health.contains("neither claude nor kimi is signed in"), row.health);
+
+      String ci = LeaseDoorsTest.lease("dev-qits-ci", "CI", "run-cold", CI_IMAGE, "").path("id");
+      runner.await(Estate.class, e -> e.leases().stream().anyMatch(l -> l.leaseId().equals(ci)));
+      assertEquals(LeaseState.GRANTED, TargetRows.reload(UUID.fromString(ci)).state);
+
+      // A later scheduled check that fails only login keeps it admitted.
+      String requestId =
+          given()
+              .header("X-Qits-User", "an-operator")
+              .header("X-Qits-Roles", "qits:admin")
+              .post("/system/api/targets/" + target + "/healthcheck")
+              .then()
+              .statusCode(202)
+              .extract()
+              .path("requestId");
+      runner.await(HealthCheck.class, c -> c.requestId().equals(requestId));
+      runner.healthChecked(
+          requestId,
+          List.of(new eu.wohlben.qits.runner.protocol.health.CheckResult("docker", true, null, null)));
+      awaitHealthCheck(requestId);
+      row = TargetRows.reloadTarget(target);
+      assertFalse(row.quarantined());
+      assertFalse(row.lastHealthCheckOk);
+    }
+  }
+
+  @Test
+  void aFailingDockerCheckStillQuarantines() throws Exception {
+    try (FakeTargetRunner runner = greetedRunner()) {
+      String requestId =
+          given()
+              .header("X-Qits-User", "an-operator")
+              .header("X-Qits-Roles", "qits:admin")
+              .post("/system/api/targets/" + target + "/healthcheck")
+              .then()
+              .statusCode(202)
+              .extract()
+              .path("requestId");
+      runner.await(HealthCheck.class, c -> c.requestId().equals(requestId));
+      runner.healthChecked(
+          requestId,
+          List.of(
+              new eu.wohlben.qits.runner.protocol.health.CheckResult(
+                  "docker", false, "the socket is gone", null)));
+      Quarantined quarantined = runner.await(Quarantined.class);
+      assertTrue(quarantined.reason().contains("docker: the socket is gone"), quarantined.reason());
+      assertTrue(TargetRows.reloadTarget(target).quarantined());
+    }
+  }
+
+  private void awaitHealthCheck(String requestId) throws InterruptedException {
+    long deadline = System.currentTimeMillis() + FakeTargetRunner.TIMEOUT.toMillis();
+    while (System.currentTimeMillis() < deadline) {
+      Target row = TargetRows.reloadTarget(target);
+      if (row.health != null && row.health.contains(requestId)) {
+        return;
+      }
+      Thread.sleep(25);
+    }
+    throw new AssertionError("health check " + requestId + " never settled");
+  }
+
+  @Test
   void theSignInGateHoldsAnAgentLeaseUntilALoginStateSaysPresent() throws Exception {
     try (FakeTargetRunner runner = greetedRunner()) {
       String workspace =
