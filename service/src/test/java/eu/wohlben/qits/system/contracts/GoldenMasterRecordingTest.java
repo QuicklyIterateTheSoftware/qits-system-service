@@ -277,6 +277,22 @@ class GoldenMasterRecordingTest {
               409,
               "{\"capabilities\":{\"arch\":\"amd64\",\"docker\":true}}",
               BEARER),
+          call(
+              ProviderStates.A_REGISTERED_RUNNER,
+              "rotateTargetRegistrationToken",
+              "POST",
+              RUNNER + "/registration-token",
+              200,
+              "{\"slots\":2}",
+              Map.of()),
+          call(
+              ProviderStates.A_ROTATED_RUNNER,
+              "registerTarget",
+              "POST",
+              RUNNER + "/register",
+              200,
+              "{\"capabilities\":{\"arch\":\"amd64\",\"docker\":true}}",
+              BEARER),
           call(ProviderStates.A_QUEUED_LEASE, "listLeases", "GET", API + "/leases", 200, null, BEARER),
           call(ProviderStates.A_QUEUED_LEASE, "getLease", "GET", LEASE, 200, null, BEARER),
           call(

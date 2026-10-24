@@ -1,0 +1,42 @@
+{
+  "target": {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "name": "lab",
+    "description": null,
+    "slotsTotal": 0,
+    "minimums": {
+      "ci": 0,
+      "workspace": 0,
+      "desk": 0
+    },
+    "used": {
+      "ci": 0,
+      "workspace": 0,
+      "desk": 0
+    },
+    "login": {
+      "claude": "UNKNOWN",
+      "kimi": "UNKNOWN",
+      "checkedAt": null
+    },
+    "credentialVolume": null,
+    "loginCommand": null,
+    "kimiLoginCommand": null,
+    "connected": false,
+    "connectedSince": null,
+    "quarantined": true,
+    "quarantineReason": "awaiting first health check",
+    "quarantinedAt": "2026-01-01T00:00:00Z",
+    "runnerVersion": null,
+    "hostname": null,
+    "engineId": null,
+    "registered": true,
+    "registeredAt": "2026-01-01T00:00:00Z",
+    "lastSeenAt": null,
+    "lastHealthCheckAt": null,
+    "lastHealthCheckOk": null,
+    "createdAt": "2026-01-01T00:00:00Z"
+  },
+  "registrationToken": "qits_tok_suite-1",
+  "installLine": "curl -fsSL -H 'Authorization: Bearer qits_tok_suite-1' https://system.qits.wohlben.eu/system/api/targets/install.sh | sudo env QITS_SYSTEM_RUNNER_URL='https://system.qits.wohlben.eu' QITS_SYSTEM_RUNNER_ID='00000000-0000-4000-8000-000000000001' QITS_SYSTEM_RUNNER_REGISTRATION_TOKEN='qits_tok_suite-1' QITS_SYSTEM_RUNNER_SLOTS='2' sh"
+}

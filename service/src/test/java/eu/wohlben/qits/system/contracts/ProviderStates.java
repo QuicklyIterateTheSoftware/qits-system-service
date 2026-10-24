@@ -58,6 +58,12 @@ public class ProviderStates {
 
   public static final String A_REGISTERED_RUNNER = "a registered runner";
 
+  /**
+   * Target {@code lab} registered as {@code target-runner-client-lab}, its registration token
+   * rotated since: the runner installed with the new token registers again (qits-1579).
+   */
+  public static final String A_ROTATED_RUNNER = "a rotated runner";
+
   /** qits-ci's CI lease {@code run-1}, QUEUED, and the bearer qits-ci calls with. */
   public static final String A_QUEUED_LEASE = "a queued lease";
 
@@ -154,6 +160,7 @@ public class ProviderStates {
     states.put(A_DECLARED_TARGET, this::aDeclaredTarget);
     states.put(AN_UNREGISTERED_RUNNER, this::anUnregisteredRunner);
     states.put(A_REGISTERED_RUNNER, this::aRegisteredRunner);
+    states.put(A_ROTATED_RUNNER, this::aRotatedRunner);
     states.put(A_QUEUED_LEASE, this::aQueuedLease);
     states.put(AN_UNUSED_WORK_VOLUME, this::anUnusedWorkVolume);
     states.put(A_QUEUED_WORKSPACE_LEASE, () -> tenantLease(WORKSPACES, LeaseState.QUEUED));
@@ -258,6 +265,15 @@ public class ProviderStates {
     fresh();
     UUID id = UUID.fromString(TARGET_ID);
     TargetRows.target(id, "lab", 0, "target-runner-client-lab", true);
+    bearers.grant(REGISTRATION_BEARER, REGISTRATION_SUBJECT, "qits:target-runner-registration");
+    return new Setup(Map.of("authorization", REGISTRATION_BEARER, "runnerId", TARGET_ID));
+  }
+
+  private Setup aRotatedRunner() {
+    fresh();
+    UUID id = UUID.fromString(TARGET_ID);
+    TargetRows.target(id, "lab", 4, "target-runner-client-lab", false);
+    TargetRows.registrationToken(id, "tok-contract", REGISTRATION_SUBJECT);
     bearers.grant(REGISTRATION_BEARER, REGISTRATION_SUBJECT, "qits:target-runner-registration");
     return new Setup(Map.of("authorization", REGISTRATION_BEARER, "runnerId", TARGET_ID));
   }

@@ -589,6 +589,63 @@
             "strings": [],
             "listFilteredTo": null
           }
+        },
+        {
+          "operationId": "rotateTargetRegistrationToken",
+          "method": "POST",
+          "path": "/system/api/targets/{runnerId}/registration-token",
+          "body": {
+            "slots": 2
+          },
+          "status": 200,
+          "file": "a-registered-runner/rotateTargetRegistrationToken.json",
+          "frozen": {
+            "ids": [
+              "$.target.id"
+            ],
+            "instants": [
+              "$.target.quarantinedAt",
+              "$.target.registeredAt",
+              "$.target.createdAt"
+            ],
+            "strings": [
+              "$.installLine"
+            ],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a rotated runner",
+      "slug": "a-rotated-runner",
+      "params": {
+        "authorization": "Bearer qits_tok_contract-registration",
+        "runnerId": "00000000-0000-4000-8000-000000000001"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "registerTarget",
+          "method": "POST",
+          "path": "/system/api/targets/{runnerId}/register",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "body": {
+            "capabilities": {
+              "arch": "amd64",
+              "docker": true
+            }
+          },
+          "status": 200,
+          "file": "a-rotated-runner/registerTarget.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
         }
       ]
     },
