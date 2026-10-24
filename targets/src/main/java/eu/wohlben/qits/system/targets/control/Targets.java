@@ -129,6 +129,39 @@ public class Targets {
 
   // --- the operator's writes --------------------------------------------------------------------
 
+  /** The most slots an install line may name. */
+  public static final int SLOTS_MAX = 1024;
+
+  /**
+   * 400 unless {@code slots} — the total an install line carries, never stored — is absent, or
+   * within 0..{@value #SLOTS_MAX} and at least {@code minimumsSum}. Asked before anything is
+   * commissioned.
+   */
+  public static void requireInstallSlots(Integer slots, int minimumsSum) {
+    if (slots == null) {
+      return;
+    }
+    if (slots < 0 || slots > SLOTS_MAX) {
+      throw TargetRefusal.badRequest(
+          "A slots total is between 0 and " + SLOTS_MAX + ", not " + slots);
+    }
+    if (slots < minimumsSum) {
+      throw TargetRefusal.badRequest(
+          "A slots total of "
+              + slots
+              + " is below the minimums, which reserve "
+              + minimumsSum
+              + " slot(s)");
+    }
+  }
+
+  /** The sum of the minimums a request sets, absent members counted 0. */
+  public static int sum(Minimums minimums) {
+    return minimums == null
+        ? 0
+        : orZero(minimums.ci()) + orZero(minimums.workspace()) + orZero(minimums.desk());
+  }
+
   /** 400 or 409 for a create that could not be written; asked before anything is commissioned. */
   public void requireCreatable(String name, String description, Minimums minimums) {
     requireName(name);
@@ -263,15 +296,11 @@ public class Targets {
     return gone;
   }
 
-  /** 409 {@link TargetRefusal#ALREADY_REGISTERED} once the runner holds its own client. */
-  public void requireUnregistered(UUID id) {
-    Target target = get(id);
-    if (target.registered()) {
-      throw registeredAlready(target);
-    }
-  }
-
-  /** Swaps in a new registration token; answers the replaced one's id, for the caller to delete. */
+  /**
+   * Swaps in a new registration token; answers the replaced one's id, for the caller to delete. A
+   * registered target keeps its client meanwhile: its runner keeps working until the one installed
+   * with the new token registers (qits-1579).
+   */
   public String replaceRegistrationToken(UUID id, String tokenId, String subject) {
     return QuarkusTransaction.requiringNew()
         .call(
@@ -279,9 +308,6 @@ public class Targets {
               Target target = Target.findById(id);
               if (target == null) {
                 throw TargetRefusal.notFound("No target " + id);
-              }
-              if (target.registered()) {
-                throw registeredAlready(target);
               }
               String previous = target.registrationTokenId;
               target.registrationTokenId = tokenId;
@@ -291,12 +317,13 @@ public class Targets {
   }
 
   /**
-   * 409 once registered (its token was spent, so nothing else can be checked against it); 403
-   * unless {@code subject} is the target's registration token.
+   * 409 when registered and holding no pending registration token (its token was spent, so nothing
+   * else can be checked against it); 403 unless {@code subject} is the target's registration token.
+   * A registered target whose token was rotated registers again with the new one (qits-1579).
    */
   public Target requireRegistrable(UUID id, String subject) {
     Target target = get(id);
-    if (target.registered()) {
+    if (target.registered() && target.registrationTokenSubject == null) {
       throw registeredAlready(target);
     }
     if (subject == null
@@ -307,8 +334,16 @@ public class Targets {
     return target;
   }
 
-  /** Records the runner's client; the registration token is spent and forgotten. */
-  public Target markRegistered(UUID id, String clientId, String capabilities) {
+  /** What a registration did: the target as it now is, and the client it replaced (null if none). */
+  public record Registered(Target target, String previousClientId) {}
+
+  /**
+   * Records the runner's client; the registration token is spent and forgotten. Inside the write the
+   * token {@code subject} registered with must still be the pending one, so of two registrations on
+   * one token only the first wins and the other is 409 {@link TargetRefusal#ALREADY_REGISTERED}.
+   * Answers the client it replaced, which the caller gives back to qits-idp.
+   */
+  public Registered markRegistered(UUID id, String subject, String clientId, String capabilities) {
     return QuarkusTransaction.requiringNew()
         .call(
             () -> {
@@ -316,9 +351,13 @@ public class Targets {
               if (target == null) {
                 throw TargetRefusal.notFound("No target " + id);
               }
-              if (target.registered()) {
-                throw registeredAlready(target);
+              if (subject == null || !subject.equals(target.registrationTokenSubject)) {
+                // Spent by a racer on the same token, or rotated away since requireRegistrable.
+                throw target.registered()
+                    ? registeredAlready(target)
+                    : new TargetRefusal(403, null, "This registration token is not this target's");
               }
+              String previous = target.clientId;
               Instant now = Instant.now();
               target.clientId = clientId;
               target.registeredAt = now;
@@ -331,7 +370,7 @@ public class Targets {
                 target.quarantinedAt = now;
                 target.quarantineReason = AWAITING_FIRST_HEALTH_CHECK;
               }
-              return target;
+              return new Registered(target, previous);
             });
   }
 
@@ -496,7 +535,9 @@ public class Targets {
   private static TargetRefusal registeredAlready(Target target) {
     return TargetRefusal.conflict(
         TargetRefusal.ALREADY_REGISTERED,
-        "Target " + target.name + " is registered already; delete and declare it again");
+        "Target "
+            + target.name
+            + " is registered already; rotate its registration token to reinstall it");
   }
 
   private static int orZero(Integer value) {

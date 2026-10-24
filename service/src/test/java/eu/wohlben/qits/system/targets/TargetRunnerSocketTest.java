@@ -21,6 +21,7 @@ import eu.wohlben.qits.system.targets.entity.Lease;
 import eu.wohlben.qits.system.targets.entity.LeaseState;
 import eu.wohlben.qits.system.targets.entity.LoginValue;
 import eu.wohlben.qits.system.targets.entity.Target;
+import eu.wohlben.qits.system.targets.runner.TargetRegistry;
 import eu.wohlben.qits.systemrunner.protocol.DesiredState;
 import eu.wohlben.qits.systemrunner.protocol.Estate;
 import eu.wohlben.qits.systemrunner.protocol.HealthCheck;
@@ -375,6 +376,42 @@ class TargetRunnerSocketTest {
       assertEquals(eu.wohlben.qits.runner.protocol.Retire.Kind.DELETED, retire.kind());
       assertEquals(RunnerWire.CLOSE_POLICY_VIOLATION, runner.awaitClose());
       assertNull(TargetRows.reloadTarget(target));
+    }
+  }
+
+  @Test
+  void aReregistrationClosesTheReplacedRunnerWithoutRetiringItAndAdmitsTheNewOne()
+      throws Exception {
+    IdpStub.reset();
+    TargetRows.registrationToken(target, "tok-pending", "tok-subject-pending");
+    bearers.grant("Bearer the-new-token", "tok-subject-pending", "qits:target-runner-registration");
+    try (FakeTargetRunner old = greetedRunner()) {
+      given()
+          .header("Authorization", "Bearer the-new-token")
+          .contentType("application/json")
+          .body("{}")
+          .post("/system/api/targets/" + target + "/register")
+          .then()
+          .statusCode(200)
+          .body("clientId", equalTo("target-runner-client-1"));
+      assertEquals(RunnerWire.CLOSE_POLICY_VIOLATION, old.awaitClose());
+      assertEquals(TargetRegistry.REREGISTERED, old.closeReason());
+      assertFalse(
+          old.received(eu.wohlben.qits.runner.protocol.Retire.class),
+          "a re-registered target's old runner must not be told to remove its namespace");
+      assertTrue(IdpStub.requests().contains("DELETE /idp/api/clients/" + CLIENT));
+    }
+    Target row = TargetRows.reloadTarget(target);
+    assertEquals("target-runner-client-1", row.clientId);
+    try (FakeTargetRunner stale = FakeTargetRunner.dial(base, BEARER)) {
+      assertEquals(RunnerWire.CLOSE_POLICY_VIOLATION, stale.awaitClose());
+      assertEquals(RunnerWire.CloseReason.RUNNER_DELETED, stale.closeReason());
+    }
+    bearers.grant("Bearer new-runner-client-token", "target-runner-client-1", "qits:target-runner");
+    try (FakeTargetRunner fresh = FakeTargetRunner.dial(base, "Bearer new-runner-client-token")) {
+      fresh.hello(4, "qits-system-runner-dot-claude-lab");
+      assertEquals(0, fresh.await(Ack.class).slots(), "re-registered, it awaits a health check");
+      fresh.await(Quarantined.class);
     }
   }
 

@@ -17,6 +17,7 @@ import eu.wohlben.qits.system.targets.entity.LeaseState;
 import eu.wohlben.qits.system.targets.entity.SlotType;
 import eu.wohlben.qits.system.targets.entity.Target;
 import eu.wohlben.qits.systemrunner.protocol.SystemRunnerBinary;
+import io.quarkus.test.common.http.TestHTTPResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
@@ -35,6 +36,9 @@ class TargetDoorsTest {
   @Inject Targets targets;
 
   @Inject ContractBearers bearers;
+
+  @TestHTTPResource("/")
+  java.net.URI base;
 
   @BeforeEach
   void clean() {
@@ -186,6 +190,24 @@ class TargetDoorsTest {
   }
 
   @Test
+  void aRotationWithNoBodyAndNoContentTypeIsAnswered() throws Exception {
+    String id = create("lab", "{\"ci\":2}").path("target.id");
+    java.net.http.HttpResponse<String> answer =
+        java.net.http.HttpClient.newHttpClient()
+            .send(
+                java.net.http.HttpRequest.newBuilder(
+                        base.resolve(API.substring(1) + "/" + id + "/registration-token"))
+                    .header("X-Qits-User", "an-operator")
+                    .header("X-Qits-Roles", "qits:admin")
+                    .POST(java.net.http.HttpRequest.BodyPublishers.noBody())
+                    .build(),
+                java.net.http.HttpResponse.BodyHandlers.ofString());
+    assertEquals(200, answer.statusCode(), answer.body());
+    assertFalse(answer.request().headers().firstValue("Content-Type").isPresent());
+    assertTrue(answer.body().contains("QITS_SYSTEM_RUNNER_SLOTS='2'"), answer.body());
+  }
+
+  @Test
   void aRotationAnswersANewLineAndGivesTheOldTokenBack() {
     String id = create("lab", "null").path("target.id");
     admin()
@@ -243,6 +265,142 @@ class TargetDoorsTest {
         .then()
         .statusCode(409)
         .body("code", equalTo("ALREADY_REGISTERED"));
+  }
+
+  private static Response register(UUID id, String bearer) {
+    return given()
+        .header("Authorization", bearer)
+        .contentType("application/json")
+        .body("{\"capabilities\":{\"docker\":true,\"arch\":\"amd64\"}}")
+        .post(API + "/" + id + "/register");
+  }
+
+  @Test
+  void aRegisteredTargetRotatesItsTokenAndRegistersAgainUnderItsOwnId() {
+    UUID id = UUID.fromString(create("lab", "{\"ci\":1}").path("target.id"));
+    bearers.grant("Bearer qits_tok_suite-1", "tok-subject-1", "qits:target-runner-registration");
+    register(id, "Bearer qits_tok_suite-1")
+        .then()
+        .statusCode(200)
+        .body("clientId", equalTo("target-runner-client-1"));
+
+    admin()
+        .post(API + "/" + id + "/registration-token")
+        .then()
+        .statusCode(200)
+        .body("target.id", equalTo(id.toString()))
+        .body("target.registered", is(true))
+        .body("registrationToken", equalTo("qits_tok_suite-2"))
+        .body("installLine", containsString("QITS_SYSTEM_RUNNER_REGISTRATION_TOKEN='qits_tok_suite-2'"));
+    Target pending = targets.get(id);
+    assertEquals("target-runner-client-1", pending.clientId, "the old runner keeps its client");
+    assertEquals("tok-2", pending.registrationTokenId);
+
+    bearers.grant("Bearer qits_tok_suite-2", "tok-subject-2", "qits:target-runner-registration");
+    register(id, "Bearer qits_tok_suite-2")
+        .then()
+        .statusCode(200)
+        .body("clientId", equalTo("target-runner-client-2"));
+    Target row = targets.get(id);
+    assertEquals(id, row.id);
+    assertEquals("lab", row.name);
+    assertEquals(1, row.minCi);
+    assertEquals("target-runner-client-2", row.clientId);
+    assertNull(row.registrationTokenId);
+    assertNull(row.registrationTokenSubject);
+    assertTrue(row.quarantined());
+    assertTrue(
+        IdpStub.requests().contains("DELETE /idp/api/clients/target-runner-client-1"),
+        IdpStub.requests().toString());
+    assertFalse(IdpStub.requests().contains("DELETE /idp/api/clients/target-runner-client-2"));
+    assertTrue(IdpStub.requests().contains("DELETE /idp/api/tokens/tok-2"));
+
+    register(id, "Bearer qits_tok_suite-2")
+        .then()
+        .statusCode(409)
+        .body("code", equalTo("ALREADY_REGISTERED"))
+        .body("message", equalTo(
+            "Target lab is registered already; rotate its registration token to reinstall it"));
+    register(id, "Bearer qits_tok_suite-1").then().statusCode(409);
+    assertEquals("target-runner-client-2", targets.get(id).clientId);
+  }
+
+  @Test
+  void aRotatedTokenOnlyRegistersWithItsOwnSubject() {
+    UUID id = UUID.fromString(create("lab", "null").path("target.id"));
+    bearers.grant("Bearer qits_tok_suite-1", "tok-subject-1", "qits:target-runner-registration");
+    register(id, "Bearer qits_tok_suite-1").then().statusCode(200);
+    admin().post(API + "/" + id + "/registration-token").then().statusCode(200);
+    register(id, "Bearer qits_tok_suite-1").then().statusCode(403);
+    assertEquals("target-runner-client-1", targets.get(id).clientId);
+  }
+
+  @Test
+  void theInstallLineCarriesTheSlotsAnOperatorNames() {
+    Response created =
+        admin()
+            .contentType("application/json")
+            .body("{\"name\":\"lab\",\"minimums\":{\"ci\":2},\"slots\":6}")
+            .post(API);
+    created
+        .then()
+        .statusCode(201)
+        .body("installLine", containsString("QITS_SYSTEM_RUNNER_SLOTS='6'"));
+    String id = created.path("target.id");
+    admin()
+        .contentType("application/json")
+        .body("{\"slots\":8}")
+        .post(API + "/" + id + "/registration-token")
+        .then()
+        .statusCode(200)
+        .body("installLine", containsString("QITS_SYSTEM_RUNNER_SLOTS='8'"));
+    admin()
+        .contentType("application/json")
+        .body("{}")
+        .post(API + "/" + id + "/registration-token")
+        .then()
+        .statusCode(200)
+        .body("installLine", containsString("QITS_SYSTEM_RUNNER_SLOTS='2'"));
+    admin()
+        .post(API + "/" + id + "/registration-token")
+        .then()
+        .statusCode(200)
+        .body("installLine", containsString("QITS_SYSTEM_RUNNER_SLOTS='2'"));
+    admin()
+        .contentType("application/json")
+        .body("{\"slots\":null}")
+        .post(API + "/" + id + "/registration-token")
+        .then()
+        .statusCode(200)
+        .body("installLine", containsString("QITS_SYSTEM_RUNNER_SLOTS='2'"));
+    admin()
+        .contentType("application/json")
+        .body("{\"slots\":\"many\"}")
+        .post(API + "/" + id + "/registration-token")
+        .then()
+        .statusCode(400);
+    assertEquals(0, targets.get(UUID.fromString(id)).slotsTotal, "the named total is not stored");
+  }
+
+  @Test
+  void aSlotsTotalBelowTheMinimumsOrOutOfRangeIsRefusedBeforeAnythingIsMinted() {
+    String id = create("lab", "{\"ci\":2,\"desk\":1}").path("target.id");
+    IdpStub.reset();
+    for (String slots : new String[] {"2", "-1", "1025"}) {
+      admin()
+          .contentType("application/json")
+          .body("{\"slots\":" + slots + "}")
+          .post(API + "/" + id + "/registration-token")
+          .then()
+          .statusCode(400);
+    }
+    admin()
+        .contentType("application/json")
+        .body("{\"name\":\"other\",\"minimums\":{\"workspace\":3},\"slots\":2}")
+        .post(API)
+        .then()
+        .statusCode(400);
+    assertEquals(java.util.List.of(), IdpStub.requests());
   }
 
   @Test

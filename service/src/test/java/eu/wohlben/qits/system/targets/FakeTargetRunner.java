@@ -145,6 +145,12 @@ public final class FakeTargetRunner implements AutoCloseable {
     return await(type, m -> true);
   }
 
+  /** Whether any frame of {@code type} has arrived so far, without waiting for one. */
+  public synchronized boolean received(Class<? extends RunnerMessage> type) {
+    inbox.drainTo(seen);
+    return seen.stream().anyMatch(type::isInstance);
+  }
+
   public int awaitClose() throws InterruptedException {
     if (!closed.await(TIMEOUT.toSeconds(), TimeUnit.SECONDS)) {
       throw new AssertionError("the server never closed the socket");
