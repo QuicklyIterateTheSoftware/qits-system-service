@@ -96,6 +96,13 @@ public class TargetRegistry implements TargetPresence {
 
   public static final String ALREADY_CONNECTED = "ALREADY_CONNECTED";
 
+  /**
+   * The close reason of a connection whose client was replaced by a re-registration (qits-1579).
+   * Deliberately not {@link RunnerWire.CloseReason#RUNNER_DELETED}: the target lives on, and the
+   * runner must not remove its namespace from the node, which the new runner takes over.
+   */
+  public static final String REREGISTERED = "REREGISTERED";
+
   static final Duration SEND_TIMEOUT = Duration.ofSeconds(30);
 
   static final Duration CLOSE_TIMEOUT = Duration.ofSeconds(5);
@@ -148,6 +155,8 @@ public class TargetRegistry implements TargetPresence {
 
     private final UUID targetId;
     private final String targetName;
+    /** The client the connection's bearer named: the target's client when it was admitted. */
+    private final String clientId;
     private final WebSocketConnection connection;
     private final long order;
     private volatile boolean open = true;
@@ -162,6 +171,7 @@ public class TargetRegistry implements TargetPresence {
     Session(Target target, WebSocketConnection connection, long order) {
       this.targetId = target.id;
       this.targetName = target.name;
+      this.clientId = target.clientId;
       this.connection = connection;
       this.order = order;
     }
@@ -172,6 +182,10 @@ public class TargetRegistry implements TargetPresence {
 
     public String targetName() {
       return targetName;
+    }
+
+    public String clientId() {
+      return clientId;
     }
 
     public boolean greeted() {
@@ -594,6 +608,38 @@ public class TargetRegistry implements TargetPresence {
     droppedAt.remove(targetId);
     connectedSince.remove(targetId);
     health.forget(targetId);
+  }
+
+  /**
+   * The target registered again (qits-1579): every connection admitted on {@code previousClientId}
+   * is closed 1008 {@link #REREGISTERED} — no {@code retire{DELETED}}, since the target, its leases
+   * and its work volumes stay, and the runner installed with the new token takes them over. A
+   * connection the new client opens is untouched; a later dial with the old client finds no row and
+   * is refused at the socket.
+   */
+  public void reregistered(UUID targetId, String previousClientId) {
+    if (targetId == null || previousClientId == null) {
+      return;
+    }
+    boolean closed = false;
+    for (Session session : open(targetId)) {
+      if (!previousClientId.equals(session.clientId)) {
+        continue;
+      }
+      closed = true;
+      LOG.infof(
+          "Target %s (%s) registered again; closing its connection %s of replaced client %s",
+          session.targetName, session.targetId, session.connection.id(), previousClientId);
+      session.open = false;
+      closeBounded(
+          session.connection,
+          new CloseReason(CLOSE_POLICY, REREGISTERED),
+          "the replaced connection of target " + session.targetName);
+    }
+    if (closed && open(targetId).isEmpty()) {
+      connectedSince.remove(targetId);
+      droppedAt.put(targetId, Instant.now());
+    }
   }
 
   // --- frames -----------------------------------------------------------------------------------

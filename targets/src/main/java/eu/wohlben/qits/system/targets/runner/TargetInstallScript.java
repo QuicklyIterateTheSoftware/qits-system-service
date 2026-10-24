@@ -69,8 +69,16 @@ public class TargetInstallScript {
     }
   }
 
-  /** The one line that installs {@code target}'s runner, carrying {@code registrationToken}. */
+  /**
+   * The one line that installs {@code target}'s runner, carrying {@code registrationToken}; its
+   * slots are the reported total, or the minimums' sum when that is more.
+   */
   public String line(Target target, String registrationToken) {
+    return line(target, registrationToken, defaultSlots(target));
+  }
+
+  /** The same line, with {@code slots} as the runner's total. */
+  public String line(Target target, String registrationToken, int slots) {
     try {
       return InstallScript.line(
           identity(version()),
@@ -78,10 +86,15 @@ public class TargetInstallScript {
           PATH,
           target.id.toString(),
           registrationToken,
-          Math.max(target.slotsTotal, target.minimumsSum()));
+          slots);
     } catch (IllegalStateException unrenderable) {
       throw new TargetRefusal(503, null, unrenderable.getMessage());
     }
+  }
+
+  /** The total an install line carries when the operator names none. */
+  public static int defaultSlots(Target target) {
+    return Math.max(target.slotsTotal, target.minimumsSum());
   }
 
   public static void requireCarriable(String registrationToken) {

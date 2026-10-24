@@ -27,7 +27,9 @@ import org.jboss.logging.Logger;
  * <p><b>Two arms, judged by the target table.</b> A {@code target-runner} client belongs to the
  * target its {@code contextId} names, and is decommissioned when that row is gone or names a
  * different client; a row with no client yet spares every client of its target (a registration
- * between the commission and the write). A {@code target-runner-registration} token is deleted when
+ * between the commission and the write), and so does a row holding a pending registration token (a
+ * re-registration after a rotation, qits-1579, between the commission and the write; the replaced
+ * client is given back by the register door, or by the first pass after the token is spent). A {@code target-runner-registration} token is deleted when
  * no row's {@code registration_token_id} names it; one younger than {@link #TOKEN_GRACE} is spared,
  * because a create and a rotation commission it before the row names it.
  *
@@ -89,7 +91,7 @@ public class TargetCommissionReconcile {
     int reaped = 0;
     for (TargetRunnerCommissioner.LiveClient client : live.get()) {
       Credentials row = rows.get(client.contextId());
-      if (row != null && (row.clientId() == null || row.clientId().equals(client.clientId()))) {
+      if (spares(row, client.clientId())) {
         continue;
       }
       LOG.infof(
@@ -138,6 +140,18 @@ public class TargetCommissionReconcile {
   }
 
   record Credentials(String clientId, String registrationTokenId) {}
+
+  /**
+   * Whether target row {@code row} keeps {@code clientId} alive: it is the row's client, or the row
+   * has no client yet, or it holds a pending registration token — either may be registering right
+   * now, between qits-idp commissioning the client and the row naming it.
+   */
+  static boolean spares(Credentials row, String clientId) {
+    return row != null
+        && (row.clientId() == null
+            || row.registrationTokenId() != null
+            || row.clientId().equals(clientId));
+  }
 
   private Map<String, Credentials> credentials() {
     try {

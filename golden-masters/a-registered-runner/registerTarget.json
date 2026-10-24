@@ -1,4 +1,4 @@
 {
   "code": "ALREADY_REGISTERED",
-  "message": "Target lab is registered already; delete and declare it again"
+  "message": "Target lab is registered already; rotate its registration token to reinstall it"
 }
