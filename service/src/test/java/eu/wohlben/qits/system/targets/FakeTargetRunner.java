@@ -72,7 +72,7 @@ public final class FakeTargetRunner implements AutoCloseable {
   public void hello(String version, int slots, String credentialVolume) {
     SystemRunnerCapabilities capabilities =
         new SystemRunnerCapabilities(
-            true, "amd64", "linux", slots, 65536L, "ENGINE-1", "node-1", credentialVolume, true);
+            true, "amd64", "linux", slots, "ENGINE-1", "node-1", credentialVolume, true);
     send(
         new Hello(
             version,
