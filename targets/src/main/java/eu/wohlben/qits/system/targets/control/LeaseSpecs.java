@@ -42,6 +42,13 @@ public final class LeaseSpecs {
   public static final java.util.Set<String> POLICY_ENV =
       java.util.Set.of("BUILDKIT_HOST", "HOME", "CLAUDE_CONFIG_DIR");
 
+  /**
+   * What every {@code spec.env} value reads as on a lease door (qits-1594). The values are the
+   * owner's secrets — a workspace's platform bearer, its daemon token — and the doors answer far
+   * wider than the owner; the keys stay, so a reader still sees what a lease is given.
+   */
+  public static final String REDACTED = "<redacted>";
+
   private LeaseSpecs() {}
 
   /**
@@ -148,6 +155,25 @@ public final class LeaseSpecs {
       return array;
     }
     return node;
+  }
+
+  /**
+   * A copy of {@code spec} with every {@code env} value replaced by {@link #REDACTED}, every key and
+   * every other member as they were. The input is not touched; null, or anything that is not an
+   * object, comes back as it is.
+   */
+  public static JsonNode redacted(JsonNode spec) {
+    if (spec == null || !spec.isObject()) {
+      return spec;
+    }
+    ObjectNode copy = ((ObjectNode) spec).deepCopy();
+    JsonNode env = copy.get("env");
+    if (env != null && env.isObject()) {
+      ObjectNode masked = JsonNodeFactory.instance.objectNode();
+      env.fieldNames().forEachRemaining(name -> masked.put(name, REDACTED));
+      copy.set("env", masked);
+    }
+    return copy;
   }
 
   /** sha256 of the canonical text, hex. */

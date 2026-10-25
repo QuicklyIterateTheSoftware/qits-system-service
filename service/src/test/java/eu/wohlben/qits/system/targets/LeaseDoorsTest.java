@@ -6,7 +6,11 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import eu.wohlben.qits.system.targets.control.LeaseSpecs;
 
 import eu.wohlben.qits.system.targets.control.TargetAllocation;
 import eu.wohlben.qits.system.targets.entity.LeaseState;
@@ -158,6 +162,65 @@ class LeaseDoorsTest {
         .statusCode(200)
         .body("$", hasSize(2));
     service("dev-qits-ci").get(API + "?state=NOPE").then().statusCode(400);
+  }
+
+  @Test
+  void noDoorAnswersASpecEnvValueOnlyItsKey() throws Exception {
+    String secret = "qits_tok_never_on_a_door";
+    String spec =
+        "{\"image\":\""
+            + WORKSPACE_IMAGE
+            + "\",\"env\":{\"QITS_TOKEN\":\""
+            + secret
+            + "\"},\"user\":\"1001\",\"limits\":{\"memory\":\"2g\"}}";
+    Response created =
+        service("dev-qits-workspaces")
+            .contentType("application/json")
+            .body("{\"slotType\":\"WORKSPACE\",\"ownerRef\":\"17\",\"spec\":" + spec + "}")
+            .post(API);
+    created.then().statusCode(201).body("spec.env.QITS_TOKEN", equalTo(LeaseSpecs.REDACTED));
+    assertFalse(created.asString().contains(secret), "the create answer carries no env value");
+    String id = created.path("id");
+    String hash = LeaseSpecs.hash(new ObjectMapper().readTree(spec));
+    assertEquals(hash, created.path("specHash"), "the hash is the real spec's");
+
+    RequestSpecification agent =
+        given().header("X-Qits-User", "dyn-agent").header("X-Qits-Roles", "qits:agent");
+    RequestSpecification owner = service("dev-qits-workspaces");
+    for (RequestSpecification caller : new RequestSpecification[] {agent, owner}) {
+      Response list = given().spec(caller).get(API);
+      list.then()
+          .statusCode(200)
+          .body("[0].spec.env.QITS_TOKEN", equalTo(LeaseSpecs.REDACTED))
+          .body("[0].spec.image", equalTo(WORKSPACE_IMAGE))
+          .body("[0].specHash", equalTo(hash));
+      assertFalse(list.asString().contains(secret));
+      Response one = given().spec(caller).get(API + "/" + id);
+      one.then()
+          .statusCode(200)
+          .body("spec.env.QITS_TOKEN", equalTo(LeaseSpecs.REDACTED))
+          .body("spec.user", equalTo("1001"))
+          .body("spec.limits.memory", equalTo("2g"))
+          .body("specHash", equalTo(hash));
+      assertFalse(one.asString().contains(secret));
+    }
+    String stored = TargetRows.reload(UUID.fromString(id)).spec;
+    assertEquals(
+        secret,
+        new ObjectMapper().readTree(stored).get("env").get("QITS_TOKEN").asText(),
+        "the stored spec keeps the real value");
+
+    Response replaced =
+        service("dev-qits-workspaces")
+            .contentType("application/json")
+            .body("{\"spec\":" + spec + "}")
+            .put(API + "/" + id + "/spec");
+    replaced
+        .then()
+        .statusCode(200)
+        .body("spec.env.QITS_TOKEN", equalTo(LeaseSpecs.REDACTED))
+        .body("specHash", equalTo(hash));
+    assertFalse(replaced.asString().contains(secret), "the replace answer carries no env value");
   }
 
   @Test

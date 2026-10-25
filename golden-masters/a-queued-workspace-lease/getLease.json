@@ -11,7 +11,7 @@
   "state": "QUEUED",
   "spec": {
     "env": {
-      "QITS_TOKEN": "qits_tok_lease"
+      "QITS_TOKEN": "<redacted>"
     },
     "user": "1000",
     "image": "registry.qits.wohlben.eu/qits/workspace:2026.1",

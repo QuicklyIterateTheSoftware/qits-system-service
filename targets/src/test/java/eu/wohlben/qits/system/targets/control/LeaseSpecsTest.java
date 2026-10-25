@@ -74,4 +74,34 @@ class LeaseSpecsTest {
     assertEquals("dev-", OwnerIdentity.application("dev-", "dev"));
     assertEquals(null, OwnerIdentity.application(" ", "dev"));
   }
+
+  @Test
+  void aRedactedSpecKeepsEveryEnvKeyAndNoEnvValue() throws Exception {
+    String text =
+        "{\"image\":\"registry.qits.example.eu/qits/workspace:1\",\"user\":\"1000:1000\","
+            + "\"limits\":{\"memory\":\"4g\"},"
+            + "\"env\":{\"QITS_TOKEN\":\"qits_tok_secret\",\"PORT\":8080}}";
+    var spec = JSON.readTree(text);
+
+    var redacted = LeaseSpecs.redacted(spec);
+
+    assertEquals(LeaseSpecs.REDACTED, redacted.get("env").get("QITS_TOKEN").asText());
+    assertEquals(LeaseSpecs.REDACTED, redacted.get("env").get("PORT").asText());
+    assertEquals(2, redacted.get("env").size());
+    assertEquals(spec.get("image"), redacted.get("image"));
+    assertEquals(spec.get("user"), redacted.get("user"));
+    assertEquals(spec.get("limits"), redacted.get("limits"));
+    assertFalse(LeaseSpecs.text(redacted).contains("qits_tok_secret"));
+    assertEquals(JSON.readTree(text), spec, "the input is not touched");
+    assertEquals("qits_tok_secret", spec.get("env").get("QITS_TOKEN").asText());
+  }
+
+  @Test
+  void aSpecWithoutEnvRedactsToItself() throws Exception {
+    assertEquals(null, LeaseSpecs.redacted(null));
+    var bare = JSON.readTree("{\"image\":\"a:1\"}");
+    assertEquals(bare, LeaseSpecs.redacted(bare));
+    var nullEnv = JSON.readTree("{\"image\":\"a:1\",\"env\":null}");
+    assertEquals(nullEnv, LeaseSpecs.redacted(nullEnv));
+  }
 }

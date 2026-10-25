@@ -114,7 +114,11 @@ public class TargetViews {
       UUID targetId,
       int priority,
       String state,
-      @Schema(description = "LeaseSpec{image, env, user, limits}") JsonNode spec,
+      @Schema(
+              description =
+                  "LeaseSpec{image, env, user, limits}; every env value reads \"<redacted>\","
+                      + " the keys are kept. specHash is the stored spec's, unredacted")
+          JsonNode spec,
       String specHash,
       JsonNode adopt,
       Integer exitCode,
@@ -184,7 +188,7 @@ public class TargetViews {
         lease.targetId,
         lease.priority,
         lease.state.name(),
-        LeaseSpecs.parse(lease.spec),
+        LeaseSpecs.redacted(LeaseSpecs.parse(lease.spec)),
         lease.specHash,
         LeaseSpecs.parse(lease.adopt),
         lease.exitCode,

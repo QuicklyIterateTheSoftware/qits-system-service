@@ -11,7 +11,7 @@
   "state": "QUEUED",
   "spec": {
     "env": {
-      "QITS_TOKEN": "qits_tok_lease"
+      "QITS_TOKEN": "<redacted>"
     },
     "image": "registry.qits.wohlben.eu/qits/project-agent:2026.1",
     "limits": {

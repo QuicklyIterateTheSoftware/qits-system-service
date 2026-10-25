@@ -11,7 +11,7 @@
   "state": "QUEUED",
   "spec": {
     "env": {
-      "QITS_TOKEN": "qits_tok_run"
+      "QITS_TOKEN": "<redacted>"
     },
     "user": "1001",
     "image": "registry.qits.wohlben.eu/qits/build-images/ci-slot:2026.1",

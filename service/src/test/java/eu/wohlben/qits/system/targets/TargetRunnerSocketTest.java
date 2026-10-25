@@ -242,6 +242,8 @@ class TargetRunnerSocketTest {
       assertEquals(WORKSPACE_IMAGE, entry.spec().image());
       assertEquals("1001", entry.spec().user());
       assertEquals("2g", entry.spec().limits().memory());
+      assertEquals(
+          "t", entry.spec().env().get("QITS_TOKEN"), "the runner gets the real env, never the door's");
       Lease granted = TargetRows.reload(UUID.fromString(workspace));
       assertEquals(LeaseState.GRANTED, granted.state);
       assertEquals(target, granted.targetId);
