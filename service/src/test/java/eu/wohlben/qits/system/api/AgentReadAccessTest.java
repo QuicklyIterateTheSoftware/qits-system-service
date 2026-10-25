@@ -134,4 +134,19 @@ class AgentReadAccessTest {
         .then()
         .statusCode(403);
   }
+
+  /**
+   * A project's delivery desk ({@code qits:desk}, qits-1596) holds the coordinator's writes but not
+   * a terminal: a shell in any container on the host reaches the git host's and the identity
+   * provider's storage, so it would be a way to push and to change the desk's own rights.
+   */
+  @Test
+  void aDeliveryDeskIsRefusedATerminal() {
+    as("qits:agent,qits:desk")
+        .contentType("application/json")
+        .body("{\"kind\":\"GLANCES\"}")
+        .post("/system/api/terminals")
+        .then()
+        .statusCode(403);
+  }
 }

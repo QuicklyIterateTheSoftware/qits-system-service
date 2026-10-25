@@ -189,6 +189,52 @@ class TargetDoorsTest {
     admin().post(API + "/" + id + "/greenlight").then().statusCode(200).body("quarantined", is(false));
   }
 
+  /**
+   * A project's delivery desk ({@code qits:desk}, qits-1596) is admitted beside {@code
+   * qits:admin-agent} on every target door: a target carries no project to bind the desk to, and
+   * none of these write a git ref or touch the desk's own credentials. The representative doors
+   * that admit {@code qits:admin-agent} without already admitting {@code qits:agent} — create,
+   * patch, delete, the registration-token rotation, greenlight and the login check.
+   */
+  @Test
+  void aDeliveryDeskActsLikeTheCoordinatorOnEveryTargetDoor() {
+    RequestSpecification desk = as("desk-of-a-project", "qits:agent,qits:desk");
+
+    String id =
+        desk.contentType("application/json")
+            .body("{\"name\":\"lab\"}")
+            .post(API)
+            .then()
+            .statusCode(201)
+            .extract()
+            .path("target.id");
+
+    desk.contentType("application/json")
+        .body("{\"description\":\"the lab box\"}")
+        .patch(API + "/" + id)
+        .then()
+        .statusCode(200)
+        .body("description", equalTo("the lab box"));
+
+    desk.post(API + "/" + id + "/registration-token")
+        .then()
+        .statusCode(200)
+        .body("registrationToken", equalTo("qits_tok_suite-2"));
+
+    UUID quarantined = UUID.randomUUID();
+    TargetRows.target(quarantined, "q", 4, "client-q", true);
+    desk.post(API + "/" + quarantined + "/greenlight")
+        .then()
+        .statusCode(200)
+        .body("quarantined", is(false));
+
+    UUID away = UUID.randomUUID();
+    TargetRows.target(away, "away", 4, "client-away", false);
+    desk.post(API + "/" + away + "/login-check").then().statusCode(409).body("code", equalTo("TARGET_UNAVAILABLE"));
+
+    desk.delete(API + "/" + id).then().statusCode(204);
+  }
+
   @Test
   void aRotationWithNoBodyAndNoContentTypeIsAnswered() throws Exception {
     String id = create("lab", "{\"ci\":2}").path("target.id");
