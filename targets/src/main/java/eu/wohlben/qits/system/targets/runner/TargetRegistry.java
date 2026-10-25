@@ -29,6 +29,7 @@ import eu.wohlben.qits.systemrunner.protocol.Inventory;
 import eu.wohlben.qits.systemrunner.protocol.LeaseReport;
 import eu.wohlben.qits.systemrunner.protocol.LoginState;
 import eu.wohlben.qits.systemrunner.protocol.ProbeLogin;
+import eu.wohlben.qits.systemrunner.protocol.SignInProgress;
 import eu.wohlben.qits.systemrunner.protocol.SlotImages;
 import eu.wohlben.qits.systemrunner.protocol.SystemRunnerAck;
 import eu.wohlben.qits.systemrunner.protocol.SystemRunnerCapabilities;
@@ -85,7 +86,9 @@ import org.jboss.logging.Logger;
  *
  * <p><b>Sign-in.</b> {@code loginState} is written to the row ({@link Targets#recordLogin}) and
  * announced when it changed; the login commands are rendered only once one has arrived on the
- * current connection ({@link #loginStateSeen}), the proof the probe image is on the node.
+ * current connection ({@link #loginStateSeen}), the proof the probe image is on the node. A
+ * harness sign-in runs on the serving connection and reports {@code signInProgress} ({@link
+ * TargetSignIns}); a connection that closes fails whatever it was signing in.
  */
 @ApplicationScoped
 public class TargetRegistry implements TargetPresence {
@@ -130,6 +133,8 @@ public class TargetRegistry implements TargetPresence {
   @Inject TargetHealth health;
 
   @Inject ProbeImages probeImages;
+
+  @Inject TargetSignIns signIns;
 
   @Inject ObjectMapper objectMapper;
 
@@ -435,9 +440,15 @@ public class TargetRegistry implements TargetPresence {
     health.onHealthChecked(session.targetId, checked.requestId(), checked.report());
   }
 
+  /** A harness sign-in moved ({@link TargetSignIns}). */
+  public void onSignInProgress(Session session, SignInProgress progress) {
+    signIns.onProgress(session, progress);
+  }
+
   /** A connection went away; when it was the target's last, the reconnect grace starts. */
   public void onClose(Session session) {
     session.open = false;
+    signIns.onClose(session);
     boolean[] last = {false};
     sessions.computeIfPresent(
         session.targetId,
@@ -608,6 +619,7 @@ public class TargetRegistry implements TargetPresence {
     droppedAt.remove(targetId);
     connectedSince.remove(targetId);
     health.forget(targetId);
+    signIns.forget(targetId);
   }
 
   /**

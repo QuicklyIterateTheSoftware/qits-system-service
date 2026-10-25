@@ -10,6 +10,7 @@ import eu.wohlben.qits.system.targets.entity.Target;
 import eu.wohlben.qits.systemrunner.protocol.HealthChecked;
 import eu.wohlben.qits.systemrunner.protocol.Inventory;
 import eu.wohlben.qits.systemrunner.protocol.LoginState;
+import eu.wohlben.qits.systemrunner.protocol.SignInProgress;
 import eu.wohlben.qits.systemrunner.protocol.SystemRunnerProtocol;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.quarkus.websockets.next.CloseReason;
@@ -111,6 +112,7 @@ public class TargetRunnerSocket {
       case Inventory inventory -> registry.onInventory(session, inventory);
       case LoginState login -> registry.onLoginState(session, login);
       case HealthChecked checked -> registry.onHealthChecked(session, checked);
+      case SignInProgress progress -> registry.onSignInProgress(session, progress);
       default ->
           LOG.debugf(
               "Target %s sent a host frame %s; ignored",

@@ -26,6 +26,9 @@ public class TargetRefusal extends SystemException {
   public static final String RUNNER_PLANE_UNCONFIGURED = "RUNNER_PLANE_UNCONFIGURED";
   public static final String COMMISSIONING_OFF = "COMMISSIONING_OFF";
   public static final String IDP_REFUSED = "IDP_REFUSED";
+  public static final String SIGN_IN_RUNNING = "SIGN_IN_RUNNING";
+  public static final String SIGN_IN_NOT_FOUND = "SIGN_IN_NOT_FOUND";
+  public static final String SIGN_IN_NOT_AWAITING_CODE = "SIGN_IN_NOT_AWAITING_CODE";
 
   private final int status;
   private final String code;
