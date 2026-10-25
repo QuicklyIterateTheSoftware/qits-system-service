@@ -103,7 +103,7 @@
              One version for both: they are released together from qits-runner-javalib. -->
         <qits.eventstream.version>2026.1019.123026</qits.eventstream.version>
         <qits.db-core.version>2026.1002.70617</qits.db-core.version>
-        <qits.runner.version>2026.1025.90750</qits.runner.version>
+        <qits.runner.version>2026.1025.95949</qits.runner.version>
         <!-- The qits-system-runner's own frames (qits-1481): SystemRunnerProtocol, SystemRunnerCodec
              and SystemRunnerBinary, whose VERSION is the runner image every target is pinned to.
              Published by qits-system-runner-daemon. -->
