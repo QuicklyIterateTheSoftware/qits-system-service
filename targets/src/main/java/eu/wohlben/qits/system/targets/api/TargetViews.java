@@ -9,6 +9,7 @@ import eu.wohlben.qits.system.targets.entity.SlotType;
 import eu.wohlben.qits.system.targets.entity.Target;
 import eu.wohlben.qits.system.targets.runner.TargetLoginCommand;
 import eu.wohlben.qits.system.targets.runner.TargetRegistry;
+import eu.wohlben.qits.system.targets.runner.TargetSignIns;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.time.Instant;
@@ -101,6 +102,24 @@ public class TargetViews {
   @Schema(name = "TargetHealthCheckRequested")
   public record HealthCheckRequested(String requestId) {}
 
+  @Schema(name = "TargetSignIn")
+  @JsonInclude(JsonInclude.Include.ALWAYS)
+  public record SignInView(
+      UUID signInId,
+      UUID targetId,
+      @Schema(description = "claude or kimi") String harness,
+      @Schema(
+              description =
+                  "STARTING, AWAITING_CODE (claude: open url, post the code it shows),"
+                      + " AWAITING_BROWSER (kimi: open url, approve userCode), or the terminal"
+                      + " SUCCEEDED, FAILED, EXPIRED, CANCELLED")
+          String state,
+      @Schema(description = "The browser url the CLI printed; null until it did") String url,
+      @Schema(description = "Kimi Code's device code; null for claude") String userCode,
+      @Schema(description = "Why, on a terminal state; else null") String detail,
+      Instant startedAt,
+      Instant updatedAt) {}
+
   @Schema(name = "Lease")
   @JsonInclude(JsonInclude.Include.ALWAYS)
   public record LeaseDto(
@@ -174,6 +193,19 @@ public class TargetViews {
 
   public TargetDto view(Target target) {
     return view(target, targets.used().getOrDefault(target.id, Map.of()));
+  }
+
+  public static SignInView view(TargetSignIns.View signIn) {
+    return new SignInView(
+        signIn.signInId(),
+        signIn.targetId(),
+        signIn.harness(),
+        signIn.state().name(),
+        signIn.url(),
+        signIn.userCode(),
+        signIn.detail(),
+        signIn.startedAt(),
+        signIn.updatedAt());
   }
 
   public static LeaseDto view(Lease lease) {

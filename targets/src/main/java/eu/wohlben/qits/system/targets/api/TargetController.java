@@ -13,6 +13,7 @@ import eu.wohlben.qits.system.targets.runner.TargetAddresses;
 import eu.wohlben.qits.system.targets.runner.TargetHealth;
 import eu.wohlben.qits.system.targets.runner.TargetInstallScript;
 import eu.wohlben.qits.system.targets.runner.TargetRegistry;
+import eu.wohlben.qits.system.targets.runner.TargetSignIns;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.annotation.security.RolesAllowed;
@@ -58,6 +59,9 @@ import org.jboss.logging.Logger;
       TargetViews.TargetRegistrationDto.class,
       TargetViews.RegisteredTarget.class,
       TargetViews.HealthCheckRequested.class,
+      TargetViews.SignInView.class,
+      TargetController.StartSignInRequest.class,
+      TargetController.SignInCodeRequest.class,
       TargetController.CreateTargetRequest.class,
       TargetController.PatchTargetRequest.class,
       TargetController.RegisterTargetRequest.class,
@@ -89,6 +93,8 @@ public class TargetController {
   @Inject TargetRegistry registry;
 
   @Inject TargetHealth health;
+
+  @Inject TargetSignIns signIns;
 
   @Inject TargetRunnerCommissioner idp;
 
@@ -124,6 +130,20 @@ public class TargetController {
                       + " sum; absent is the reported total, or the minimums' sum when that is"
                       + " more. Not stored: the runner reports its total")
           Integer slots) {}
+
+  @Schema(name = "StartTargetSignInRequest")
+  public record StartSignInRequest(
+      @Schema(description = "claude or kimi", required = true) String harness) {}
+
+  @Schema(name = "TargetSignInCodeRequest")
+  public record SignInCodeRequest(
+      @Schema(description = "The code the browser showed after the sign-in", required = true)
+          String code) {
+    @Override
+    public String toString() {
+      return "SignInCodeRequest[code=<redacted>]";
+    }
+  }
 
   @Schema(name = "RegisterTargetRequest")
   public record RegisterTargetRequest(
@@ -368,6 +388,95 @@ public class TargetController {
       throw unavailable(target, "check its sign-in");
     }
     return Response.accepted().build();
+  }
+
+  // --- sign-in (qits-1593): the runner runs the harness login, these doors relay it -------------
+
+  @POST
+  @Path("/{id}/sign-ins")
+  @Consumes(MediaType.APPLICATION_JSON)
+  @RolesAllowed({ADMIN, ADMIN_AGENT})
+  @Operation(
+      operationId = "startTargetSignIn",
+      summary = "Sign a connected target in to a harness: its runner runs the harness's own login",
+      description =
+          "Poll the sign-in until it is AWAITING_CODE (claude: open its url, then post the code the"
+              + " browser shows) or AWAITING_BROWSER (kimi: open its url and approve its userCode),"
+              + " and then until it settles. It expires after 10 minutes.")
+  @APIResponse(
+      responseCode = "202",
+      description = "Started: the sign-in, STARTING",
+      content = @Content(schema = @Schema(implementation = TargetViews.SignInView.class)))
+  @APIResponse(responseCode = "400", description = "A harness other than claude or kimi")
+  @APIResponse(responseCode = "404", description = "No such target")
+  @APIResponse(
+      responseCode = "409",
+      description =
+          "TARGET_UNAVAILABLE: the target is not connected; SIGN_IN_RUNNING: a sign-in for that"
+              + " harness has not settled, and the message names it")
+  public Response startSignIn(@PathParam("id") String id, StartSignInRequest request) {
+    Target target = targets.get(targetId(id));
+    TargetSignIns.View started =
+        signIns.start(target.id, target.name, request == null ? null : request.harness());
+    return Response.accepted(TargetViews.view(started)).build();
+  }
+
+  @GET
+  @Path("/{id}/sign-ins/{signInId}")
+  @RolesAllowed({ADMIN, ADMIN_AGENT})
+  @Operation(operationId = "getTargetSignIn", summary = "One sign-in, while it runs and ~15 minutes after")
+  @APIResponse(
+      responseCode = "200",
+      description = "The sign-in",
+      content = @Content(schema = @Schema(implementation = TargetViews.SignInView.class)))
+  @APIResponse(responseCode = "404", description = "No such target, or SIGN_IN_NOT_FOUND")
+  public TargetViews.SignInView getSignIn(
+      @PathParam("id") String id, @PathParam("signInId") String signInId) {
+    Target target = targets.get(targetId(id));
+    return TargetViews.view(signIns.get(target.id, signInId));
+  }
+
+  @POST
+  @Path("/{id}/sign-ins/{signInId}/code")
+  @Consumes(MediaType.APPLICATION_JSON)
+  @RolesAllowed({ADMIN, ADMIN_AGENT})
+  @Operation(
+      operationId = "submitTargetSignInCode",
+      summary = "Hand an AWAITING_CODE sign-in the code the browser showed")
+  @APIResponse(
+      responseCode = "202",
+      description = "Relayed to the runner: the sign-in, which moves once the CLI took it",
+      content = @Content(schema = @Schema(implementation = TargetViews.SignInView.class)))
+  @APIResponse(responseCode = "400", description = "A blank code")
+  @APIResponse(responseCode = "404", description = "No such target, or SIGN_IN_NOT_FOUND")
+  @APIResponse(
+      responseCode = "409",
+      description =
+          "SIGN_IN_NOT_AWAITING_CODE: the sign-in is not AWAITING_CODE; TARGET_UNAVAILABLE: its"
+              + " runner is gone")
+  public Response submitSignInCode(
+      @PathParam("id") String id,
+      @PathParam("signInId") String signInId,
+      SignInCodeRequest request) {
+    Target target = targets.get(targetId(id));
+    TargetSignIns.View view =
+        signIns.code(target.id, target.name, signInId, request == null ? null : request.code());
+    return Response.accepted(TargetViews.view(view)).build();
+  }
+
+  @DELETE
+  @Path("/{id}/sign-ins/{signInId}")
+  @RolesAllowed({ADMIN, ADMIN_AGENT})
+  @Operation(operationId = "cancelTargetSignIn", summary = "Stop a sign-in")
+  @APIResponse(
+      responseCode = "202",
+      description = "The sign-in, CANCELLED; one that had settled, as it settled",
+      content = @Content(schema = @Schema(implementation = TargetViews.SignInView.class)))
+  @APIResponse(responseCode = "404", description = "No such target, or SIGN_IN_NOT_FOUND")
+  public Response cancelSignIn(@PathParam("id") String id, @PathParam("signInId") String signInId) {
+    Target target = targets.get(targetId(id));
+    return Response.accepted(TargetViews.view(signIns.cancel(target.id, target.name, signInId)))
+        .build();
   }
 
   @POST
