@@ -69,6 +69,15 @@ public class TargetController {
 
   static final String ADMIN = "qits:admin";
   static final String ADMIN_AGENT = "qits:admin-agent";
+
+  /**
+   * A project's delivery desk (qits-1596): admitted outright beside {@link #ADMIN_AGENT} wherever
+   * it is admitted here. A target is platform infrastructure with no project of its own to bind a
+   * desk's access to, and none of these doors write a git ref or touch the desk's own credentials
+   * — a registration token mints a runner's client, never the desk's.
+   */
+  static final String DESK = "qits:desk";
+
   static final String SYSTEM = "qits:system";
   static final String AGENT = "qits:agent";
   static final String REGISTRATION = "qits:target-runner-registration";
@@ -122,7 +131,7 @@ public class TargetController {
 
   @POST
   @Consumes(MediaType.APPLICATION_JSON)
-  @RolesAllowed({ADMIN, ADMIN_AGENT, SYSTEM})
+  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK, SYSTEM})
   @Operation(operationId = "createTarget", summary = "Declare a target; answers its install line, once")
   @APIResponse(
       responseCode = "201",
@@ -214,7 +223,7 @@ public class TargetController {
   @PATCH
   @Path("/{id}")
   @Consumes(MediaType.APPLICATION_JSON)
-  @RolesAllowed({ADMIN, ADMIN_AGENT, SYSTEM})
+  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK, SYSTEM})
   @Operation(operationId = "patchTarget", summary = "Change a target's description or minimums")
   @APIResponse(responseCode = "200", description = "The target as it now is")
   @APIResponse(responseCode = "400", description = "A malformed description or minimum")
@@ -239,7 +248,7 @@ public class TargetController {
 
   @DELETE
   @Path("/{id}")
-  @RolesAllowed({ADMIN, ADMIN_AGENT, SYSTEM})
+  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK, SYSTEM})
   @Operation(operationId = "deleteTarget", summary = "Decommission a target: retire its runner, give its credentials back")
   @APIResponse(responseCode = "204", description = "Gone")
   @APIResponse(responseCode = "404", description = "No such target")
@@ -260,7 +269,7 @@ public class TargetController {
 
   @POST
   @Path("/{id}/registration-token")
-  @RolesAllowed({ADMIN, ADMIN_AGENT, SYSTEM})
+  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK, SYSTEM})
   @Operation(
       operationId = "rotateTargetRegistrationToken",
       summary = "Replace a target's registration token; answers a new install line",
@@ -313,7 +322,7 @@ public class TargetController {
 
   @POST
   @Path("/{id}/greenlight")
-  @RolesAllowed({ADMIN, ADMIN_AGENT})
+  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK})
   @Operation(operationId = "greenlightTarget", summary = "Lift a target's quarantine")
   @APIResponse(responseCode = "200", description = "The target as it now is")
   @APIResponse(responseCode = "404", description = "No such target")
@@ -348,7 +357,7 @@ public class TargetController {
 
   @POST
   @Path("/{id}/login-check")
-  @RolesAllowed({ADMIN, ADMIN_AGENT})
+  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK})
   @Operation(operationId = "requestTargetLoginCheck", summary = "Ask a connected target to probe its sign-in now")
   @APIResponse(responseCode = "202", description = "Sent")
   @APIResponse(responseCode = "404", description = "No such target")
