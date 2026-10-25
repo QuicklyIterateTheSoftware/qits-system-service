@@ -87,6 +87,7 @@ class GoldenMasterRecordingTest {
   private static final String TARGET = API + "/targets/{targetId}";
   private static final String RUNNER = API + "/targets/{runnerId}";
   private static final String LEASE = API + "/leases/{leaseId}";
+  private static final String SIGN_IN = TARGET + "/sign-ins/{signInId}";
 
   /**
    * The swarm reads publish no operationIds of their own (no {@code @Operation} annotations), so
@@ -253,6 +254,39 @@ class GoldenMasterRecordingTest {
               null,
               Map.of()),
           call(ProviderStates.A_DECLARED_TARGET, "deleteTarget", "DELETE", TARGET, 204, null, Map.of()),
+          // --- the sign-in doors (qits-1593) ---
+          call(
+              ProviderStates.A_CONNECTED_TARGET,
+              "startTargetSignIn",
+              "POST",
+              TARGET + "/sign-ins",
+              202,
+              "{\"harness\":\"claude\"}",
+              Map.of()),
+          call(
+              ProviderStates.A_CLAUDE_SIGN_IN_AWAITING_ITS_CODE,
+              "getTargetSignIn",
+              "GET",
+              SIGN_IN,
+              200,
+              null,
+              Map.of()),
+          call(
+              ProviderStates.A_CLAUDE_SIGN_IN_AWAITING_ITS_CODE,
+              "submitTargetSignInCode",
+              "POST",
+              SIGN_IN + "/code",
+              202,
+              "{\"code\":\"contract-code#contract\"}",
+              Map.of()),
+          call(
+              ProviderStates.A_CLAUDE_SIGN_IN_AWAITING_ITS_CODE,
+              "cancelTargetSignIn",
+              "DELETE",
+              SIGN_IN,
+              202,
+              null,
+              Map.of()),
           call(
               ProviderStates.AN_UNREGISTERED_RUNNER,
               "registerTarget",
@@ -340,8 +374,13 @@ class GoldenMasterRecordingTest {
   @TestHTTPResource("/")
   URL base;
 
+  private ProviderStates states;
+
   @AfterEach
   void disarm() {
+    if (states != null) {
+      states.close();
+    }
     bearers.reset();
   }
 
@@ -350,7 +389,7 @@ class GoldenMasterRecordingTest {
 
   @Test
   void goldenMastersMatchTheProvider() throws Exception {
-    ProviderStates states = new ProviderStates(bearers);
+    states = new ProviderStates(bearers, URI.create(base.toString()));
     Path dir = GoldenFiles.repositoryRoot().resolve("golden-masters");
     boolean update = GoldenFiles.updating();
     List<String> failures = new ArrayList<>();

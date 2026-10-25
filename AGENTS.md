@@ -49,7 +49,7 @@ its schedules in it; `service/` discovers them through the jar's jandex index. T
     api/       TargetController (/targets), LeaseController (/leases), WorkVolumeController
     runner/    TargetRunnerSocket, TargetRegistry, TargetHealth, TargetFrames, TargetPins,
                TargetAddresses, TargetLoginCommand, TargetInstallScript, TargetCommissionReconcile,
-               SocketBearerLifetime
+               SocketBearerLifetime, TargetSignIns
     idp/       TargetRunnerCommissioner (kinds target-runner, target-runner-registration)
     events/    TargetLeaseChanged, TargetLoginChanged (qits-eventstream)
 
@@ -84,6 +84,12 @@ serving connection whose ack named another image. The login commands name the im
 qits-runner-protocol's `RunnerCodec` and qits-system-runner-protocol's `SystemRunnerCodec`; the
 runner version every `hello` is held to is `SystemRunnerBinary.VERSION` (root pom
 `qits.system-runner-protocol.version`) unless `qits.system.targets.runner-version-override` is set.
+
+**A sign-in is in memory and bound to the connection that started it** (`runner/TargetSignIns`,
+qits-1593). This service is one process and holds every runner socket itself, so there is no other
+instance to route to. The code and the cancel go to that session only; its close FAILS a sign-in that
+has not settled; a runner's `signInProgress` moves only a sign-in of its own target and never its
+harness. The code is relayed, never kept and never logged.
 
 **Every write is its own transaction, and nothing holds one across the network.** `Targets`,
 `Leases` and `WorkVolumes` each run `QuarkusTransaction.requiringNew()`; events go out on
@@ -186,7 +192,8 @@ response types are registered on their own controllers' `@RegisterForReflection`
 **`{"message": "…"}` and nothing else**, plus `"code"` on a refusal a client branches on
 (`NODE_REMOTE`, and the targets module's `TargetRefusal` codes: `MINIMUMS_EXCEED_TOTAL`,
 `TARGET_BUSY`, `TARGET_UNAVAILABLE`, `LEASE_EXISTS`, `SLOT_TYPE_NOT_YOURS`, `NOT_A_TENANT`,
-`NOT_YOUR_LEASE`, `IMAGE_NOT_ALLOWED`, `ENV_KEY_NOT_ALLOWED`, `WORK_VOLUME_IN_USE`, …). One
+`NOT_YOUR_LEASE`, `IMAGE_NOT_ALLOWED`, `ENV_KEY_NOT_ALLOWED`, `WORK_VOLUME_IN_USE`,
+`SIGN_IN_RUNNING`, `SIGN_IN_NOT_FOUND`, `SIGN_IN_NOT_AWAITING_CODE`, …). One
 exception mapper, so two routes failing for the same reason cannot answer differently.
 
 **The WebSocket path is a literal.** `@WebSocket` does not follow `quarkus.rest.path`, so

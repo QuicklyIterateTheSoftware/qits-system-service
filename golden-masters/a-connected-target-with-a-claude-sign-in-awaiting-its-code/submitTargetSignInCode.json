@@ -1,0 +1,11 @@
+{
+  "signInId": "00000000-0000-4000-8000-000000000003",
+  "targetId": "00000000-0000-4000-8000-000000000001",
+  "harness": "claude",
+  "state": "AWAITING_CODE",
+  "url": "https://claude.com/cai/oauth/authorize?code=true&client_id=contract&state=contract",
+  "userCode": null,
+  "detail": null,
+  "startedAt": "2026-01-01T00:00:00Z",
+  "updatedAt": "2026-01-01T00:00:00Z"
+}

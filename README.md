@@ -146,6 +146,10 @@ runner its whole desired `estate`; the runner answers with an `inventory`.
     PATCH  /system/api/targets/{id}                  description, minimums (409 MINIMUMS_EXCEED_TOTAL)
     DELETE /system/api/targets/{id}                  409 TARGET_BUSY while a lease is live; else Retire
     POST   /system/api/targets/{id}/registration-token | greenlight | healthcheck | login-check
+    POST   /system/api/targets/{id}/sign-ins        {harness: claude|kimi}: 202 STARTING; the runner logs in
+    GET    /system/api/targets/{id}/sign-ins/{sid}  poll: AWAITING_CODE/AWAITING_BROWSER carry url, userCode
+    POST   /system/api/targets/{id}/sign-ins/{sid}/code   {code}: relayed to the runner's login
+    DELETE /system/api/targets/{id}/sign-ins/{sid}  CANCELLED; admin and admin-agent only, all four
     GET    /system/api/targets/install.sh            the toolkit's InstallScript
     POST   /system/api/targets/{id}/register         operationId registerTarget; the runner's client
     POST   /system/api/leases                        operationId createLease; 201 QUEUED
@@ -164,6 +168,11 @@ runner its whole desired `estate`; the runner answers with an `inventory`.
 - **A WORKSPACE or DESK lease waits on a target nobody signed in** — `detail` names the command:
   `qits targets sign-in --target <name>`. `loginCommand`/`kimiLoginCommand` are rendered from the
   volume the runner reported, once its `loginState` arrived on the current connection.
+- **A sign-in runs on the target** (qits-1593): the runner runs the harness's own login in its
+  credential volume and reports `signInProgress`; this service holds it in memory, relays the code,
+  expires it after 10 minutes (EXPIRED, `signInCancel`) and keeps a settled one readable ~15. 409
+  `TARGET_UNAVAILABLE`, `SIGN_IN_RUNNING` (one per target and harness), `SIGN_IN_NOT_AWAITING_CODE`;
+  404 `SIGN_IN_NOT_FOUND`. The code is never logged.
 - **Events**: `TargetLeaseChanged` on every state change, `TargetLoginChanged` on every sign-in
   change. Owners also reconcile from `GET /leases`.
 - **Store**: postgres (`resources: postgresql:db, postgresql:eventstream:…` in deployments.yml),

@@ -181,6 +181,76 @@ class TargetDoorsTest {
     admin().get(API + "/not-a-uuid").then().statusCode(404);
   }
 
+  /**
+   * The sign-in doors (qits-1593) admit {@code qits:admin} and {@code qits:admin-agent} only: a
+   * sign-in writes the harness credentials every WORKSPACE and DESK lease on the target runs with.
+   */
+  @Test
+  void onlyAnAdministratorSignsATargetIn() {
+    UUID id = UUID.randomUUID();
+    TargetRows.target(id, "away", 4, "client-away", false);
+    String signIns = API + "/" + id + "/sign-ins";
+    String one = signIns + "/" + UUID.randomUUID();
+    for (RequestSpecification refused :
+        java.util.List.of(
+            as("dyn-agent", "qits:agent"),
+            as("a-service", "qits:system"),
+            as("desk-of-a-project", "qits:agent,qits:desk"))) {
+      refused
+          .contentType("application/json")
+          .body("{\"harness\":\"claude\"}")
+          .post(signIns)
+          .then()
+          .statusCode(403);
+    }
+    for (RequestSpecification refused :
+        java.util.List.of(as("dyn-agent", "qits:agent"), as("a-service", "qits:system"))) {
+      refused.get(one).then().statusCode(403);
+      refused.contentType("application/json").body("{\"code\":\"c\"}").post(one + "/code").then().statusCode(403);
+      refused.delete(one).then().statusCode(403);
+    }
+    as("the-coordinator", "qits:admin-agent")
+        .contentType("application/json")
+        .body("{\"harness\":\"claude\"}")
+        .post(signIns)
+        .then()
+        .statusCode(409)
+        .body("code", equalTo("TARGET_UNAVAILABLE"));
+  }
+
+  @Test
+  void aSignInNeedsAKnownHarnessAConnectedTargetAndAnIdItKnows() {
+    UUID id = UUID.randomUUID();
+    TargetRows.target(id, "away", 4, "client-away", false);
+    String signIns = API + "/" + id + "/sign-ins";
+    admin().contentType("application/json").body("{\"harness\":\"codex\"}").post(signIns).then().statusCode(400);
+    admin().contentType("application/json").body("{}").post(signIns).then().statusCode(400);
+    admin()
+        .contentType("application/json")
+        .body("{\"harness\":\"kimi\"}")
+        .post(signIns)
+        .then()
+        .statusCode(409)
+        .body("code", equalTo("TARGET_UNAVAILABLE"));
+    String unknown = signIns + "/" + UUID.randomUUID();
+    admin().get(unknown).then().statusCode(404).body("code", equalTo("SIGN_IN_NOT_FOUND"));
+    admin().get(signIns + "/not-a-uuid").then().statusCode(404).body("code", equalTo("SIGN_IN_NOT_FOUND"));
+    admin()
+        .contentType("application/json")
+        .body("{\"code\":\"c\"}")
+        .post(unknown + "/code")
+        .then()
+        .statusCode(404)
+        .body("code", equalTo("SIGN_IN_NOT_FOUND"));
+    admin().delete(unknown).then().statusCode(404).body("code", equalTo("SIGN_IN_NOT_FOUND"));
+    admin()
+        .contentType("application/json")
+        .body("{\"harness\":\"claude\"}")
+        .post(API + "/" + UUID.randomUUID() + "/sign-ins")
+        .then()
+        .statusCode(404);
+  }
+
   @Test
   void aGreenlightLiftsTheQuarantineAndOnlyAnAdministratorGivesOne() {
     UUID id = UUID.randomUUID();

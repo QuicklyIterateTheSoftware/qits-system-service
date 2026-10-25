@@ -12,6 +12,8 @@ import eu.wohlben.qits.systemrunner.protocol.LeaseReport;
 import eu.wohlben.qits.systemrunner.protocol.LeaseState;
 import eu.wohlben.qits.systemrunner.protocol.LoginPresence;
 import eu.wohlben.qits.systemrunner.protocol.LoginState;
+import eu.wohlben.qits.systemrunner.protocol.SignInProgress;
+import eu.wohlben.qits.systemrunner.protocol.SignInState;
 import eu.wohlben.qits.systemrunner.protocol.SystemRunnerBinary;
 import eu.wohlben.qits.systemrunner.protocol.SystemRunnerCapabilities;
 import eu.wohlben.qits.systemrunner.protocol.SystemRunnerCodec;
@@ -89,6 +91,12 @@ public final class FakeTargetRunner implements AutoCloseable {
 
   public void loginState(LoginPresence claude, LoginPresence kimi, String volume) {
     send(new LoginState(claude, kimi, "2026-10-23T08:00:00Z", volume));
+  }
+
+  /** A sign-in moved, as the runner reports it. */
+  public void signInProgress(
+      String signInId, String harness, SignInState state, String url, String userCode, String detail) {
+    send(new SignInProgress(signInId, harness, state, url, userCode, detail));
   }
 
   public void inventory(List<LeaseReport> leases, List<String> volumes) {
