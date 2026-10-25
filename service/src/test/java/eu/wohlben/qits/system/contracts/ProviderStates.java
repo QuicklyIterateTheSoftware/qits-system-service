@@ -1,6 +1,8 @@
 package eu.wohlben.qits.system.contracts;
 
+import eu.wohlben.qits.runner.protocol.Ack;
 import eu.wohlben.qits.system.targets.ContractBearers;
+import eu.wohlben.qits.system.targets.FakeTargetRunner;
 import eu.wohlben.qits.system.targets.IdpStub;
 import eu.wohlben.qits.system.targets.TargetRows;
 import eu.wohlben.qits.system.targets.entity.Lease;
@@ -9,8 +11,14 @@ import eu.wohlben.qits.system.targets.entity.LoginValue;
 import eu.wohlben.qits.system.targets.entity.SlotType;
 import eu.wohlben.qits.system.targets.entity.Target;
 import eu.wohlben.qits.system.targets.entity.WorkVolume;
+import eu.wohlben.qits.system.targets.runner.TargetSignIns;
+import eu.wohlben.qits.systemrunner.protocol.Estate;
+import eu.wohlben.qits.systemrunner.protocol.SignIn;
+import eu.wohlben.qits.systemrunner.protocol.SignInState;
 import eu.wohlben.qits.systemrunner.protocol.SystemRunnerBinary;
+import io.quarkus.arc.Arc;
 import io.quarkus.narayana.jta.QuarkusTransaction;
+import java.net.URI;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -32,6 +40,10 @@ import java.util.function.Supplier;
  * ContractBearers} with the bearer a consumer sends — the target runner's registration token, or a
  * tenant service's client — so the golden master and the pact both carry the {@code Authorization}
  * header a real consumer sends.
+ *
+ * <p>The sign-in states (qits-1593) need a target that is CONNECTED, which only a socket makes: they
+ * dial a {@link FakeTargetRunner} — the suite's real WebSocket runner — and keep it open until the
+ * next state ({@link #close}), so the doors relay to a live connection exactly as in a deployment.
  */
 public class ProviderStates {
 
@@ -94,6 +106,23 @@ public class ProviderStates {
   /** qits-projects' work volume {@code desk-<project>} on target {@code lab}, its lease ENDED. */
   public static final String AN_UNUSED_DESK_WORK_VOLUME = "an unused desk work volume";
 
+  /** Target {@code lab}, its runner connected and served, no sign-in running (qits-1593). */
+  public static final String A_CONNECTED_TARGET = "a connected target";
+
+  /**
+   * The same target, a claude sign-in started and its runner reporting AWAITING_CODE with the url
+   * {@link #CLAUDE_SIGN_IN_URL}: param {@code signInId}.
+   */
+  public static final String A_CLAUDE_SIGN_IN_AWAITING_ITS_CODE =
+      "a connected target with a claude sign-in awaiting its code";
+
+  static final String CLAUDE_SIGN_IN_URL =
+      "https://claude.com/cai/oauth/authorize?code=true&client_id=contract&state=contract";
+
+  static final String RUNNER_BEARER = "Bearer qits_tok_contract-target-runner";
+
+  static final String RUNNER_CLIENT = "target-runner-client-lab";
+
   /** Not seeded into the freezer: it freezes to the next free id, in the params and the body alike. */
   static final String PROJECT_ID = Freezer.frozenId(0x10);
 
@@ -153,8 +182,19 @@ public class ProviderStates {
 
   private final ContractBearers bearers;
 
+  /** Where a sign-in state dials its runner; null leaves those states unanswerable. */
+  private final URI base;
+
+  /** The runner a sign-in state holds connected, until the next state or {@link #close}. */
+  private FakeTargetRunner runner;
+
   public ProviderStates(ContractBearers bearers) {
+    this(bearers, null);
+  }
+
+  public ProviderStates(ContractBearers bearers, URI base) {
     this.bearers = bearers;
+    this.base = base;
     states.put(A_SINGLE_NODE_SWARM, ProviderStates::aSingleNodeSwarm);
     states.put(NO_TARGET, this::noTarget);
     states.put(A_DECLARED_TARGET, this::aDeclaredTarget);
@@ -169,6 +209,16 @@ public class ProviderStates {
     states.put(A_QUEUED_DESK_LEASE, () -> tenantLease(PROJECTS, LeaseState.QUEUED));
     states.put(A_RUNNING_DESK_LEASE, () -> tenantLease(PROJECTS, LeaseState.RUNNING));
     states.put(AN_UNUSED_DESK_WORK_VOLUME, () -> tenantLease(PROJECTS, LeaseState.ENDED));
+    states.put(A_CONNECTED_TARGET, this::aConnectedTarget);
+    states.put(A_CLAUDE_SIGN_IN_AWAITING_ITS_CODE, this::aClaudeSignInAwaitingItsCode);
+  }
+
+  /** Hangs up the runner a sign-in state dialled, if one did. */
+  public void close() {
+    if (runner != null) {
+      runner.close();
+      runner = null;
+    }
   }
 
   public Set<String> names() {
@@ -203,8 +253,10 @@ public class ProviderStates {
     return new Setup(Collections.unmodifiableMap(params));
   }
 
-  /** Every targets state starts here: no rows, a fresh idp stub, no bearer. */
+  /** Every targets state starts here: no runner, no sign-in, no rows, a fresh idp stub, no bearer. */
   private void fresh() {
+    close();
+    signIns().forget(UUID.fromString(TARGET_ID));
     TargetRows.clear();
     IdpStub.reset();
     bearers.reset();
@@ -381,6 +433,52 @@ public class ProviderStates {
       params.put("targetId", TARGET_ID);
     }
     return new Setup(params);
+  }
+
+  private Setup aConnectedTarget() {
+    if (base == null) {
+      throw new IllegalStateException("'" + A_CONNECTED_TARGET + "' dials a runner: pass the base URI");
+    }
+    fresh();
+    TargetRows.target(UUID.fromString(TARGET_ID), "lab", 4, RUNNER_CLIENT, false);
+    bearers.grant(RUNNER_BEARER, RUNNER_CLIENT, "qits:target-runner");
+    runner = FakeTargetRunner.dial(base, RUNNER_BEARER);
+    runner.hello(4, "qits-system-runner-dot-claude-00000000");
+    try {
+      runner.await(Ack.class);
+      // The estate follows the greeting: once it is here, the connection serves the target.
+      runner.await(Estate.class);
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException(interrupted);
+    }
+    return new Setup(Map.of("targetId", TARGET_ID));
+  }
+
+  private Setup aClaudeSignInAwaitingItsCode() {
+    aConnectedTarget();
+    UUID target = UUID.fromString(TARGET_ID);
+    TargetSignIns.View started = signIns().start(target, "lab", "claude");
+    String id = started.signInId().toString();
+    try {
+      runner.await(SignIn.class, s -> s.signInId().equals(id));
+      runner.signInProgress(id, "claude", SignInState.AWAITING_CODE, CLAUDE_SIGN_IN_URL, null, null);
+      long deadline = System.currentTimeMillis() + 20_000;
+      while (signIns().get(target, id).state() != SignInState.AWAITING_CODE) {
+        if (System.currentTimeMillis() > deadline) {
+          throw new IllegalStateException("sign-in " + id + " never became AWAITING_CODE");
+        }
+        Thread.sleep(20);
+      }
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException(interrupted);
+    }
+    return new Setup(Map.of("targetId", TARGET_ID, "signInId", id));
+  }
+
+  private static TargetSignIns signIns() {
+    return Arc.container().instance(TargetSignIns.class).get();
   }
 
   /** The states' fixed ids, for a recording's freezer to keep as they are. */

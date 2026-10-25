@@ -14,9 +14,11 @@ import au.com.dius.pact.provider.junitsupport.State;
 import au.com.dius.pact.provider.junitsupport.loader.PactSource;
 import io.quarkus.test.common.http.TestHTTPResource;
 import io.quarkus.test.junit.QuarkusTest;
+import java.net.URI;
 import java.net.URL;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -63,7 +65,7 @@ class ConsumerPactVerificationTest {
 
   @BeforeEach
   void target(PactVerificationContext context, Pact pact, Interaction interaction) {
-    states = new ProviderStates(bearers);
+    states = new ProviderStates(bearers, URI.create(base.toString()));
     if (context == null) {
       return; // no pact to verify: @IgnoreNoPactsToVerify's single empty run
     }
@@ -94,6 +96,13 @@ class ConsumerPactVerificationTest {
       }
     }
     context.setTarget(new HttpTestTarget(base.getHost(), base.getPort()));
+  }
+
+  @AfterEach
+  void hangUp() {
+    if (states != null) {
+      states.close();
+    }
   }
 
   @TestTemplate
@@ -169,5 +178,15 @@ class ConsumerPactVerificationTest {
   @State(ProviderStates.AN_UNUSED_DESK_WORK_VOLUME)
   Map<String, String> anUnusedDeskWorkVolume() {
     return states.params(ProviderStates.AN_UNUSED_DESK_WORK_VOLUME);
+  }
+
+  @State(ProviderStates.A_CONNECTED_TARGET)
+  Map<String, String> aConnectedTarget() {
+    return states.params(ProviderStates.A_CONNECTED_TARGET);
+  }
+
+  @State(ProviderStates.A_CLAUDE_SIGN_IN_AWAITING_ITS_CODE)
+  Map<String, String> aClaudeSignInAwaitingItsCode() {
+    return states.params(ProviderStates.A_CLAUDE_SIGN_IN_AWAITING_ITS_CODE);
   }
 }

@@ -3,6 +3,109 @@
   "provider": "qits-system",
   "states": [
     {
+      "name": "a connected target",
+      "slug": "a-connected-target",
+      "params": {
+        "targetId": "00000000-0000-4000-8000-000000000001"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "startTargetSignIn",
+          "method": "POST",
+          "path": "/system/api/targets/{targetId}/sign-ins",
+          "body": {
+            "harness": "claude"
+          },
+          "status": 202,
+          "file": "a-connected-target/startTargetSignIn.json",
+          "frozen": {
+            "ids": [
+              "$.signInId",
+              "$.targetId"
+            ],
+            "instants": [
+              "$.startedAt",
+              "$.updatedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a connected target with a claude sign-in awaiting its code",
+      "slug": "a-connected-target-with-a-claude-sign-in-awaiting-its-code",
+      "params": {
+        "signInId": "00000000-0000-4000-8000-000000000003",
+        "targetId": "00000000-0000-4000-8000-000000000001"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "cancelTargetSignIn",
+          "method": "DELETE",
+          "path": "/system/api/targets/{targetId}/sign-ins/{signInId}",
+          "status": 202,
+          "file": "a-connected-target-with-a-claude-sign-in-awaiting-its-code/cancelTargetSignIn.json",
+          "frozen": {
+            "ids": [
+              "$.signInId",
+              "$.targetId"
+            ],
+            "instants": [
+              "$.startedAt",
+              "$.updatedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getTargetSignIn",
+          "method": "GET",
+          "path": "/system/api/targets/{targetId}/sign-ins/{signInId}",
+          "status": 200,
+          "file": "a-connected-target-with-a-claude-sign-in-awaiting-its-code/getTargetSignIn.json",
+          "frozen": {
+            "ids": [
+              "$.signInId",
+              "$.targetId"
+            ],
+            "instants": [
+              "$.startedAt",
+              "$.updatedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "submitTargetSignInCode",
+          "method": "POST",
+          "path": "/system/api/targets/{targetId}/sign-ins/{signInId}/code",
+          "body": {
+            "code": "contract-code#contract"
+          },
+          "status": 202,
+          "file": "a-connected-target-with-a-claude-sign-in-awaiting-its-code/submitTargetSignInCode.json",
+          "frozen": {
+            "ids": [
+              "$.signInId",
+              "$.targetId"
+            ],
+            "instants": [
+              "$.startedAt",
+              "$.updatedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a declared target",
       "slug": "a-declared-target",
       "params": {
