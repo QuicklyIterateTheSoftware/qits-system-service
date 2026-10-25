@@ -28,6 +28,7 @@ import eu.wohlben.qits.systemrunner.protocol.HealthCheck;
 import eu.wohlben.qits.systemrunner.protocol.LoginPresence;
 import eu.wohlben.qits.systemrunner.protocol.SystemRunnerAck;
 import eu.wohlben.qits.systemrunner.protocol.SystemRunnerProtocol;
+import eu.wohlben.qits.workspacedaemon.protocol.WorkspaceImage;
 import io.quarkus.test.common.http.TestHTTPResource;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -102,7 +103,10 @@ class TargetRunnerSocketTest {
       assertEquals("registry.qits.wohlben.eu/qits/build-images/ci-slot", extension.slotImages().ci());
       assertEquals("registry.qits.wohlben.eu/qits/workspace", extension.slotImages().workspace());
       assertEquals("registry.qits.wohlben.eu/qits/project-agent", extension.slotImages().desk());
-      assertNull(extension.probeImage(), "no lease names an image, and none is configured");
+      assertEquals(
+          "registry.qits.wohlben.eu/qits/workspace:" + WorkspaceImage.VERSION,
+          extension.probeImage(),
+          "no lease names an image and none is configured, so the pinned workspace image wins");
       assertEquals("mirror.qits.wohlben.eu/hub", extension.registryMirrors().get("docker.io"));
       Target row = TargetRows.reloadTarget(target);
       assertEquals(4, row.slotsTotal);

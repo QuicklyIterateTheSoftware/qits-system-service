@@ -108,6 +108,13 @@
              and SystemRunnerBinary, whose VERSION is the runner image every target is pinned to.
              Published by qits-system-runner-daemon. -->
         <qits.system-runner-protocol.version>2026.1025.143538</qits.system-runner-protocol.version>
+        <!-- THE LOGIN PROBE'S LAST-RESORT IMAGE (qits-1593): qits-workspace-daemon-protocol's
+             WorkspaceImage carries the `qits/workspace` tag of the release that published it, so a
+             brand-new target with no WORKSPACE or DESK lease yet can still be probed and sign in,
+             rather than reporting UNKNOWN until its first lease. Same pin qits-projects-service
+             carries for the refinement image, moved by qits-maintenance on maintenance/dependencies
+             like any other internal pin; never by hand. -->
+        <qits.workspace-daemon-protocol.version>2026.1025.155834</qits.workspace-daemon-protocol.version>
         <zonky.embedded-postgres.version>2.2.2</zonky.embedded-postgres.version>
         <zonky.postgres-binaries.version>18.6.0</zonky.postgres-binaries.version>
         <qits.maven.repository.url>https://registry.qits.wohlben.eu/artifacts/maven/maven</qits.maven.repository.url>
@@ -238,6 +245,13 @@
                         <artifactId>*</artifactId>
                     </exclusion>
                 </exclusions>
+            </dependency>
+            <dependency>
+                <!-- WorkspaceImage.VERSION, the login probe's last-resort pin (ProbeImages); see the
+                     property above. Framework-free and dependency-free, like qits-runner-protocol. -->
+                <groupId>${project.groupId}</groupId>
+                <artifactId>qits-workspace-daemon-protocol</artifactId>
+                <version>${qits.workspace-daemon-protocol.version}</version>
             </dependency>
             <dependency>
                 <!-- Published by qits-integrations-quarkus into the platform Maven repository. The

@@ -3,6 +3,7 @@ package eu.wohlben.qits.system.targets.runner;
 import eu.wohlben.qits.system.targets.control.Leases;
 import eu.wohlben.qits.system.targets.control.TargetsConfig;
 import eu.wohlben.qits.system.targets.entity.SlotType;
+import eu.wohlben.qits.workspacedaemon.protocol.WorkspaceImage;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.util.Optional;
@@ -18,7 +19,10 @@ import org.jboss.logging.Logger;
  *       already carries the owner's real, pinned image);
  *   <li>else the newest DESK lease's;
  *   <li>else {@code qits.system.targets.probe-image}, when a deployment set it;
- *   <li>else none: the runner probes nothing and reports UNKNOWN.
+ *   <li>else the pinned workspace image, {@code qits.system.targets.slot-images.workspace} at
+ *       {@link WorkspaceImage#VERSION} — the released {@code qits/workspace} tag this reactor
+ *       depends on, so a brand-new target with no lease yet can still sign in instead of sitting
+ *       at UNKNOWN until its first one.
  * </ol>
  *
  * The runner reads the probe image from every {@code ack} it is sent and probes at once, so when
@@ -45,13 +49,23 @@ public class ProbeImages {
     } catch (RuntimeException e) {
       LOG.warnf("Could not read the leases' images for the login probe: %s", e.toString());
     }
-    return choose(workspace, desk, config.probeImage()).orElse(null);
+    return choose(workspace, desk, config.probeImage(), pin()).orElse(null);
+  }
+
+  private Optional<String> pin() {
+    String workspacePrefix = config.slotImages().get("workspace");
+    return workspacePrefix == null || workspacePrefix.isBlank()
+        ? Optional.empty()
+        : Optional.of(workspacePrefix + ":" + WorkspaceImage.VERSION);
   }
 
   /** The order, pure. */
   static Optional<String> choose(
-      Optional<String> workspace, Optional<String> desk, Optional<String> configured) {
-    return set(workspace).or(() -> set(desk)).or(() -> set(configured));
+      Optional<String> workspace,
+      Optional<String> desk,
+      Optional<String> configured,
+      Optional<String> pin) {
+    return set(workspace).or(() -> set(desk)).or(() -> set(configured)).or(() -> set(pin));
   }
 
   private static Optional<String> set(Optional<String> value) {
