@@ -82,6 +82,15 @@ public class TargetController {
    */
   static final String DESK = "qits:desk";
 
+  /**
+   * The delivery desk's administrator (epic qits-1621): admitted beside {@link #ADMIN_AGENT}
+   * wherever it is admitted here, including the sign-in doors. A target is platform infrastructure
+   * with no project of its own to bind a desk's access to, and none of these doors write a git ref
+   * or touch the desk's own credentials — a registration token mints a runner's client, never the
+   * desk's.
+   */
+  static final String DESK_ADMIN = "qits:desk-admin";
+
   static final String SYSTEM = "qits:system";
   static final String AGENT = "qits:agent";
   static final String REGISTRATION = "qits:target-runner-registration";
@@ -151,7 +160,7 @@ public class TargetController {
 
   @POST
   @Consumes(MediaType.APPLICATION_JSON)
-  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK, SYSTEM})
+  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK_ADMIN, DESK, SYSTEM})
   @Operation(operationId = "createTarget", summary = "Declare a target; answers its install line, once")
   @APIResponse(
       responseCode = "201",
@@ -193,7 +202,7 @@ public class TargetController {
   }
 
   @GET
-  @RolesAllowed({ADMIN, ADMIN_AGENT, SYSTEM, AGENT})
+  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK_ADMIN, SYSTEM, AGENT})
   @Operation(operationId = "listTargets", summary = "Every target, by name")
   @APIResponse(responseCode = "200", description = "Every target, by name")
   public List<TargetViews.TargetDto> list() {
@@ -206,7 +215,7 @@ public class TargetController {
   @GET
   @Path("/install.sh")
   @Produces(MediaType.TEXT_PLAIN)
-  @RolesAllowed({REGISTRATION, ADMIN, ADMIN_AGENT, SYSTEM, AGENT})
+  @RolesAllowed({REGISTRATION, ADMIN, ADMIN_AGENT, DESK_ADMIN, SYSTEM, AGENT})
   @Operation(operationId = "getTargetInstallScript", summary = "The generic install script the install line pipes to sh")
   @APIResponse(responseCode = "200", description = "A POSIX sh script, carrying no secret")
   @APIResponse(
@@ -219,7 +228,7 @@ public class TargetController {
 
   @GET
   @Path("/{id}")
-  @RolesAllowed({ADMIN, ADMIN_AGENT, SYSTEM, AGENT})
+  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK_ADMIN, SYSTEM, AGENT})
   @Operation(operationId = "getTarget", summary = "One target")
   @APIResponse(responseCode = "200", description = "The target")
   @APIResponse(responseCode = "404", description = "No such target")
@@ -229,7 +238,7 @@ public class TargetController {
 
   @GET
   @Path("/{id}/health")
-  @RolesAllowed({ADMIN, ADMIN_AGENT, SYSTEM, AGENT})
+  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK_ADMIN, SYSTEM, AGENT})
   @Operation(operationId = "getTargetHealth", summary = "A target's newest settled health check")
   @APIResponse(responseCode = "200", description = "{at, ok, detail, requestId, checks[]}")
   @APIResponse(responseCode = "204", description = "No health check has settled yet")
@@ -243,7 +252,7 @@ public class TargetController {
   @PATCH
   @Path("/{id}")
   @Consumes(MediaType.APPLICATION_JSON)
-  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK, SYSTEM})
+  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK_ADMIN, DESK, SYSTEM})
   @Operation(operationId = "patchTarget", summary = "Change a target's description or minimums")
   @APIResponse(responseCode = "200", description = "The target as it now is")
   @APIResponse(responseCode = "400", description = "A malformed description or minimum")
@@ -268,7 +277,7 @@ public class TargetController {
 
   @DELETE
   @Path("/{id}")
-  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK, SYSTEM})
+  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK_ADMIN, DESK, SYSTEM})
   @Operation(operationId = "deleteTarget", summary = "Decommission a target: retire its runner, give its credentials back")
   @APIResponse(responseCode = "204", description = "Gone")
   @APIResponse(responseCode = "404", description = "No such target")
@@ -289,7 +298,7 @@ public class TargetController {
 
   @POST
   @Path("/{id}/registration-token")
-  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK, SYSTEM})
+  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK_ADMIN, DESK, SYSTEM})
   @Operation(
       operationId = "rotateTargetRegistrationToken",
       summary = "Replace a target's registration token; answers a new install line",
@@ -342,7 +351,7 @@ public class TargetController {
 
   @POST
   @Path("/{id}/greenlight")
-  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK})
+  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK_ADMIN, DESK})
   @Operation(operationId = "greenlightTarget", summary = "Lift a target's quarantine")
   @APIResponse(responseCode = "200", description = "The target as it now is")
   @APIResponse(responseCode = "404", description = "No such target")
@@ -358,7 +367,7 @@ public class TargetController {
 
   @POST
   @Path("/{id}/healthcheck")
-  @RolesAllowed({ADMIN, ADMIN_AGENT, SYSTEM, AGENT})
+  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK_ADMIN, SYSTEM, AGENT})
   @Operation(operationId = "requestTargetHealthCheck", summary = "Ask a connected target for a health check")
   @APIResponse(
       responseCode = "202",
@@ -377,7 +386,7 @@ public class TargetController {
 
   @POST
   @Path("/{id}/login-check")
-  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK})
+  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK_ADMIN, DESK})
   @Operation(operationId = "requestTargetLoginCheck", summary = "Ask a connected target to probe its sign-in now")
   @APIResponse(responseCode = "202", description = "Sent")
   @APIResponse(responseCode = "404", description = "No such target")
@@ -395,7 +404,7 @@ public class TargetController {
   @POST
   @Path("/{id}/sign-ins")
   @Consumes(MediaType.APPLICATION_JSON)
-  @RolesAllowed({ADMIN, ADMIN_AGENT})
+  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK_ADMIN})
   @Operation(
       operationId = "startTargetSignIn",
       summary = "Sign a connected target in to a harness: its runner runs the harness's own login",
@@ -423,7 +432,7 @@ public class TargetController {
 
   @GET
   @Path("/{id}/sign-ins/{signInId}")
-  @RolesAllowed({ADMIN, ADMIN_AGENT})
+  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK_ADMIN})
   @Operation(operationId = "getTargetSignIn", summary = "One sign-in, while it runs and ~15 minutes after")
   @APIResponse(
       responseCode = "200",
@@ -439,7 +448,7 @@ public class TargetController {
   @POST
   @Path("/{id}/sign-ins/{signInId}/code")
   @Consumes(MediaType.APPLICATION_JSON)
-  @RolesAllowed({ADMIN, ADMIN_AGENT})
+  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK_ADMIN})
   @Operation(
       operationId = "submitTargetSignInCode",
       summary = "Hand an AWAITING_CODE sign-in the code the browser showed")
@@ -466,7 +475,7 @@ public class TargetController {
 
   @DELETE
   @Path("/{id}/sign-ins/{signInId}")
-  @RolesAllowed({ADMIN, ADMIN_AGENT})
+  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK_ADMIN})
   @Operation(operationId = "cancelTargetSignIn", summary = "Stop a sign-in")
   @APIResponse(
       responseCode = "202",
@@ -623,7 +632,8 @@ public class TargetController {
   private void requireMachineAudience() {
     if (MachineIdentity.isMachine(identity)
         && !identity.hasRole(ADMIN)
-        && !identity.hasRole(ADMIN_AGENT)) {
+        && !identity.hasRole(ADMIN_AGENT)
+        && !identity.hasRole(DESK_ADMIN)) {
       machineAuth.require();
     }
   }

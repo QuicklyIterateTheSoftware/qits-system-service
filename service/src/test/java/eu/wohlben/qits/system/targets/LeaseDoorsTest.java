@@ -168,6 +168,31 @@ class LeaseDoorsTest {
     service("dev-qits-ci").get(API + "?state=NOPE").then().statusCode(400);
   }
 
+  /**
+   * The delivery desk's administrator ({@code qits:desk-admin}, epic qits-1621) reads every lease
+   * like an administrator or an agent does, and may read one that is not its own.
+   */
+  @Test
+  void aDeskAdministratorListsEveryLease() {
+    lease("dev-qits-ci", "CI", "run-1", CI_IMAGE, "").then().statusCode(201);
+    String workspace =
+        lease("dev-qits-workspaces", "WORKSPACE", "17", WORKSPACE_IMAGE, "").path("id");
+    given()
+        .header("X-Qits-User", "delivery-desk-admin")
+        .header("X-Qits-Roles", "qits:desk-admin")
+        .get(API)
+        .then()
+        .statusCode(200)
+        .body("$", hasSize(2));
+    given()
+        .header("X-Qits-User", "delivery-desk-admin")
+        .header("X-Qits-Roles", "qits:desk-admin")
+        .get(API + "/" + workspace)
+        .then()
+        .statusCode(200)
+        .body("ownerRef", equalTo("17"));
+  }
+
   @Test
   void noDoorAnswersASpecEnvValueOnlyItsKey() throws Exception {
     String secret = "qits_tok_never_on_a_door";

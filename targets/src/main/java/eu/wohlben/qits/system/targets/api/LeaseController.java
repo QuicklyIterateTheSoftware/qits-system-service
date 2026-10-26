@@ -35,9 +35,10 @@ import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 /**
  * {@code /system/api/leases}: qits-ci, qits-workspaces and qits-projects ask for a slot of their
  * type, roll its spec and end it. The owner is the caller's application ({@link OwnerIdentity}),
- * never a body field. A {@code qits:system} caller reads its own leases; an administrator or an
- * agent reads every lease. An operator ({@code qits:admin}, {@code qits:admin-agent}, {@code
- * qits:desk-admin}) ends any lease, and every such end is a {@code target_audit} row.
+ * never a body field. A {@code qits:system} caller reads its own leases; an administrator, the
+ * delivery desk's administrator or an agent reads every lease. An operator ({@code qits:admin},
+ * {@code qits:admin-agent}, {@code qits:desk-admin}) ends any lease, and every such end is a
+ * {@code target_audit} row.
  */
 @Path("/leases")
 @Produces(MediaType.APPLICATION_JSON)
@@ -123,7 +124,7 @@ public class LeaseController {
   }
 
   @GET
-  @RolesAllowed({SYSTEM, ADMIN, ADMIN_AGENT, AGENT})
+  @RolesAllowed({SYSTEM, ADMIN, ADMIN_AGENT, DESK_ADMIN, AGENT})
   @Operation(operationId = "listLeases", summary = "Leases, oldest first; a service sees its own")
   @APIResponse(responseCode = "200", description = "The leases the filter names")
   @APIResponse(responseCode = "400", description = "An unknown state or slotType")
@@ -155,7 +156,7 @@ public class LeaseController {
 
   @GET
   @Path("/{id}")
-  @RolesAllowed({SYSTEM, ADMIN, ADMIN_AGENT, AGENT})
+  @RolesAllowed({SYSTEM, ADMIN, ADMIN_AGENT, DESK_ADMIN, AGENT})
   @Operation(operationId = "getLease", summary = "One lease")
   @APIResponse(responseCode = "200", description = "The lease")
   @APIResponse(responseCode = "404", description = "No such lease, or not the caller's")
@@ -225,7 +226,10 @@ public class LeaseController {
   }
 
   private boolean readsAll() {
-    return identity.hasRole(ADMIN) || identity.hasRole(ADMIN_AGENT) || identity.hasRole(AGENT);
+    return identity.hasRole(ADMIN)
+        || identity.hasRole(ADMIN_AGENT)
+        || identity.hasRole(DESK_ADMIN)
+        || identity.hasRole(AGENT);
   }
 
   /** The caller's application, or a name no lease has. */

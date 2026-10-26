@@ -120,6 +120,12 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <!-- DeskAdminParityRules, in DeskAdminParityTest (epic qits-1621). -->
+            <groupId>${project.groupId}</groupId>
+            <artifactId>qits-arch-rules</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>io.rest-assured</groupId>
             <artifactId>rest-assured</artifactId>
             <scope>test</scope>
