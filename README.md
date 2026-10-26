@@ -174,7 +174,9 @@ runner its whole desired `estate`; the runner answers with an `inventory`.
   credential volume and reports `signInProgress`; this service holds it in memory, relays the code,
   expires it after 10 minutes (EXPIRED, `signInCancel`) and keeps a settled one readable ~15. 409
   `TARGET_UNAVAILABLE`, `SIGN_IN_RUNNING` (one per target and harness), `SIGN_IN_NOT_AWAITING_CODE`;
-  404 `SIGN_IN_NOT_FOUND`. The code is never logged.
+  404 `SIGN_IN_NOT_FOUND`. The code is never logged. `claude` reads PRESENT only once the volume
+  also holds Claude Code's first-run keys (the runner merges them in), so PRESENT means an agent
+  launch starts without a setup screen.
 - **Events**: `TargetLeaseChanged` on every state change, `TargetLoginChanged` on every sign-in
   change. Owners also reconcile from `GET /leases`.
 - **Store**: postgres (`resources: postgresql:db, postgresql:eventstream:…` in deployments.yml),
