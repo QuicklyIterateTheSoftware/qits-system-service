@@ -9,7 +9,6 @@ import eu.wohlben.qits.system.targets.events.TargetLeaseChanged;
 import eu.wohlben.qits.system.targets.events.TargetLoginChanged;
 import io.quarkus.arc.Arc;
 import io.quarkus.arc.ManagedContext;
-import io.quarkus.runtime.annotations.RegisterForReflection;
 import jakarta.annotation.PreDestroy;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -29,12 +28,13 @@ import org.jboss.logging.Logger;
  *
  * <p>{@code QitsEventBus.publish} serializes these with Jackson, which the native-image build
  * cannot see through: the only JAX-RS-declared types it discovers reflection for are return types,
- * and an event handed to the bus is neither. Without {@link RegisterForReflection} here the native
- * binary logs "could not be published or recorded" for every lease or login change while every JVM
- * test stays green, because the JVM needs no such registration.
+ * and an event handed to the bus is neither. {@link EventWireReflection} is where that
+ * registration lives now — for these two records, the PUT body ({@code EventEnvelope}) and the
+ * canonical mix-in together, so there is one place a new wire type joins rather than two to keep in
+ * sync. Without it the native binary logs "could not be published or recorded" for every lease or
+ * login change while every JVM test stays green, because the JVM needs no such registration.
  */
 @ApplicationScoped
-@RegisterForReflection(targets = {TargetLeaseChanged.class, TargetLoginChanged.class})
 public class TargetEvents {
 
   private static final Logger LOG = Logger.getLogger(TargetEvents.class);
