@@ -18,6 +18,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -58,12 +60,24 @@ class LeaseRaceTest {
     bearers.reset();
   }
 
-  /** Both run at once, released by one barrier; both must complete. */
+  /**
+   * Both run at once, released by one barrier; both must complete.
+   *
+   * <p>Each racer gets a thread of its own. Not {@code CompletableFuture.runAsync}'s default
+   * executor: that is the common ForkJoinPool, whose parallelism is {@code availableProcessors() -
+   * 1} — ONE on the 2-CPU CI slot — so the second racer queued behind the first, which sat on the
+   * two-party barrier until it timed out (qits-1526).
+   */
   private static void race(Runnable a, Runnable b) throws Exception {
     CyclicBarrier start = new CyclicBarrier(2);
-    CompletableFuture<Void> first = CompletableFuture.runAsync(() -> await(start, a));
-    CompletableFuture<Void> second = CompletableFuture.runAsync(() -> await(start, b));
-    CompletableFuture.allOf(first, second).get(20, TimeUnit.SECONDS);
+    ExecutorService racers = Executors.newFixedThreadPool(2);
+    try {
+      CompletableFuture<Void> first = CompletableFuture.runAsync(() -> await(start, a), racers);
+      CompletableFuture<Void> second = CompletableFuture.runAsync(() -> await(start, b), racers);
+      CompletableFuture.allOf(first, second).get(20, TimeUnit.SECONDS);
+    } finally {
+      racers.shutdownNow();
+    }
   }
 
   private static void await(CyclicBarrier start, Runnable work) {
