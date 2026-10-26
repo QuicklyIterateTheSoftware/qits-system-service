@@ -8,13 +8,16 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import eu.wohlben.qits.system.targets.control.LeaseSpecs;
 
 import eu.wohlben.qits.system.targets.control.TargetAllocation;
+import eu.wohlben.qits.system.targets.entity.Lease;
 import eu.wohlben.qits.system.targets.entity.LeaseState;
 import eu.wohlben.qits.system.targets.entity.SlotType;
+import eu.wohlben.qits.system.targets.entity.TargetAudit;
 import eu.wohlben.qits.system.targets.entity.WorkVolume;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
@@ -22,6 +25,7 @@ import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
 import jakarta.inject.Inject;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -239,6 +243,118 @@ class LeaseDoorsTest {
     TargetRows.lease(id, SlotType.CI, "qits-ci", "run-9", LeaseState.RUNNING, target);
     service("dev-qits-ci").delete(API + "/" + id).then().statusCode(200).body("state", equalTo("ENDING"));
     assertEquals(LeaseState.ENDING, TargetRows.reload(id).state);
+  }
+
+  static RequestSpecification operator(String principal, String roles) {
+    return given().header("X-Qits-User", principal).header("X-Qits-Roles", roles);
+  }
+
+  @Test
+  void anOperatorEndsARunningLeaseOfAnyOwnerAndItIsEnding() {
+    UUID target = UUID.randomUUID();
+    TargetRows.target(target, "lab", 4, "client-lab", false);
+    UUID id = UUID.randomUUID();
+    TargetRows.lease(id, SlotType.CI, "qits-ci", "run-9", LeaseState.RUNNING, target);
+    operator("an-operator", "qits:admin")
+        .delete(API + "/" + id + "?reason=rotating the node")
+        .then()
+        .statusCode(200)
+        .body("state", equalTo("ENDING"))
+        .body("detail", equalTo("ended by an-operator: rotating the node"));
+    Lease row = TargetRows.reload(id);
+    assertEquals(LeaseState.ENDING, row.state);
+    assertNotNull(row.endingSince, "every entry into ENDING starts the deadline");
+    List<TargetAudit> audit = TargetRows.audit(id);
+    assertEquals(1, audit.size());
+    assertEquals("LEASE_END", audit.get(0).operation);
+    assertEquals("ENDING", audit.get(0).outcome);
+    assertEquals("an-operator", audit.get(0).actor);
+    assertEquals("qits:admin", audit.get(0).roles);
+    assertEquals(target, audit.get(0).targetId);
+    assertTrue(audit.get(0).args.contains("rotating the node"), audit.get(0).args);
+  }
+
+  @Test
+  void anOperatorEndsAnEndingLeaseAtOnceAndTheDetailSaysWhoAndWhy() {
+    UUID target = UUID.randomUUID();
+    TargetRows.target(target, "lab", 4, "client-lab", false);
+    UUID id = UUID.randomUUID();
+    TargetRows.ending(id, SlotType.WORKSPACE, "qits-workspaces", "17", target, TargetRows.T0);
+    operator("an-operator", "qits:admin-agent")
+        .delete(API + "/" + id + "?reason=stuck since monday")
+        .then()
+        .statusCode(200)
+        .body("state", equalTo("ENDED"))
+        .body("detail", equalTo("ended by an-operator: stuck since monday"))
+        .body("endedAt", notNullValue());
+    assertEquals(LeaseState.ENDED, TargetRows.reload(id).state);
+    assertTrue(
+        allocation.estateOf(target).leases().isEmpty(),
+        "an ENDED lease leaves its target's estate, so the runner removes what is left of it");
+
+    List<TargetAudit> audit = TargetRows.audit(id);
+    assertEquals(1, audit.size());
+    assertEquals("ENDED", audit.get(0).outcome);
+    assertEquals("ended by an-operator: stuck since monday", audit.get(0).detail);
+
+    operator("an-operator", "qits:admin")
+        .delete(API + "/" + id)
+        .then()
+        .statusCode(200)
+        .body("state", equalTo("ENDED"))
+        .body("detail", equalTo("ended by an-operator: stuck since monday"));
+    assertEquals("NOOP", TargetRows.audit(id).get(1).outcome, "a repeated end is recorded, and moves nothing");
+  }
+
+  @Test
+  void theDeskAdministratorIsAnOperatorAndAReasonIsOptional() {
+    UUID target = UUID.randomUUID();
+    TargetRows.target(target, "lab", 4, "client-lab", false);
+    UUID id = UUID.randomUUID();
+    TargetRows.ending(id, SlotType.DESK, "qits-projects", "desk-1", target, TargetRows.T0);
+    operator("dev-qits-desk-7", "qits:desk-admin")
+        .delete(API + "/" + id)
+        .then()
+        .statusCode(200)
+        .body("state", equalTo("ENDED"))
+        .body("detail", equalTo("ended by dev-qits-desk-7"));
+    assertEquals("qits:desk-admin", TargetRows.audit(id).get(0).roles);
+  }
+
+  @Test
+  void aServiceIsStillRefusedAnotherOwnersLeaseAndAnOperatorRoleWins() {
+    UUID target = UUID.randomUUID();
+    TargetRows.target(target, "lab", 4, "client-lab", false);
+    UUID id = UUID.randomUUID();
+    TargetRows.lease(id, SlotType.CI, "qits-ci", "run-9", LeaseState.RUNNING, target);
+    service("dev-qits-workspaces")
+        .delete(API + "/" + id + "?reason=mine now")
+        .then()
+        .statusCode(403)
+        .body("code", equalTo("NOT_YOUR_LEASE"));
+    assertEquals(LeaseState.RUNNING, TargetRows.reload(id).state);
+    assertTrue(TargetRows.audit(id).isEmpty(), "an owner's door writes no audit row");
+    operator("dyn-agent", "qits:agent").delete(API + "/" + id).then().statusCode(403);
+    operator("dev-qits-workspaces", "qits:system,qits:admin")
+        .delete(API + "/" + id)
+        .then()
+        .statusCode(200)
+        .body("state", equalTo("ENDING"));
+  }
+
+  @Test
+  void anOperatorsEndOfNoLeaseIsRecordedToo() {
+    UUID missing = UUID.randomUUID();
+    operator("an-operator", "qits:admin").delete(API + "/" + missing).then().statusCode(404);
+    List<TargetAudit> audit = TargetRows.audit(missing);
+    assertEquals(1, audit.size());
+    assertEquals("NOT_FOUND", audit.get(0).outcome);
+    operator("an-operator", "qits:admin").delete(API + "/not-a-lease").then().statusCode(404);
+    assertEquals(
+        1L,
+        (long)
+            QuarkusTransaction.requiringNew()
+                .call(() -> TargetAudit.count("resource = ?1 and outcome = ?2", "not-a-lease", "NOT_FOUND")));
   }
 
   @Test

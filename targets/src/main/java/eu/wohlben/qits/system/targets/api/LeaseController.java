@@ -3,6 +3,7 @@ package eu.wohlben.qits.system.targets.api;
 import com.fasterxml.jackson.databind.JsonNode;
 import eu.wohlben.qits.system.targets.control.Leases;
 import eu.wohlben.qits.system.targets.control.OwnerIdentity;
+import eu.wohlben.qits.system.targets.control.TargetAuditLog;
 import eu.wohlben.qits.system.targets.control.TargetRefusal;
 import eu.wohlben.qits.system.targets.entity.Lease;
 import eu.wohlben.qits.system.targets.entity.LeaseState;
@@ -28,13 +29,15 @@ import java.util.UUID;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.media.Content;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.parameters.Parameter;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 
 /**
  * {@code /system/api/leases}: qits-ci, qits-workspaces and qits-projects ask for a slot of their
  * type, roll its spec and end it. The owner is the caller's application ({@link OwnerIdentity}),
  * never a body field. A {@code qits:system} caller reads its own leases; an administrator or an
- * agent reads every lease.
+ * agent reads every lease. An operator ({@code qits:admin}, {@code qits:admin-agent}, {@code
+ * qits:desk-admin}) ends any lease, and every such end is a {@code target_audit} row.
  */
 @Path("/leases")
 @Produces(MediaType.APPLICATION_JSON)
@@ -48,8 +51,17 @@ public class LeaseController {
 
   static final String ADMIN = "qits:admin";
   static final String ADMIN_AGENT = "qits:admin-agent";
+
+  /**
+   * The delivery desk's administrator (epic qits-1621): an operator on {@link #end}, beside {@link
+   * #ADMIN} and {@link #ADMIN_AGENT}, so a desk can clear a lease stuck in ENDING.
+   */
+  static final String DESK_ADMIN = "qits:desk-admin";
   static final String SYSTEM = "qits:system";
   static final String AGENT = "qits:agent";
+
+  /** The longest {@code ?reason=} an end takes. */
+  static final int REASON_MAX = 500;
 
   @Inject Leases leases;
 
@@ -172,13 +184,44 @@ public class LeaseController {
 
   @DELETE
   @Path("/{id}")
-  @RolesAllowed(SYSTEM)
-  @Operation(operationId = "endLease", summary = "End a lease: ENDING, then ENDED once the runner reports it gone")
+  @RolesAllowed({SYSTEM, ADMIN, ADMIN_AGENT, DESK_ADMIN})
+  @Operation(
+      operationId = "endLease",
+      summary =
+          "End a lease: ENDING, then ENDED once the runner reports it gone. An operator (qits:admin,"
+              + " qits:admin-agent, qits:desk-admin) ends any lease, and an ENDING one at once")
   @APIResponse(responseCode = "200", description = "The lease, ENDING or ENDED")
-  @APIResponse(responseCode = "403", description = "NOT_YOUR_LEASE")
+  @APIResponse(responseCode = "400", description = "A reason longer than " + REASON_MAX + " characters")
+  @APIResponse(responseCode = "403", description = "NOT_YOUR_LEASE: a qits:system caller's end of another's lease")
   @APIResponse(responseCode = "404", description = "No such lease")
-  public TargetViews.LeaseDto end(@PathParam("id") String id) {
-    return TargetViews.view(leases.end(leaseId(id), owners.application(identity)));
+  public TargetViews.LeaseDto end(
+      @PathParam("id") String id,
+      @Parameter(description = "Why; an operator's lands in the lease's detail and the audit")
+          @QueryParam("reason")
+          String reason) {
+    if (reason != null && reason.length() > REASON_MAX) {
+      throw TargetRefusal.badRequest("A reason is at most " + REASON_MAX + " characters");
+    }
+    if (!operates()) {
+      return TargetViews.view(leases.end(leaseId(id), owners.application(identity)));
+    }
+    UUID leaseId;
+    try {
+      leaseId = UUID.fromString(id);
+    } catch (IllegalArgumentException | NullPointerException notAUuid) {
+      leaseId = null;
+    }
+    Leases.Operator operator =
+        new Leases.Operator(owners.clientId(identity), TargetAuditLog.roles(identity));
+    return TargetViews.view(leases.endByOperator(leaseId, id, operator, reason));
+  }
+
+  /**
+   * Whether the caller ends leases as an operator. Decided by role, and an operator role wins: a
+   * caller holding one and {@code qits:system} as well is an operator.
+   */
+  private boolean operates() {
+    return identity.hasRole(ADMIN) || identity.hasRole(ADMIN_AGENT) || identity.hasRole(DESK_ADMIN);
   }
 
   private boolean readsAll() {
