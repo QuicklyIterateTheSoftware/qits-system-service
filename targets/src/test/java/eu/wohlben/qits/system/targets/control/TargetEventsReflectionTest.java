@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import eu.wohlben.qits.eventstream.QitsEvent;
 import eu.wohlben.qits.eventstream.control.EventEnvelope;
 import eu.wohlben.qits.system.targets.events.TargetLeaseChanged;
 import eu.wohlben.qits.system.targets.events.TargetLoginChanged;
@@ -55,11 +56,40 @@ class TargetEventsReflectionTest {
   }
 
   /**
+   * No {@code QitsEvent} record declares a component named like one of the interface's own default
+   * methods ({@code name}, {@code signature}) — {@code eventId} and {@code occurredAt} are the only
+   * ones meant to be components, since the interface declares those two abstract. A component named
+   * {@code name} would shadow {@code QitsEvent.name()}'s {@code signature()} default and put the
+   * wrong value in the envelope's wire {@code name}, exactly as {@link TargetLoginChanged}'s former
+   * {@code name} component did (qits-1526, fixed by renaming it to {@code targetName}).
+   */
+  @Test
+  void everyEventsRecordNameIsItsOwnSimpleClassName() {
+    for (QitsEvent event :
+        new QitsEvent[] {
+          new TargetLeaseChanged(
+              "lease-1",
+              "qits-workspaces",
+              "385",
+              "WORKSPACE",
+              "target-1",
+              "RUNNING",
+              null,
+              null,
+              java.time.Instant.now()),
+          new TargetLoginChanged(
+              "target-1", "runner-1", "PRESENT", "ABSENT", "2026-10-26T18:30:05Z", java.time.Instant.now())
+        }) {
+      assertEquals(event.getClass().getSimpleName(), event.name());
+    }
+  }
+
+  /**
    * The flow the registration is for: canonicalized, PUT and bound back. {@link TargetLeaseChanged}
-   * rather than {@link TargetLoginChanged}: the latter declares its own {@code name} record
-   * component (the target's name), which shadows {@code QitsEvent.name()}'s {@code signature()}
-   * default and would put the wrong value in the envelope's wire {@code name} — a real but separate
-   * defect from the one this file guards, left for a ticket of its own.
+   * first, then {@link TargetLoginChanged} on its own below — its {@code targetName} component used
+   * to be named {@code name} and shadow {@code QitsEvent.name()}, which this round trip would have
+   * caught: the envelope's wire {@code name} would have been the target's name rather than the
+   * signature {@code "TargetLoginChanged"}.
    */
   @Test
   void theWholeWirePathBindsBothWays() {
@@ -90,5 +120,41 @@ class TargetEventsReflectionTest {
     assertTrue(back.leaseId().equals(out.leaseId()));
     assertEquals(out.ownerRef(), back.ownerRef());
     assertEquals(out.state(), back.state());
+  }
+
+  /**
+   * qits-1526: {@link TargetLoginChanged} used to declare its target-name component as {@code
+   * name}, which shadowed {@code QitsEvent.name()}'s {@code signature()} default — the envelope's
+   * wire {@code name} would have been the target's name ("runner-1") rather than the signature
+   * {@code "TargetLoginChanged"}, and no subscriber selecting this event type would ever have seen
+   * it published. The component is {@code targetName} now, and this is the round trip that would
+   * have caught the old shape.
+   */
+  @Test
+  void targetLoginChangedKeepsItsSignatureAsTheWireName() {
+    TargetLoginChanged out =
+        new TargetLoginChanged(
+            "target-1",
+            "runner-1",
+            "PRESENT",
+            "ABSENT",
+            "2026-10-26T18:30:05Z",
+            java.time.Instant.parse("2026-10-26T18:30:05Z"));
+
+    EventEnvelope envelope = EventEnvelope.of(out);
+    assertEquals("TargetLoginChanged", envelope.name());
+    assertEquals(
+        "TargetLoginChanged",
+        eu.wohlben.qits.eventstream.control.CanonicalJson.parse(
+                eu.wohlben.qits.eventstream.control.CanonicalJson.envelope(envelope))
+            .get("name")
+            .asText());
+
+    TargetLoginChanged back =
+        eu.wohlben.qits.eventstream.control.CanonicalJson.payloadTo(
+            envelope.payload(), TargetLoginChanged.class);
+
+    assertEquals(out.targetId(), back.targetId());
+    assertEquals(out.targetName(), back.targetName());
   }
 }
