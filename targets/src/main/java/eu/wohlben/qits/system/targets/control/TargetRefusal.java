@@ -30,6 +30,15 @@ public class TargetRefusal extends SystemException {
   public static final String SIGN_IN_NOT_FOUND = "SIGN_IN_NOT_FOUND";
   public static final String SIGN_IN_NOT_AWAITING_CODE = "SIGN_IN_NOT_AWAITING_CODE";
 
+  /** The runner refused a docker request: its own container, or a malformed argument. */
+  public static final String DOCKER_REFUSED = "DOCKER_REFUSED";
+
+  /** Docker on the target could not answer (502). */
+  public static final String DOCKER_FAILED = "DOCKER_FAILED";
+
+  /** The runner did not answer a docker request in time (504). */
+  public static final String DOCKER_TIMEOUT = "DOCKER_TIMEOUT";
+
   private final int status;
   private final String code;
 

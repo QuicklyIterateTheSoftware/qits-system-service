@@ -106,6 +106,12 @@ public final class TargetRows {
         .call(() -> TargetAudit.<TargetAudit>find("leaseId = ?1 order by at, id", leaseId).list());
   }
 
+  /** Every audit row, oldest first. */
+  public static java.util.List<TargetAudit> allAudit() {
+    return QuarkusTransaction.requiringNew()
+        .call(() -> TargetAudit.<TargetAudit>find("order by at, id").list());
+  }
+
   public static Lease reload(UUID leaseId) {
     return QuarkusTransaction.requiringNew().call(() -> Lease.findById(leaseId));
   }

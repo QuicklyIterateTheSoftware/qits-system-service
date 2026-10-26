@@ -7,6 +7,7 @@ import eu.wohlben.qits.runner.protocol.RunnerMessage;
 import eu.wohlben.qits.runner.protocol.RunnerWire;
 import eu.wohlben.qits.system.targets.control.Targets;
 import eu.wohlben.qits.system.targets.entity.Target;
+import eu.wohlben.qits.systemrunner.protocol.DockerResult;
 import eu.wohlben.qits.systemrunner.protocol.HealthChecked;
 import eu.wohlben.qits.systemrunner.protocol.Inventory;
 import eu.wohlben.qits.systemrunner.protocol.LoginState;
@@ -113,6 +114,7 @@ public class TargetRunnerSocket {
       case LoginState login -> registry.onLoginState(session, login);
       case HealthChecked checked -> registry.onHealthChecked(session, checked);
       case SignInProgress progress -> registry.onSignInProgress(session, progress);
+      case DockerResult result -> registry.onDockerResult(session, result);
       default ->
           LOG.debugf(
               "Target %s sent a host frame %s; ignored",

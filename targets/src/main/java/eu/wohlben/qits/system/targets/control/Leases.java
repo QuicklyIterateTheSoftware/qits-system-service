@@ -172,6 +172,11 @@ public class Leases {
             });
   }
 
+  /** The lease, or null. */
+  public Lease find(UUID id) {
+    return id == null ? null : QuarkusTransaction.requiringNew().call(() -> Lease.findById(id));
+  }
+
   /** @throws TargetRefusal 404 */
   public Lease get(UUID id) {
     Lease lease = id == null ? null : QuarkusTransaction.requiringNew().call(() -> Lease.findById(id));

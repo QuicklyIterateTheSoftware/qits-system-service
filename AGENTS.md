@@ -47,9 +47,11 @@ its schedules in it; `service/` discovers them through the jar's jandex index. T
                db/system/migration
     control/   SlotAllocator (pure), TargetAllocation (runs it, writes grants, builds estates),
                Targets, Leases, WorkVolumes, OwnerIdentity, LeaseSpecs, TargetEvents, TargetsConfig,
-               LeaseEndingDeadline, TargetAuditLog
-    api/       TargetController (/targets), LeaseController (/leases), WorkVolumeController
-    runner/    TargetRunnerSocket, TargetRegistry, TargetHealth, TargetFrames, TargetPins,
+               LeaseEndingDeadline, TargetAuditLog, DockerRedaction (pure)
+    api/       TargetController (/targets), LeaseController (/leases), WorkVolumeController,
+               TargetDockerController (/targets/{id}/docker), LeaseLogsController
+               (/leases/{id}/logs), DockerDoor (their audit and status mapping)
+    runner/    TargetRunnerSocket, TargetRegistry, TargetHealth, TargetDocker, TargetFrames, TargetPins,
                TargetAddresses, TargetLoginCommand, TargetInstallScript, TargetCommissionReconcile,
                SocketBearerLifetime, TargetSignIns
     idp/       TargetRunnerCommissioner (kinds target-runner, target-runner-registration)
@@ -77,6 +79,17 @@ lease at once with `detail = "ended by <principal>[: <reason>]"`, and writes a `
 every call, refused ones included. `TargetAuditLog` writes each row in its own transaction and never
 throws. ENDING has a deadline, `LeaseEndingDeadline` — one nudge (the estate again), then ENDED
 after the grace; its `sweep(Instant)` takes the clock, which is how the suite drives it.
+
+**Docker on a target is a request/answer pair on the runner socket, and every call is audited**
+(epic qits-1621). `runner/TargetDocker` sends `Docker` and waits on a future keyed by `requestId`
+that the socket's `DockerResult` dispatch completes — only for the target it went to; the REST
+worker thread blocks, the socket's frame handler never does. `api/DockerDoor` writes the
+`target_audit` row (`DOCKER_<OP>`) BEFORE answering, for refusals, timeouts and an unknown target
+too, and maps the status (OK 200, NOT_FOUND 404, REFUSED 403, FAILED 502, timeout 504, not
+connected 409). Inspect and listing JSON go through `control/DockerRedaction` and are never passed
+through unparsed: an OK answer that is not JSON is a 502. The suite's wait is PT3S
+(`qits.system.targets.docker.timeout` in the test `application.properties`), so a 504 test costs 3 s,
+not 30.
 
 **The estate is the whole desired state, and only a successful read is sent.** The runner removes
 whatever an estate does not list, so a lease read that failed sends nothing. `workVolume` on the wire
@@ -203,7 +216,8 @@ response types are registered on their own controllers' `@RegisterForReflection`
 (`NODE_REMOTE`, and the targets module's `TargetRefusal` codes: `MINIMUMS_EXCEED_TOTAL`,
 `TARGET_BUSY`, `TARGET_UNAVAILABLE`, `LEASE_EXISTS`, `SLOT_TYPE_NOT_YOURS`, `NOT_A_TENANT`,
 `NOT_YOUR_LEASE`, `IMAGE_NOT_ALLOWED`, `ENV_KEY_NOT_ALLOWED`, `WORK_VOLUME_IN_USE`,
-`SIGN_IN_RUNNING`, `SIGN_IN_NOT_FOUND`, `SIGN_IN_NOT_AWAITING_CODE`, …). One
+`SIGN_IN_RUNNING`, `SIGN_IN_NOT_FOUND`, `SIGN_IN_NOT_AWAITING_CODE`, `DOCKER_REFUSED`,
+`DOCKER_FAILED`, `DOCKER_TIMEOUT`, …). One
 exception mapper, so two routes failing for the same reason cannot answer differently.
 
 **The WebSocket path is a literal.** `@WebSocket` does not follow `quarkus.rest.path`, so

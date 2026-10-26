@@ -64,6 +64,15 @@ public class Targets {
     return id == null ? null : QuarkusTransaction.requiringNew().call(() -> Target.findById(id));
   }
 
+  /** The target named {@code name}, or null. */
+  public Target findByName(String name) {
+    if (name == null || name.isBlank()) {
+      return null;
+    }
+    return QuarkusTransaction.requiringNew()
+        .call(() -> Target.<Target>find("name", name).firstResult());
+  }
+
   public Target findByClientId(String clientId) {
     if (clientId == null || clientId.isBlank()) {
       return null;

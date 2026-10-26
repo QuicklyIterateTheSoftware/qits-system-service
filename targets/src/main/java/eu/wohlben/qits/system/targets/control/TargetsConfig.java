@@ -45,6 +45,8 @@ public interface TargetsConfig {
 
   Idp idp();
 
+  Docker docker();
+
   /** Sent to every runner in its {@code ack}. */
   interface RegistryMirrors {
     Optional<List<String>> registryHosts();
@@ -60,6 +62,15 @@ public interface TargetsConfig {
     Duration timeout();
 
     String sweepInterval();
+  }
+
+  /** The Docker API's wait for a runner's {@code docker-result} ({@code runner/TargetDocker}). */
+  interface Docker {
+    /** How long a call waits for its answer. */
+    Duration timeout();
+
+    /** An exec waits its own {@code timeoutSeconds} plus this. */
+    Duration execGrace();
   }
 
   interface Idp {

@@ -158,6 +158,14 @@ runner its whole desired `estate`; the runner answers with an `inventory`.
     PUT    /system/api/leases/{id}/spec              replaceLeaseSpec: a roll
     DELETE /system/api/leases/{id}[?reason=]         endLease: ENDING, then ENDED; operators end any
     DELETE /system/api/work-volumes/{workKey}        purgeWorkVolume
+    GET    /system/api/targets/{id}/docker/containers[/{name}]   ps -a / inspect (secrets ***)
+    GET    /system/api/targets/{id}/docker/containers/{name}/logs?tail=&since=   text/plain
+    POST   /system/api/targets/{id}/docker/containers/{name}/exec    {argv, timeoutSeconds}
+    POST   /system/api/targets/{id}/docker/containers/{name}/stop    docker stop -t 10
+    DELETE /system/api/targets/{id}/docker/containers/{name}         docker rm -f
+    GET    /system/api/targets/{id}/docker/volumes[/{name}]          volume ls / inspect (with Size)
+    GET    /system/api/targets/{id}/docker/audit?limit=100           target_audit rows, newest first
+    GET    /system/api/leases/{id}/logs?tail=&since=                 a lease's own container log
     WS     /system/targets/socket                    qits:target-runner; sub is target.client_id
 
 - **The owner of a lease is the caller**: its bearer's client id without `<environment>-`, checked
@@ -192,6 +200,25 @@ runner its whole desired `estate`; the runner answers with an `inventory`.
   <ending_since>)"`, announced, and audited as `LEASE_ENDING_DEADLINE` by `qits-system`.
 - **`target_audit`**: who did what to a target or lease beyond its owner's doors (`TargetAuditLog`,
   its own transaction per row): actor, `qits:*` roles, target, lease, operation, outcome, detail.
+- **Docker on a target, over the runner socket** (epic qits-1621, `api/TargetDockerController`,
+  `api/LeaseLogsController`): `qits:admin`, `qits:admin-agent` and `qits:desk-admin` only; `{id}` is
+  the target's UUID or its name. Each call sends one `docker` frame (`runner/TargetDocker`) and
+  waits for its `docker-result` — `qits.system.targets.docker.timeout` (PT30S), an exec its own
+  `timeoutSeconds` (default 30, at most 120) plus `docker.exec-grace` (PT10S) — on the REST worker
+  thread, never the socket's. The runner answers only for its own resources (name prefix and owner
+  label). OK 200; NOT_FOUND 404; REFUSED 403 `DOCKER_REFUSED` (the runner's own container, a bad
+  argument); FAILED 502 `DOCKER_FAILED` with docker's words; no answer 504 `DOCKER_TIMEOUT`; no live
+  socket 409 `TARGET_UNAVAILABLE` "target <name> is not connected". A log is `text/plain` with
+  `X-Qits-Truncated: true|false` (the runner caps at 1 MiB); an exec answers `{exitCode, stdout,
+  stderr, truncated}`. An inspect's `Config.Env` `KEY=VALUE` and `Config.Labels`/`Labels` values, and
+  a listing row's `Labels`, are `***` where the key matches
+  `(?i)(TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|API_?KEY|PRIVATE_KEY|AUTH)` (`control/DockerRedaction`);
+  a log and an exec's output are redacted by the runner. `GET /leases/{id}/logs` finds the lease's
+  target, lists its containers and takes the one labelled `qits.system.runner.lease=<id>`.
+  **Every call is one `target_audit` row written before the answer** — `DOCKER_<OP>`, the container
+  or volume, `args {tail, since, argv, timeoutSeconds}`, outcome `OK | NOT_FOUND | REFUSED | FAILED |
+  TIMEOUT | NOT_CONNECTED | BAD_REQUEST` (an unknown target is NOT_FOUND with no target id); reading
+  the audit is not itself audited.
 - **Events**: `TargetLeaseChanged` on every state change, `TargetLoginChanged` on every sign-in
   change. Owners also reconcile from `GET /leases`.
 - **Store**: postgres (`resources: postgresql:db, postgresql:eventstream:…` in deployments.yml),
@@ -219,7 +246,7 @@ The targets module's keys are `qits.system.targets.*`, defaulted in
 DESK, lease's image first), `registry-mirrors.{registry-hosts,mirror-hosts,
 upstreams}`, `runner-version-override`, `reconnect-grace=PT2M`, `commission-reconcile-interval=1h`,
 `public-url` (wss base), `estate-interval=PT1M`, `healthcheck.schedule`, `healthcheck.timeout=PT5M`,
-`idp.{url,client-id,client-secret}`. Beside them, `qits.system.leases.ending-deadline=PT10M`,
+`idp.{url,client-id,client-secret}`, `docker.timeout=PT30S`, `docker.exec-grace=PT10S`. Beside them, `qits.system.leases.ending-deadline=PT10M`,
 `ending-grace=PT2M` and `ending-check-interval=60s` (the ENDING deadline).
 
 ## Building

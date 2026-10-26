@@ -24,6 +24,7 @@ import eu.wohlben.qits.system.targets.entity.LoginValue;
 import eu.wohlben.qits.system.targets.entity.SlotType;
 import eu.wohlben.qits.system.targets.entity.Target;
 import eu.wohlben.qits.systemrunner.protocol.Estate;
+import eu.wohlben.qits.systemrunner.protocol.DockerResult;
 import eu.wohlben.qits.systemrunner.protocol.HealthChecked;
 import eu.wohlben.qits.systemrunner.protocol.Inventory;
 import eu.wohlben.qits.systemrunner.protocol.LeaseReport;
@@ -135,6 +136,8 @@ public class TargetRegistry implements TargetPresence {
   @Inject ProbeImages probeImages;
 
   @Inject TargetSignIns signIns;
+
+  @Inject TargetDocker docker;
 
   @Inject ObjectMapper objectMapper;
 
@@ -438,6 +441,11 @@ public class TargetRegistry implements TargetPresence {
 
   public void onHealthChecked(Session session, HealthChecked checked) {
     health.onHealthChecked(session.targetId, checked.requestId(), checked.report());
+  }
+
+  /** A docker request's answer ({@link TargetDocker}). */
+  public void onDockerResult(Session session, DockerResult result) {
+    docker.onResult(session.targetId, result);
   }
 
   /** A harness sign-in moved ({@link TargetSignIns}). */

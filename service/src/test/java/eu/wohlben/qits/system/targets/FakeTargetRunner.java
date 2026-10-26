@@ -6,6 +6,9 @@ import eu.wohlben.qits.runner.protocol.Hello;
 import eu.wohlben.qits.runner.protocol.RunnerCodec;
 import eu.wohlben.qits.runner.protocol.RunnerMessage;
 import eu.wohlben.qits.runner.protocol.health.HealthReport;
+import eu.wohlben.qits.systemrunner.protocol.Docker;
+import eu.wohlben.qits.systemrunner.protocol.DockerResult;
+import eu.wohlben.qits.systemrunner.protocol.DockerStatus;
 import eu.wohlben.qits.systemrunner.protocol.HealthChecked;
 import eu.wohlben.qits.systemrunner.protocol.Inventory;
 import eu.wohlben.qits.systemrunner.protocol.LeaseReport;
@@ -116,6 +119,11 @@ public final class FakeTargetRunner implements AutoCloseable {
       String requestId, List<eu.wohlben.qits.runner.protocol.health.CheckResult> checks) {
     boolean ok = checks.stream().allMatch(eu.wohlben.qits.runner.protocol.health.CheckResult::ok);
     send(HealthChecked.of(new HealthReport(ok, ok ? "" : "a check failed", requestId, checks)));
+  }
+
+  /** Answers a {@code docker} request as the runner would. */
+  public void dockerResult(Docker request, DockerStatus status, String body) {
+    send(new DockerResult(request.requestId(), status, body, false, null, null));
   }
 
   public void send(RunnerMessage message) {
