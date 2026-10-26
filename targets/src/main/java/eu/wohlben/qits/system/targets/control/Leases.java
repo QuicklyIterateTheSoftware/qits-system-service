@@ -38,7 +38,8 @@ import org.jboss.logging.Logger;
  *
  * <p><b>The owner is the caller's application</b>, resolved by {@link OwnerIdentity} before any of
  * this is reached; a lease of another owner is 403 {@link TargetRefusal#NOT_YOUR_LEASE} to every
- * write.
+ * write. The one door past it is an operator's end ({@link #endByOperator}), which the controller
+ * takes for a caller holding an operator role, and which leaves a {@code target_audit} row.
  */
 @ApplicationScoped
 public class Leases {
@@ -58,6 +59,8 @@ public class Leases {
   @Inject TargetEvents events;
 
   @Inject TargetAllocation allocation;
+
+  @Inject TargetAuditLog audit;
 
   /** What an owner asks for. {@code spec} is checked by {@link LeaseSpecs#require}. */
   public record NewLease(
@@ -210,6 +213,84 @@ public class Leases {
    */
   public Lease end(UUID id, String ownerApp) {
     owned(id, ownerApp);
+    return endOne(id, null).lease();
+  }
+
+  /** Who ends a lease as an operator, for its detail and its audit row. */
+  public record Operator(String actor, String roles) {}
+
+  /**
+   * An operator ends any lease, whoever owns it — the stuck-lease door. QUEUED (or targetless) is
+   * ENDED and GRANTED, RUNNING, EXITED or FAILED is ENDING, as for its owner; an ENDING lease is
+   * ENDED at once, without the runner's word. A lease it moves gets {@code detail = "ended by
+   * <actor>[: <reason>]"}. Every call writes a {@link TargetAuditLog#LEASE_END} row, a refused one
+   * too: outcome ENDED, ENDING, NOOP (already ENDED) or NOT_FOUND.
+   *
+   * @param id null for an id that is not one, which is NOT_FOUND
+   * @param asWritten the id as the caller wrote it, recorded as the row's resource when it is no
+   *     lease's
+   */
+  public Lease endByOperator(UUID id, String asWritten, Operator operator, String reason) {
+    String why = reason == null || reason.isBlank() ? null : reason.strip();
+    String detail = "ended by " + operator.actor() + (why == null ? "" : ": " + why);
+    ObjectNode args = null;
+    if (why != null) {
+      args = JsonNodeFactory.instance.objectNode();
+      args.put("reason", why);
+    }
+    Ended ended;
+    try {
+      if (id == null) {
+        throw TargetRefusal.notFound("No lease " + asWritten);
+      }
+      ended = endOne(id, detail);
+    } catch (TargetRefusal refused) {
+      audit.record(
+          new TargetAuditLog.Entry(
+              operator.actor(),
+              operator.roles(),
+              null,
+              id,
+              TargetAuditLog.LEASE_END,
+              id == null ? asWritten : null,
+              args,
+              refused.status() == 404 ? "NOT_FOUND" : refused.code(),
+              refused.getMessage()));
+      throw refused;
+    }
+    Lease lease = ended.lease();
+    boolean moved = lease.state != ended.before();
+    LOG.infof(
+        "%s ended lease %s (%s %s of %s): %s",
+        operator.actor(),
+        lease.id,
+        lease.slotType,
+        lease.ownerRef,
+        lease.ownerApp,
+        moved ? ended.before() + " -> " + lease.state : "already " + lease.state);
+    audit.record(
+        new TargetAuditLog.Entry(
+            operator.actor(),
+            operator.roles(),
+            lease.targetId,
+            lease.id,
+            TargetAuditLog.LEASE_END,
+            null,
+            args,
+            moved ? lease.state.name() : "NOOP",
+            moved ? detail : "already " + lease.state));
+    return lease;
+  }
+
+  /** A lease after an end, and the state it was in before. */
+  private record Ended(Lease lease, LeaseState before) {}
+
+  /**
+   * The one end transition. {@code operatorDetail} null is the owner's end, which leaves an ENDING
+   * lease alone; set, it is an operator's, which also ends an ENDING lease and leaves the detail on
+   * any lease it moves. Every entry into ENDING stamps {@code ending_since}.
+   */
+  private Ended endOne(UUID id, String operatorDetail) {
     LeaseState[] before = {null};
     Lease ended =
         QuarkusTransaction.requiringNew()
@@ -220,18 +301,100 @@ public class Leases {
                     throw TargetRefusal.notFound("No lease " + id);
                   }
                   before[0] = lease.state;
-                  if (lease.state == LeaseState.ENDING || lease.state == LeaseState.ENDED) {
+                  Instant now = Instant.now();
+                  if (lease.state == LeaseState.ENDED
+                      || (lease.state == LeaseState.ENDING && operatorDetail == null)) {
                     return lease;
                   }
-                  if (lease.state == LeaseState.QUEUED || lease.targetId == null) {
+                  if (lease.state == LeaseState.ENDING
+                      || lease.state == LeaseState.QUEUED
+                      || lease.targetId == null) {
                     lease.state = LeaseState.ENDED;
-                    lease.endedAt = Instant.now();
+                    lease.endedAt = now;
                   } else {
                     lease.state = LeaseState.ENDING;
+                    lease.endingSince = now;
+                    lease.endingNudgedAt = null;
+                  }
+                  if (operatorDetail != null) {
+                    lease.detail = operatorDetail;
                   }
                   return lease;
                 });
     if (ended.state != before[0]) {
+      events.leaseChanged(ended);
+      allocation.estateChanged(ended.targetId);
+      allocation.requestPass();
+    }
+    return new Ended(ended, before[0]);
+  }
+
+  // --- the ENDING deadline (LeaseEndingDeadline) -----------------------------------------------
+
+  /** An ENDING lease as the deadline reads it. */
+  public record Ending(UUID id, UUID targetId, Instant endingSince, Instant endingNudgedAt) {}
+
+  /**
+   * Every ENDING lease. One whose {@code ending_since} is missing (it went ENDING before that was
+   * recorded and after the migration's backfill) is given {@code now}, so its deadline starts.
+   */
+  public List<Ending> ending(Instant now) {
+    return QuarkusTransaction.requiringNew()
+        .call(
+            () ->
+                Lease.<Lease>find("state = ?1 order by id", LeaseState.ENDING)
+                    .withLock(LockModeType.PESSIMISTIC_WRITE)
+                    .list()
+                    .stream()
+                    .map(
+                        lease -> {
+                          if (lease.endingSince == null) {
+                            lease.endingSince = now;
+                          }
+                          return new Ending(
+                              lease.id, lease.targetId, lease.endingSince, lease.endingNudgedAt);
+                        })
+                    .toList());
+  }
+
+  /** Records the nudge of a lease that is still ENDING and not yet nudged; true when it did. */
+  public boolean nudged(UUID id, Instant now) {
+    return QuarkusTransaction.requiringNew()
+        .call(
+            () -> {
+              Lease lease = Lease.findById(id, LockModeType.PESSIMISTIC_WRITE);
+              if (lease == null
+                  || lease.state != LeaseState.ENDING
+                  || lease.endingNudgedAt != null) {
+                return false;
+              }
+              lease.endingNudgedAt = now;
+              return true;
+            });
+  }
+
+  /**
+   * ENDED without the runner's word, with {@code detail}, when it is still ENDING; announced. Answers
+   * the lease as ENDED, or null when something else ended it first.
+   */
+  public Lease endPastDeadline(UUID id, Instant now, String detail) {
+    Lease ended =
+        QuarkusTransaction.requiringNew()
+            .call(
+                () -> {
+                  Lease lease = Lease.findById(id, LockModeType.PESSIMISTIC_WRITE);
+                  if (lease == null || lease.state != LeaseState.ENDING) {
+                    return null;
+                  }
+                  lease.state = LeaseState.ENDED;
+                  lease.endedAt = now;
+                  lease.detail = detail;
+                  return lease;
+                });
+    if (ended != null) {
+      LOG.warnf(
+          "Lease %s (%s %s of %s) is ENDED: %s",
+          ended.id, ended.slotType, ended.ownerRef, ended.ownerApp, detail);
       events.leaseChanged(ended);
       allocation.estateChanged(ended.targetId);
       allocation.requestPass();

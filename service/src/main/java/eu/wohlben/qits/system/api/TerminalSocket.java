@@ -39,7 +39,9 @@ import org.jboss.logging.Logger;
  * reason to hold one. Class-level {@code @RolesAllowed} on a WebSockets Next endpoint secures the
  * HTTP UPGRADE itself (3.34's {@code SecurityHttpUpgradeCheck}), so an unauthorised client is
  * refused the handshake rather than connected and then ignored. {@code qits:admin-agent} is
- * admitted too (qits-628 follow-up); remove it here if this door must stay human-only.
+ * admitted too (qits-628 follow-up), and {@code qits:desk-admin} beside it (epic qits-1621, literal
+ * parity with no refusal recorded for this service); remove either here if this door must stay
+ * human-only.
  *
  * <p><b>The path is a LITERAL.</b> {@code @WebSocket} does not follow {@code quarkus.rest.path}, so
  * the {@code /system/api} prefix is spelled out here and has to move with that key by hand.
@@ -51,7 +53,7 @@ import org.jboss.logging.Logger;
  * the client's signal to reconnect, which it does, and the replay puts it back where it was.
  */
 @WebSocket(path = TerminalSocket.PATH_PREFIX + "{id}")
-@RolesAllowed({"qits:admin", "qits:admin-agent"})
+@RolesAllowed({"qits:admin", "qits:admin-agent", "qits:desk-admin"})
 public class TerminalSocket {
 
   /** The literal prefix of the socket path. See the class javadoc for why it is spelled at all. */

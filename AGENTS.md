@@ -43,9 +43,11 @@ its schedules in it; `service/` discovers them through the jar's jandex index. T
 "Targets in qits-system: data, doors, allocation", "The runner: qits-system-runner-daemon" and
 "Leases and tokens per slot type" (epic qits-1481) are the spec; `qits-system-plan.md` pins the wire.
 
-    entity/    Target, Lease, WorkVolume — named persistence unit `system`, flyway db/system/migration
+    entity/    Target, Lease, WorkVolume, TargetAudit — named persistence unit `system`, flyway
+               db/system/migration
     control/   SlotAllocator (pure), TargetAllocation (runs it, writes grants, builds estates),
-               Targets, Leases, WorkVolumes, OwnerIdentity, LeaseSpecs, TargetEvents, TargetsConfig
+               Targets, Leases, WorkVolumes, OwnerIdentity, LeaseSpecs, TargetEvents, TargetsConfig,
+               LeaseEndingDeadline, TargetAuditLog
     api/       TargetController (/targets), LeaseController (/leases), WorkVolumeController
     runner/    TargetRunnerSocket, TargetRegistry, TargetHealth, TargetFrames, TargetPins,
                TargetAddresses, TargetLoginCommand, TargetInstallScript, TargetCommissionReconcile,
@@ -67,6 +69,14 @@ leases — and minimums that do not fit the total are already ignored by the all
 **The owner is the bearer, never the body.** `OwnerIdentity` takes the caller's client id (`sub`, or
 the forwarded principal) without its `<environment>-` prefix and looks it up in
 `qits.system.targets.tenants.*`. A field in a request that names an owner is ignored.
+
+**An operator ends any lease; its owner only its own** (epic qits-1621). `LeaseController.end`
+decides by role, and an operator role (`qits:admin`, `qits:admin-agent`, `qits:desk-admin`) wins over
+`qits:system`: the operator path (`Leases.endByOperator`) skips the ownership check, ends an ENDING
+lease at once with `detail = "ended by <principal>[: <reason>]"`, and writes a `target_audit` row for
+every call, refused ones included. `TargetAuditLog` writes each row in its own transaction and never
+throws. ENDING has a deadline, `LeaseEndingDeadline` — one nudge (the estate again), then ENDED
+after the grace; its `sweep(Instant)` takes the clock, which is how the suite drives it.
 
 **The estate is the whole desired state, and only a successful read is sent.** The runner removes
 whatever an estate does not list, so a lease read that failed sends nothing. `workVolume` on the wire

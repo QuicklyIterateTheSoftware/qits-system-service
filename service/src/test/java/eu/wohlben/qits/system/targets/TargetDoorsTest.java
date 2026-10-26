@@ -182,8 +182,10 @@ class TargetDoorsTest {
   }
 
   /**
-   * The sign-in doors (qits-1593) admit {@code qits:admin} and {@code qits:admin-agent} only: a
-   * sign-in writes the harness credentials every WORKSPACE and DESK lease on the target runs with.
+   * The sign-in doors (qits-1593) admit {@code qits:admin}, {@code qits:admin-agent} and, since
+   * epic qits-1621, {@code qits:desk-admin}: a sign-in writes the harness credentials every
+   * WORKSPACE and DESK lease on the target runs with. The plain delivery desk ({@code qits:desk})
+   * stays refused.
    */
   @Test
   void onlyAnAdministratorSignsATargetIn() {
@@ -210,6 +212,25 @@ class TargetDoorsTest {
       refused.delete(one).then().statusCode(403);
     }
     as("the-coordinator", "qits:admin-agent")
+        .contentType("application/json")
+        .body("{\"harness\":\"claude\"}")
+        .post(signIns)
+        .then()
+        .statusCode(409)
+        .body("code", equalTo("TARGET_UNAVAILABLE"));
+  }
+
+  /**
+   * The delivery desk's administrator ({@code qits:desk-admin}, epic qits-1621) starts a sign-in
+   * like the coordinator does above: a target carries no project to bind the desk to, and a
+   * sign-in writes no git ref and touches no credential of the desk's own.
+   */
+  @Test
+  void aDeskAdministratorSignsATargetInLikeTheCoordinator() {
+    UUID id = UUID.randomUUID();
+    TargetRows.target(id, "away", 4, "client-away", false);
+    String signIns = API + "/" + id + "/sign-ins";
+    as("delivery-desk-admin", "qits:desk-admin")
         .contentType("application/json")
         .body("{\"harness\":\"claude\"}")
         .post(signIns)

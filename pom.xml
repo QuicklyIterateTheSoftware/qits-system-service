@@ -65,7 +65,7 @@
              property so the image build can point it at the address the builder container can
              actually reach — see docker/Dockerfile and .qits-maven-settings.xml. -->
         <qits.auth-core.version>2026.1012.173247</qits.auth-core.version>
-        <qits.arch-rules.version>2026.1011.185745</qits.arch-rules.version>
+        <qits.arch-rules.version>2026.1026.133840</qits.arch-rules.version>
         <!-- CallerServerFilter/CallerClientFilter: jandex-indexed filters that record inbound
              X-Qits-Caller as the qits.caller span attribute and stamp it on outgoing REST-client
              calls. Also published by qits-integrations-quarkus. -->
@@ -107,7 +107,7 @@
         <!-- The qits-system-runner's own frames (qits-1481): SystemRunnerProtocol, SystemRunnerCodec
              and SystemRunnerBinary, whose VERSION is the runner image every target is pinned to.
              Published by qits-system-runner-daemon. -->
-        <qits.system-runner-protocol.version>2026.1026.44704</qits.system-runner-protocol.version>
+        <qits.system-runner-protocol.version>2026.1026.121514</qits.system-runner-protocol.version>
         <!-- THE LOGIN PROBE'S LAST-RESORT IMAGE (qits-1593): qits-workspace-daemon-protocol's
              WorkspaceImage carries the `qits/workspace` tag of the release that published it, so a
              brand-new target with no WORKSPACE or DESK lease yet can still be probed and sign in,

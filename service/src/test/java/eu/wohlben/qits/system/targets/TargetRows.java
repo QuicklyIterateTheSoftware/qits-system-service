@@ -5,6 +5,7 @@ import eu.wohlben.qits.system.targets.entity.LeaseState;
 import eu.wohlben.qits.system.targets.entity.LoginValue;
 import eu.wohlben.qits.system.targets.entity.SlotType;
 import eu.wohlben.qits.system.targets.entity.Target;
+import eu.wohlben.qits.system.targets.entity.TargetAudit;
 import eu.wohlben.qits.system.targets.entity.WorkVolume;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import java.time.Instant;
@@ -17,11 +18,12 @@ public final class TargetRows {
 
   private TargetRows() {}
 
-  /** Removes every lease, work volume and target. */
+  /** Removes every audit row, lease, work volume and target. */
   public static void clear() {
     QuarkusTransaction.requiringNew()
         .run(
             () -> {
+              TargetAudit.deleteAll();
               Lease.deleteAll();
               WorkVolume.deleteAll();
               Target.deleteAll();
@@ -83,6 +85,25 @@ public final class TargetRows {
               lease.persist();
               return lease;
             });
+  }
+
+  /** An ENDING lease on {@code targetId}, ENDING since {@code since}. */
+  public static Lease ending(
+      UUID id, SlotType type, String ownerApp, String ownerRef, UUID targetId, Instant since) {
+    lease(id, type, ownerApp, ownerRef, LeaseState.ENDING, targetId);
+    return QuarkusTransaction.requiringNew()
+        .call(
+            () -> {
+              Lease lease = Lease.findById(id);
+              lease.endingSince = since;
+              return lease;
+            });
+  }
+
+  /** The audit rows of {@code leaseId}, oldest first. */
+  public static java.util.List<TargetAudit> audit(UUID leaseId) {
+    return QuarkusTransaction.requiringNew()
+        .call(() -> TargetAudit.<TargetAudit>find("leaseId = ?1 order by at, id", leaseId).list());
   }
 
   public static Lease reload(UUID leaseId) {

@@ -83,6 +83,14 @@ public class Lease extends PanacheEntityBase implements CausedRow {
   @Column(name = "ended_at")
   public Instant endedAt;
 
+  /** When it last went ENDING; {@code LeaseEndingDeadline} counts from here. */
+  @Column(name = "ending_since")
+  public Instant endingSince;
+
+  /** When {@code LeaseEndingDeadline} re-sent its target's estate, once per ENDING; else null. */
+  @Column(name = "ending_nudged_at")
+  public Instant endingNudgedAt;
+
   @Column(name = "causation_id")
   public UUID causationId;
 

@@ -132,7 +132,8 @@ Any other close code means reconnect — and a reconnect gets the scrollback rep
 Only `qits:admin` may open a socket. Every REST route also accepts `qits:system`, because reading
 the host's shape is something a machine may do; holding a shell on the platform host is not.
 `qits:admin-agent` — an ADMIN workspace's own commissioned agent — is admitted everywhere
-`qits:admin` is, including the socket (qits-628 follow-up).
+`qits:admin` is, including the socket (qits-628 follow-up), and `qits:desk-admin` — the delivery
+desk's administrator — beside it (epic qits-1621; no refusal is recorded for this service).
 
 ## Execution targets
 
@@ -149,13 +150,13 @@ runner its whole desired `estate`; the runner answers with an `inventory`.
     POST   /system/api/targets/{id}/sign-ins        {harness: claude|kimi}: 202 STARTING; the runner logs in
     GET    /system/api/targets/{id}/sign-ins/{sid}  poll: AWAITING_CODE/AWAITING_BROWSER carry url, userCode
     POST   /system/api/targets/{id}/sign-ins/{sid}/code   {code}: relayed to the runner's login
-    DELETE /system/api/targets/{id}/sign-ins/{sid}  CANCELLED; admin and admin-agent only, all four
+    DELETE /system/api/targets/{id}/sign-ins/{sid}  CANCELLED; admin, admin-agent and desk-admin only, all four
     GET    /system/api/targets/install.sh            the toolkit's InstallScript
     POST   /system/api/targets/{id}/register         operationId registerTarget; the runner's client
     POST   /system/api/leases                        operationId createLease; 201 QUEUED
     GET    /system/api/leases[/{id}]                 listLeases / getLease; a service sees its own
     PUT    /system/api/leases/{id}/spec              replaceLeaseSpec: a roll
-    DELETE /system/api/leases/{id}                   endLease: ENDING, then ENDED
+    DELETE /system/api/leases/{id}[?reason=]         endLease: ENDING, then ENDED; operators end any
     DELETE /system/api/work-volumes/{workKey}        purgeWorkVolume
     WS     /system/targets/socket                    qits:target-runner; sub is target.client_id
 
@@ -177,6 +178,20 @@ runner its whole desired `estate`; the runner answers with an `inventory`.
   404 `SIGN_IN_NOT_FOUND`. The code is never logged. `claude` reads PRESENT only once the volume
   also holds Claude Code's first-run keys (the runner merges them in), so PRESENT means an agent
   launch starts without a setup screen.
+- **Ending a lease**: its owner (`qits:system`, 403 `NOT_YOUR_LEASE` on another's) or an operator
+  (`qits:admin`, `qits:admin-agent`, `qits:desk-admin`; an operator role wins over `qits:system`),
+  who ends any lease. QUEUED or targetless is ENDED at once; GRANTED, RUNNING, EXITED or FAILED is
+  ENDING until the runner reports the container gone. An operator's end of an ENDING lease is ENDED
+  at once — the stuck-lease door — and a lease an operator moves carries `detail = "ended by
+  <principal>[: <reason>]"`. Every operator call, a refused one too, is a `target_audit` row
+  (`LEASE_END`; outcome ENDED, ENDING, NOOP or NOT_FOUND).
+- **ENDING has a deadline** (`control/LeaseEndingDeadline`): past `ending_since +
+  qits.system.leases.ending-deadline` (PT10M) its target's estate is sent once more; past that nudge
+  `+ ending-grace` (PT2M) — or at the deadline, when the target is not connected — it is ENDED with
+  `detail = "ENDING deadline passed: the runner on <target> never reported the container gone (since
+  <ending_since>)"`, announced, and audited as `LEASE_ENDING_DEADLINE` by `qits-system`.
+- **`target_audit`**: who did what to a target or lease beyond its owner's doors (`TargetAuditLog`,
+  its own transaction per row): actor, `qits:*` roles, target, lease, operation, outcome, detail.
 - **Events**: `TargetLeaseChanged` on every state change, `TargetLoginChanged` on every sign-in
   change. Owners also reconcile from `GET /leases`.
 - **Store**: postgres (`resources: postgresql:db, postgresql:eventstream:…` in deployments.yml),
@@ -204,7 +219,8 @@ The targets module's keys are `qits.system.targets.*`, defaulted in
 DESK, lease's image first), `registry-mirrors.{registry-hosts,mirror-hosts,
 upstreams}`, `runner-version-override`, `reconnect-grace=PT2M`, `commission-reconcile-interval=1h`,
 `public-url` (wss base), `estate-interval=PT1M`, `healthcheck.schedule`, `healthcheck.timeout=PT5M`,
-`idp.{url,client-id,client-secret}`.
+`idp.{url,client-id,client-secret}`. Beside them, `qits.system.leases.ending-deadline=PT10M`,
+`ending-grace=PT2M` and `ending-check-interval=60s` (the ENDING deadline).
 
 ## Building
 
