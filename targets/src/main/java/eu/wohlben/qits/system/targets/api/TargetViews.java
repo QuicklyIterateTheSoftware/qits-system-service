@@ -55,7 +55,10 @@ public class TargetViews {
       @Schema(description = "GRANTED, RUNNING and ENDING leases per type") SlotCounts used,
       Login login,
       String credentialVolume,
-      @Schema(description = "Null until a loginState arrived on the current connection")
+      @Schema(
+              description =
+                  "The manual fallback, run on the target's node: the sign-in doors need no shell."
+                      + " Null until a loginState arrived on the current connection")
           String loginCommand,
       String kimiLoginCommand,
       boolean connected,

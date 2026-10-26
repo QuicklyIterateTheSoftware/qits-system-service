@@ -166,8 +166,10 @@ runner its whole desired `estate`; the runner answers with an `inventory`.
   `IMAGE_NOT_ALLOWED`), never as root, and never with a policy-owned env key (`HOME`,
   `CLAUDE_CONFIG_DIR`, `BUILDKIT_HOST`; 400 `ENV_KEY_NOT_ALLOWED`).
 - **A WORKSPACE or DESK lease waits on a target nobody signed in** — `detail` names the command:
-  `qits targets sign-in --target <name>`. `loginCommand`/`kimiLoginCommand` are rendered from the
-  volume the runner reported, once its `loginState` arrived on the current connection.
+  `qits targets sign-in --target <name>`, which signs in through the sign-in doors below, as the
+  Targets page does. `loginCommand`/`kimiLoginCommand` are the manual fallback, run on the node:
+  rendered from the volume the runner reported, once its `loginState` arrived on the current
+  connection.
 - **A sign-in runs on the target** (qits-1593): the runner runs the harness's own login in its
   credential volume and reports `signInProgress`; this service holds it in memory, relays the code,
   expires it after 10 minutes (EXPIRED, `signInCancel`) and keeps a settled one readable ~15. 409
