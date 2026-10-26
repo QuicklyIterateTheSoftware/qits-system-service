@@ -60,6 +60,21 @@ record SuiteTargetsConfig(String idpUrl, String clientId, String secret) impleme
   }
 
   @Override
+  public Docker docker() {
+    return new Docker() {
+      @Override
+      public Duration timeout() {
+        return Duration.ofSeconds(30);
+      }
+
+      @Override
+      public Duration execGrace() {
+        return Duration.ofSeconds(10);
+      }
+    };
+  }
+
+  @Override
   public Optional<String> runnerVersionOverride() {
     return Optional.empty();
   }
