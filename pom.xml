@@ -65,7 +65,7 @@
              property so the image build can point it at the address the builder container can
              actually reach — see docker/Dockerfile and .qits-maven-settings.xml. -->
         <qits.auth-core.version>2026.1012.173247</qits.auth-core.version>
-        <qits.arch-rules.version>2026.1011.185745</qits.arch-rules.version>
+        <qits.arch-rules.version>2026.1026.133840</qits.arch-rules.version>
         <!-- CallerServerFilter/CallerClientFilter: jandex-indexed filters that record inbound
              X-Qits-Caller as the qits.caller span attribute and stamp it on outgoing REST-client
              calls. Also published by qits-integrations-quarkus. -->
