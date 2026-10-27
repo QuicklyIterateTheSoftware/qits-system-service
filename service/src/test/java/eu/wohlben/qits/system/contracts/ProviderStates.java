@@ -277,9 +277,9 @@ public class ProviderStates {
             () -> {
               Target target = Target.findById(id);
               target.description = "the lab box";
-              target.minCi = 2;
-              target.minWorkspace = 2;
-              target.minDesk = 1;
+              target.reservedCi = 2;
+              target.reservedWorkspace = 2;
+              target.reservedDesk = 1;
               target.loginClaude = LoginValue.PRESENT;
               target.loginKimi = LoginValue.ABSENT;
               target.loginCheckedAt = TargetRows.T0;
@@ -299,7 +299,7 @@ public class ProviderStates {
                       + "{\"name\":\"login\",\"ok\":true,\"detail\":null,\"data\":"
                       + "{\"claude\":\"PRESENT\",\"kimi\":\"ABSENT\"}},"
                       + "{\"name\":\"slots\",\"ok\":true,\"detail\":null,\"data\":"
-                      + "{\"minimums\":5,\"total\":6}}]}";
+                      + "{\"reservations\":5,\"minimums\":5,\"total\":6}}]}";
             });
     return new Setup(Map.of("targetId", TARGET_ID));
   }

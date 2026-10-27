@@ -190,7 +190,7 @@ class GoldenMasterRecordingTest {
               API + "/targets",
               201,
               "{\"name\":\"lab\",\"description\":\"the lab box\","
-                  + "\"minimums\":{\"ci\":2,\"workspace\":2,\"desk\":1}}",
+                  + "\"reservations\":{\"ci\":2,\"workspace\":2,\"desk\":1}}",
               Map.of()),
           call(
               ProviderStates.NO_TARGET,
@@ -227,7 +227,7 @@ class GoldenMasterRecordingTest {
               "PATCH",
               TARGET,
               200,
-              "{\"description\":\"the lab box, rebuilt\",\"minimums\":{\"desk\":0}}",
+              "{\"description\":\"the lab box, rebuilt\",\"reservations\":{\"desk\":0}}",
               Map.of()),
           call(
               ProviderStates.A_DECLARED_TARGET,

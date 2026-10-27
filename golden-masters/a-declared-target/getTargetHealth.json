@@ -21,7 +21,8 @@
       "ok": true,
       "data": {
         "total": 6,
-        "minimums": 5
+        "minimums": 5,
+        "reservations": 5
       },
       "name": "slots",
       "detail": null

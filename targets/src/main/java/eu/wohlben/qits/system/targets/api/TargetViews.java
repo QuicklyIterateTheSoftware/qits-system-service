@@ -37,8 +37,8 @@ public class TargetViews {
           counts.getOrDefault(SlotType.DESK, 0));
     }
 
-    Targets.Minimums minimums() {
-      return new Targets.Minimums(ci, workspace, desk);
+    Targets.Reservations reservations() {
+      return new Targets.Reservations(ci, workspace, desk);
     }
   }
 
@@ -51,7 +51,14 @@ public class TargetViews {
       String name,
       String description,
       @Schema(description = "What the runner said in its last hello") int slotsTotal,
-      SlotCounts minimums,
+      @Schema(
+              description =
+                  "Slots reserved per type. Not a limit: a type may use more while shared"
+                      + " (unreserved) slots are free")
+          SlotCounts reservations,
+      // Deprecated (qits-1682): the old name of reservations, same values. Remove one release on.
+      @Schema(deprecated = true, description = "Deprecated: read reservations. Same values")
+          SlotCounts minimums,
       @Schema(description = "GRANTED, RUNNING and ENDING leases per type") SlotCounts used,
       Login login,
       String credentialVolume,
@@ -162,7 +169,8 @@ public class TargetViews {
         target.name,
         target.description,
         target.slotsTotal,
-        SlotCounts.of(target.minimums()),
+        SlotCounts.of(target.reservations()),
+        SlotCounts.of(target.reservations()),
         SlotCounts.of(used == null ? Map.of() : used),
         new Login(
             target.loginClaude == null ? null : target.loginClaude.name(),

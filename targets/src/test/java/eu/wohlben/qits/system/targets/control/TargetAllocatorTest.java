@@ -33,7 +33,7 @@ class TargetAllocatorTest {
     return counts;
   }
 
-  /** The worked example's target: T=6, minimums ci 2, workspace 2, desk 1, signed in. */
+  /** The worked example's target: T=6, reservations ci 2, workspace 2, desk 1, signed in. */
   private static TargetSlots worked(int ciRunning) {
     return new TargetSlots(A, "alpha", 6, counts(2, 2, 1), counts(ciRunning, 0, 0), true, false, true);
   }
@@ -98,11 +98,11 @@ class TargetAllocatorTest {
   // --- Σ min > total ------------------------------------------------------------------------------
 
   @Test
-  void minimumsAboveTheTotalAreIgnored() {
-    // Minimums 2+2+1 = 5 against a reported total of 4: ci may take all four.
+  void reservationsAboveTheTotalAreIgnored() {
+    // Reservations 2+2+1 = 5 against a reported total of 4: ci may take all four.
     TargetSlots shrunk =
         new TargetSlots(A, "alpha", 4, counts(2, 2, 1), counts(3, 0, 0), true, false, true);
-    assertTrue(SlotAllocator.minimumsExceedTotal(4, shrunk.minimums()));
+    assertTrue(SlotAllocator.reservationsExceedTotal(4, shrunk.reservations()));
     assertTrue(SlotAllocator.fits(shrunk, SlotType.CI));
     TargetSlots full =
         new TargetSlots(A, "alpha", 4, counts(2, 2, 1), counts(4, 0, 0), true, false, true);

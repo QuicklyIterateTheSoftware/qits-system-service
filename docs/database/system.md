@@ -46,15 +46,15 @@ erDiagram
     instant login_checked_at
     enum login_claude
     enum login_kimi
-    int min_ci "not null"
-    int min_desk "not null"
-    int min_workspace "not null"
     string name "not null"
     string quarantine_reason
     instant quarantined_at
     instant registered_at
     string registration_token_id
     string registration_token_subject
+    int reserved_ci "not null"
+    int reserved_desk "not null"
+    int reserved_workspace "not null"
     string runner_version
     int slots_total "not null"
   }

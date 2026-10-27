@@ -40,12 +40,12 @@ import org.jboss.logging.Logger;
 
 /**
  * {@code /system/api/targets}: an operator declares the machines a qits-system-runner runs on,
- * reads them, sets their minimums, gates them, and a runner registers with its one-use token. The
+ * reads them, sets their reservations, gates them, and a runner registers with its one-use token. The
  * roles are the dossier's table ("Targets in qits-system: data, doors, allocation").
  *
  * <p><b>A registration is rotated, never redeclared</b> (qits-1579): a registered target's token may
  * be rotated, and a runner installed with the new one registers again — the target keeps its id,
- * name, minimums, leases and work volumes, the old client is given back to qits-idp and the old
+ * name, reservations, leases and work volumes, the old client is given back to qits-idp and the old
  * runner's connections are closed {@link TargetRegistry#REREGISTERED}. Until then the old runner
  * keeps working.
  */
@@ -119,24 +119,45 @@ public class TargetController {
   public record CreateTargetRequest(
       @Schema(description = "[a-z][a-z0-9-]{0,63}, unique", required = true) String name,
       @Schema(description = "Free text, at most 1024 characters") String description,
-      @Schema(description = "Slots reserved per type; absent is 0") TargetViews.SlotCounts minimums,
       @Schema(
               description =
-                  "The slots total the install line carries, 0..1024 and at least the minimums'"
-                      + " sum; absent is the minimums' sum. Not stored: the runner reports its total")
-          Integer slots) {}
+                  "Slots reserved per type; absent is 0. Not a limit: a type may use more while"
+                      + " shared slots are free")
+          TargetViews.SlotCounts reservations,
+      // Deprecated (qits-1682): the old name of reservations; read only when reservations is absent.
+      @Schema(deprecated = true, description = "Deprecated: send reservations")
+          TargetViews.SlotCounts minimums,
+      @Schema(
+              description =
+                  "The slots total the install line carries, 0..1024 and at least the reservations'"
+                      + " sum; absent is the reservations' sum. Not stored: the runner reports its total")
+          Integer slots) {
+    /** The reservations sent, under the new name or else the deprecated one. */
+    TargetViews.SlotCounts reserved() {
+      return reservations != null ? reservations : minimums;
+    }
+  }
 
   @Schema(name = "PatchTargetRequest")
   public record PatchTargetRequest(
       @Schema(description = "Blank clears it; absent leaves it") String description,
-      @Schema(description = "Absent members leave theirs") TargetViews.SlotCounts minimums) {}
+      @Schema(description = "Slots reserved per type; absent members leave theirs")
+          TargetViews.SlotCounts reservations,
+      // Deprecated (qits-1682): the old name of reservations; read only when reservations is absent.
+      @Schema(deprecated = true, description = "Deprecated: send reservations")
+          TargetViews.SlotCounts minimums) {
+    /** The reservations sent, under the new name or else the deprecated one. */
+    TargetViews.SlotCounts reserved() {
+      return reservations != null ? reservations : minimums;
+    }
+  }
 
   @Schema(name = "RotateTargetRegistrationTokenRequest")
   public record RotateTargetRegistrationTokenRequest(
       @Schema(
               description =
-                  "The slots total the new install line carries, 0..1024 and at least the minimums'"
-                      + " sum; absent is the reported total, or the minimums' sum when that is"
+                  "The slots total the new install line carries, 0..1024 and at least the reservations'"
+                      + " sum; absent is the reported total, or the reservations' sum when that is"
                       + " more. Not stored: the runner reports its total")
           Integer slots) {}
 
@@ -168,7 +189,9 @@ public class TargetController {
       content = @Content(schema = @Schema(implementation = TargetViews.TargetRegistrationDto.class)))
   @APIResponse(
       responseCode = "400",
-      description = "A malformed name, description or minimum, or slots outside 0..1024 or below the minimums' sum")
+      description =
+          "A malformed name, description or reservation, or slots outside 0..1024 or below the"
+              + " reservations' sum")
   @APIResponse(responseCode = "409", description = "TARGET_NAME_TAKEN")
   @APIResponse(responseCode = "502", description = "qits-idp refused the registration token")
   @APIResponse(
@@ -179,9 +202,10 @@ public class TargetController {
     if (request == null) {
       throw TargetRefusal.badRequest("A target needs a name");
     }
-    Targets.Minimums minimums = request.minimums() == null ? null : request.minimums().minimums();
-    targets.requireCreatable(request.name(), request.description(), minimums);
-    Targets.requireInstallSlots(request.slots(), Targets.sum(minimums));
+    Targets.Reservations reservations =
+        request.reserved() == null ? null : request.reserved().reservations();
+    targets.requireCreatable(request.name(), request.description(), reservations);
+    Targets.requireInstallSlots(request.slots(), Targets.sum(reservations));
     requireCommissioning();
     installScript.requireRenderable();
     UUID id = UUID.randomUUID();
@@ -190,7 +214,12 @@ public class TargetController {
     try {
       target =
           targets.create(
-              id, request.name(), request.description(), minimums, token.tokenId(), token.subject());
+              id,
+              request.name(),
+              request.description(),
+              reservations,
+              token.tokenId(),
+              token.subject());
     } catch (RuntimeException refused) {
       idp.deleteToken(token.tokenId());
       throw refused;
@@ -253,23 +282,24 @@ public class TargetController {
   @Path("/{id}")
   @Consumes(MediaType.APPLICATION_JSON)
   @RolesAllowed({ADMIN, ADMIN_AGENT, DESK_ADMIN, DESK, SYSTEM})
-  @Operation(operationId = "patchTarget", summary = "Change a target's description or minimums")
+  @Operation(operationId = "patchTarget", summary = "Change a target's description or reservations")
   @APIResponse(responseCode = "200", description = "The target as it now is")
-  @APIResponse(responseCode = "400", description = "A malformed description or minimum")
+  @APIResponse(responseCode = "400", description = "A malformed description or reservation")
   @APIResponse(responseCode = "404", description = "No such target")
   @APIResponse(
       responseCode = "409",
-      description = "MINIMUMS_EXCEED_TOTAL: their sum is above the total the runner reports")
+      description = "RESERVATIONS_EXCEED_TOTAL: their sum is above the total the runner reports")
   public TargetViews.TargetDto patch(@PathParam("id") String id, PatchTargetRequest request) {
     requireMachineAudience();
-    PatchTargetRequest change = request == null ? new PatchTargetRequest(null, null) : request;
+    PatchTargetRequest change =
+        request == null ? new PatchTargetRequest(null, null, null) : request;
     UUID targetId = targetId(id);
     Target patched =
         targets.patch(
             targetId,
             change.description(),
-            change.minimums() == null ? null : change.minimums().minimums());
-    if (change.minimums() != null) {
+            change.reserved() == null ? null : change.reserved().reservations());
+    if (change.reserved() != null) {
       registry.estateChanged(targetId);
     }
     return views.view(patched);
@@ -311,7 +341,7 @@ public class TargetController {
       content = @Content(schema = @Schema(implementation = TargetViews.TargetRegistrationDto.class)))
   @APIResponse(
       responseCode = "400",
-      description = "slots outside 0..1024 or below the target's minimums' sum")
+      description = "slots outside 0..1024 or below the target's reservations' sum")
   @APIResponse(responseCode = "404", description = "No such target")
   @APIResponse(responseCode = "502", description = "qits-idp refused the registration token")
   @APIResponse(responseCode = "503", description = "Commissioning is off, or RUNNER_PLANE_UNCONFIGURED")
@@ -329,7 +359,7 @@ public class TargetController {
     requireMachineAudience();
     UUID targetId = targetId(id);
     Integer slots = rotateSlots(body);
-    Targets.requireInstallSlots(slots, targets.get(targetId).minimumsSum());
+    Targets.requireInstallSlots(slots, targets.get(targetId).reservationsSum());
     requireCommissioning();
     installScript.requireRenderable();
     TargetRunnerCommissioner.IssuedToken token = commissionRegistrationToken(targetId);

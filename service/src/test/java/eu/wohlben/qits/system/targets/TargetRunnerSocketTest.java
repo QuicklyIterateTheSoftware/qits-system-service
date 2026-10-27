@@ -148,8 +148,8 @@ class TargetRunnerSocketTest {
   @Test
   void aSignedOutTargetReservedForAgentsIsNeverQuarantinedAndStillRunsCi() throws Exception {
     io.quarkus.narayana.jta.QuarkusTransaction.requiringNew()
-        .run(() -> Target.<Target>findById(target).minWorkspace = 1);
-    // Its first check fails `login` (min_workspace 1, nobody signed in) and admits it all the same.
+        .run(() -> Target.<Target>findById(target).reservedWorkspace = 1);
+    // Its first check fails `login` (reserved_workspace 1, nobody signed in) and admits it all the same.
     try (FakeTargetRunner runner = greetedRunner()) {
       Target row = TargetRows.reloadTarget(target);
       assertFalse(row.quarantined(), "login is reported, never a quarantine");

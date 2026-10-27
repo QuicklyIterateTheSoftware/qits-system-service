@@ -58,15 +58,17 @@ its schedules in it; `service/` discovers them through the jar's jandex index. T
     events/    TargetLeaseChanged, TargetLoginChanged (qits-eventstream)
 
 **The allocation rule is pure, and only `SlotAllocator` spells it.** `n_total < T and n_total + 1 +
-Σ_{u≠t} max(0, m[u] − n[u]) ≤ T`, minimums ignored when `Σ m > T`, one queue `priority desc,
+Σ_{u≠t} max(0, r[u] − n[u]) ≤ T`, reservations ignored when `Σ r > T`, one queue `priority desc,
 requested_at asc`, pins considered on their target only, the most free slots then the name, nothing
-for a quarantined or disconnected target, and the sign-in gate for WORKSPACE and DESK. Change it in
+for a quarantined or disconnected target, and the sign-in gate for WORKSPACE and DESK. A
+reservation holds slots for one type; it is not a limit, so a type may use more while shared
+slots are free. Change it in
 `TargetAllocatorTest` first: the dossier's worked example is the first table there.
 
 **`login` and `slots` are reported, never a quarantine** (`TargetHealth.REPORT_ONLY`). They fail
 the recorded health and its detail; quarantine and reinstatement decide on every other check. A
 signed-out target keeps running CI — the allocator's sign-in gate holds only its WORKSPACE and DESK
-leases — and minimums that do not fit the total are already ignored by the allocator.
+leases — and reservations that do not fit the total are already ignored by the allocator.
 
 **The owner is the bearer, never the body.** `OwnerIdentity` takes the caller's client id (`sub`, or
 the forwarded principal) without its `<environment>-` prefix and looks it up in
@@ -213,7 +215,7 @@ failure is a 500 in the native binary while every JVM test stays green. The targ
 response types are registered on their own controllers' `@RegisterForReflection`, beside them.
 
 **`{"message": "…"}` and nothing else**, plus `"code"` on a refusal a client branches on
-(`NODE_REMOTE`, and the targets module's `TargetRefusal` codes: `MINIMUMS_EXCEED_TOTAL`,
+(`NODE_REMOTE`, and the targets module's `TargetRefusal` codes: `RESERVATIONS_EXCEED_TOTAL`,
 `TARGET_BUSY`, `TARGET_UNAVAILABLE`, `LEASE_EXISTS`, `SLOT_TYPE_NOT_YOURS`, `NOT_A_TENANT`,
 `NOT_YOUR_LEASE`, `IMAGE_NOT_ALLOWED`, `ENV_KEY_NOT_ALLOWED`, `WORK_VOLUME_IN_USE`,
 `SIGN_IN_RUNNING`, `SIGN_IN_NOT_FOUND`, `SIGN_IN_NOT_AWAITING_CODE`, `DOCKER_REFUSED`,

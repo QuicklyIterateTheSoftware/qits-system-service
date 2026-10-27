@@ -30,17 +30,17 @@ import org.jboss.logging.Logger;
  *
  * <p><b>The checks.</b> The runner runs the toolkit's {@code HealthChecks} and its own ({@code
  * buildkit}) and answers {@code healthChecked{requestId, ok, detail, checks[]}}. This service adds
- * the two only it can judge, because only it knows the minimums ({@link #serverChecks}):
+ * the two only it can judge, because only it knows the reservations ({@link #serverChecks}):
  *
  * <ul>
- *   <li>{@code login} <b>fails</b> when {@code min_workspace + min_desk > 0} and neither harness is
+ *   <li>{@code login} <b>fails</b> when {@code reserved_workspace + reserved_desk > 0} and neither harness is
  *       PRESENT: a target reserved for agents that cannot run one;
- *   <li>{@code slots} fails when the minimums do not fit the total, naming the sum and the total.
+ *   <li>{@code slots} fails when the reservations do not fit the total, naming the sum and the total.
  * </ul>
  *
  * <b>Both are reported and never quarantine</b> ({@link #REPORT_ONLY}): they fail the recorded
  * health and its detail, and are left out of the quarantine decision, so a signed-out target still
- * runs CI. And {@code buildkit} counts only when the target has {@code min_ci > 0} or runs a CI lease; a
+ * runs CI. And {@code buildkit} counts only when the target has {@code reserved_ci > 0} or runs a CI lease; a
  * failing one on any other target is kept in the report and does not fail it.
  *
  * <p><b>Quarantine.</b> A quarantined target's {@code ack} carries 0 slots and it is granted
@@ -140,7 +140,7 @@ public class TargetHealth {
     checks.removeIf(c -> LOGIN.equals(c.name()) || SLOTS.equals(c.name()));
     boolean runnerNamedNone = checks.isEmpty();
     checks.addAll(serverChecks(row));
-    boolean buildkitCounts = row.minCi > 0 || targets.runsCi(targetId);
+    boolean buildkitCounts = row.reservedCi > 0 || targets.runsCi(targetId);
     Verdict verdict = verdict(checks, buildkitCounts, report, runnerNamedNone);
     settle(
         targetId,
@@ -159,7 +159,7 @@ public class TargetHealth {
    * A settled check's two answers. {@code ok} is the reported health: every check that counts,
    * {@code login} and {@code slots} included. {@code admitted} is what quarantine and reinstatement
    * decide on, and it leaves {@link #REPORT_ONLY} out: a signed-out target must never stop CI (the
-   * allocator's sign-in gate already holds its WORKSPACE and DESK leases), nor must minimums that do
+   * allocator's sign-in gate already holds its WORKSPACE and DESK leases), nor must reservations that do
    * not fit the total (the allocator already ignores them).
    */
   record Verdict(boolean ok, boolean admitted, String detail, String gateDetail) {}
@@ -196,8 +196,8 @@ public class TargetHealth {
   /** The checks this service judges, from the row alone. Pure. */
   static List<CheckResult> serverChecks(Target row) {
     List<CheckResult> checks = new ArrayList<>();
-    int agentMinimums = row.minWorkspace + row.minDesk;
-    boolean loginOk = agentMinimums == 0 || row.signedIn();
+    int agentReservations = row.reservedWorkspace + row.reservedDesk;
+    boolean loginOk = agentReservations == 0 || row.signedIn();
     checks.add(
         new CheckResult(
             LOGIN,
@@ -205,15 +205,17 @@ public class TargetHealth {
             loginOk
                 ? null
                 : "neither claude nor kimi is signed in, and "
-                    + agentMinimums
+                    + agentReservations
                     + " slot(s) are reserved for agents: qits targets sign-in --target "
                     + row.name,
             Map.of(
                 "claude", String.valueOf(row.loginClaude),
                 "kimi", String.valueOf(row.loginKimi))));
-    int sum = row.minimumsSum();
+    int sum = row.reservationsSum();
     boolean slotsOk = sum <= row.slotsTotal;
     Map<String, Object> data = new LinkedHashMap<>();
+    data.put("reservations", sum);
+    // Deprecated (qits-1682): the old key, same value. Remove one release on.
     data.put("minimums", sum);
     data.put("total", row.slotsTotal);
     checks.add(
@@ -222,7 +224,7 @@ public class TargetHealth {
             slotsOk,
             slotsOk
                 ? null
-                : "the minimums sum to "
+                : "the reservations sum to "
                     + sum
                     + ", above the "
                     + row.slotsTotal

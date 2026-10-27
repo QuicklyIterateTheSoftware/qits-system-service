@@ -34,14 +34,14 @@ public class Target extends PanacheEntityBase implements CausedRow {
   @Column(name = "slots_total", nullable = false)
   public int slotsTotal;
 
-  @Column(name = "min_ci", nullable = false)
-  public int minCi;
+  @Column(name = "reserved_ci", nullable = false)
+  public int reservedCi;
 
-  @Column(name = "min_workspace", nullable = false)
-  public int minWorkspace;
+  @Column(name = "reserved_workspace", nullable = false)
+  public int reservedWorkspace;
 
-  @Column(name = "min_desk", nullable = false)
-  public int minDesk;
+  @Column(name = "reserved_desk", nullable = false)
+  public int reservedDesk;
 
   /** The {@code hello} capabilities extension as the runner sent it. */
   @JdbcTypeCode(SqlTypes.JSON)
@@ -127,15 +127,15 @@ public class Target extends PanacheEntityBase implements CausedRow {
     return loginClaude == LoginValue.PRESENT || loginKimi == LoginValue.PRESENT;
   }
 
-  public Map<SlotType, Integer> minimums() {
-    Map<SlotType, Integer> minimums = new EnumMap<>(SlotType.class);
-    minimums.put(SlotType.CI, minCi);
-    minimums.put(SlotType.WORKSPACE, minWorkspace);
-    minimums.put(SlotType.DESK, minDesk);
-    return minimums;
+  public Map<SlotType, Integer> reservations() {
+    Map<SlotType, Integer> reservations = new EnumMap<>(SlotType.class);
+    reservations.put(SlotType.CI, reservedCi);
+    reservations.put(SlotType.WORKSPACE, reservedWorkspace);
+    reservations.put(SlotType.DESK, reservedDesk);
+    return reservations;
   }
 
-  public int minimumsSum() {
-    return minCi + minWorkspace + minDesk;
+  public int reservationsSum() {
+    return reservedCi + reservedWorkspace + reservedDesk;
   }
 }

@@ -4,6 +4,11 @@
     "name": "lab",
     "description": null,
     "slotsTotal": 0,
+    "reservations": {
+      "ci": 0,
+      "workspace": 0,
+      "desk": 0
+    },
     "minimums": {
       "ci": 0,
       "workspace": 0,

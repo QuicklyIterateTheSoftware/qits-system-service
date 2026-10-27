@@ -60,14 +60,14 @@ class TargetDoorsTest {
     return as("an-operator", "qits:admin");
   }
 
-  private static Response create(String name, String minimums) {
+  private static Response create(String name, String reservations) {
     return admin()
         .contentType("application/json")
         .body(
             "{\"name\":\""
                 + name
-                + "\",\"description\":\"the lab box\",\"minimums\":"
-                + minimums
+                + "\",\"description\":\"the lab box\",\"reservations\":"
+                + reservations
                 + "}")
         .post(API);
   }
@@ -80,9 +80,9 @@ class TargetDoorsTest {
     created
         .then()
         .body("target.name", equalTo("lab"))
-        .body("target.minimums.ci", equalTo(2))
-        .body("target.minimums.workspace", equalTo(1))
-        .body("target.minimums.desk", equalTo(0))
+        .body("target.reservations.ci", equalTo(2))
+        .body("target.reservations.workspace", equalTo(1))
+        .body("target.reservations.desk", equalTo(0))
         .body("target.quarantined", is(true))
         .body("target.connected", is(false))
         .body("target.loginCommand", nullValue())
@@ -120,25 +120,67 @@ class TargetDoorsTest {
   }
 
   @Test
-  void theMinimumsMayNotExceedAReportedTotal() {
+  void theReservationsMayNotExceedAReportedTotal() {
     UUID id = UUID.randomUUID();
     TargetRows.target(id, "lab", 4, "client-lab", false);
     admin()
         .contentType("application/json")
-        .body("{\"minimums\":{\"ci\":2,\"workspace\":2,\"desk\":1}}")
+        .body("{\"reservations\":{\"ci\":2,\"workspace\":2,\"desk\":1}}")
         .patch(API + "/" + id)
         .then()
         .statusCode(409)
-        .body("code", equalTo("MINIMUMS_EXCEED_TOTAL"));
+        .body("code", equalTo("RESERVATIONS_EXCEED_TOTAL"));
     admin()
         .contentType("application/json")
-        .body("{\"minimums\":{\"ci\":2,\"workspace\":2}, \"description\":\"four slots\"}")
+        .body("{\"reservations\":{\"ci\":2,\"workspace\":2}, \"description\":\"four slots\"}")
         .patch(API + "/" + id)
         .then()
         .statusCode(200)
-        .body("minimums.ci", equalTo(2))
-        .body("minimums.workspace", equalTo(2))
+        .body("reservations.ci", equalTo(2))
+        .body("reservations.workspace", equalTo(2))
         .body("description", equalTo("four slots"));
+  }
+
+  @Test
+  void theDeprecatedMinimumsStillReadAndWriteTheReservations() {
+    // qits-1682: `minimums` is the old name of `reservations`, kept one release with the same values.
+    Response created =
+        admin()
+            .contentType("application/json")
+            .body("{\"name\":\"old\",\"minimums\":{\"ci\":2,\"desk\":1}}")
+            .post(API);
+    created
+        .then()
+        .statusCode(201)
+        .body("target.reservations.ci", equalTo(2))
+        .body("target.reservations.desk", equalTo(1))
+        .body("target.minimums.ci", equalTo(2))
+        .body("target.minimums.workspace", equalTo(0))
+        .body("target.minimums.desk", equalTo(1));
+    String id = created.path("target.id");
+    admin()
+        .contentType("application/json")
+        .body("{\"minimums\":{\"workspace\":3}}")
+        .patch(API + "/" + id)
+        .then()
+        .statusCode(200)
+        .body("reservations.workspace", equalTo(3))
+        .body("minimums.workspace", equalTo(3));
+    // Both sent: the new name wins.
+    admin()
+        .contentType("application/json")
+        .body("{\"reservations\":{\"ci\":4},\"minimums\":{\"ci\":7}}")
+        .patch(API + "/" + id)
+        .then()
+        .statusCode(200)
+        .body("reservations.ci", equalTo(4))
+        .body("minimums.ci", equalTo(4));
+    admin()
+        .get(API)
+        .then()
+        .statusCode(200)
+        .body("find { it.name == 'old' }.reservations.ci", equalTo(4))
+        .body("find { it.name == 'old' }.minimums.ci", equalTo(4));
   }
 
   @Test
@@ -147,11 +189,11 @@ class TargetDoorsTest {
     TargetRows.target(id, "fresh", 0, null, true);
     admin()
         .contentType("application/json")
-        .body("{\"minimums\":{\"ci\":9}}")
+        .body("{\"reservations\":{\"ci\":9}}")
         .patch(API + "/" + id)
         .then()
         .statusCode(200)
-        .body("minimums.ci", equalTo(9));
+        .body("reservations.ci", equalTo(9));
   }
 
   @Test
@@ -441,7 +483,7 @@ class TargetDoorsTest {
     Target row = targets.get(id);
     assertEquals(id, row.id);
     assertEquals("lab", row.name);
-    assertEquals(1, row.minCi);
+    assertEquals(1, row.reservedCi);
     assertEquals("target-runner-client-2", row.clientId);
     assertNull(row.registrationTokenId);
     assertNull(row.registrationTokenSubject);
@@ -477,7 +519,7 @@ class TargetDoorsTest {
     Response created =
         admin()
             .contentType("application/json")
-            .body("{\"name\":\"lab\",\"minimums\":{\"ci\":2},\"slots\":6}")
+            .body("{\"name\":\"lab\",\"reservations\":{\"ci\":2},\"slots\":6}")
             .post(API);
     created
         .then()
@@ -520,7 +562,7 @@ class TargetDoorsTest {
   }
 
   @Test
-  void aSlotsTotalBelowTheMinimumsOrOutOfRangeIsRefusedBeforeAnythingIsMinted() {
+  void aSlotsTotalBelowTheReservationsOrOutOfRangeIsRefusedBeforeAnythingIsMinted() {
     String id = create("lab", "{\"ci\":2,\"desk\":1}").path("target.id");
     IdpStub.reset();
     for (String slots : new String[] {"2", "-1", "1025"}) {
@@ -533,7 +575,7 @@ class TargetDoorsTest {
     }
     admin()
         .contentType("application/json")
-        .body("{\"name\":\"other\",\"minimums\":{\"workspace\":3},\"slots\":2}")
+        .body("{\"name\":\"other\",\"reservations\":{\"workspace\":3},\"slots\":2}")
         .post(API)
         .then()
         .statusCode(400);

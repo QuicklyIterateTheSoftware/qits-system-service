@@ -36,9 +36,9 @@ public class Targets {
   /** The quarantine every target is created with. */
   public static final String AWAITING_FIRST_HEALTH_CHECK = "awaiting first health check";
 
-  /** The minimums a request sets, per type; null members leave the current value. */
-  public record Minimums(Integer ci, Integer workspace, Integer desk) {
-    public static final Minimums NONE = new Minimums(0, 0, 0);
+  /** The reservations a request sets, per type; null members leave the current value. */
+  public record Reservations(Integer ci, Integer workspace, Integer desk) {
+    public static final Reservations NONE = new Reservations(0, 0, 0);
   }
 
   /** What a quarantine did: began it, or only changed the reason of one already standing. */
@@ -143,10 +143,10 @@ public class Targets {
 
   /**
    * 400 unless {@code slots} — the total an install line carries, never stored — is absent, or
-   * within 0..{@value #SLOTS_MAX} and at least {@code minimumsSum}. Asked before anything is
+   * within 0..{@value #SLOTS_MAX} and at least {@code reservationsSum}. Asked before anything is
    * commissioned.
    */
-  public static void requireInstallSlots(Integer slots, int minimumsSum) {
+  public static void requireInstallSlots(Integer slots, int reservationsSum) {
     if (slots == null) {
       return;
     }
@@ -154,28 +154,28 @@ public class Targets {
       throw TargetRefusal.badRequest(
           "A slots total is between 0 and " + SLOTS_MAX + ", not " + slots);
     }
-    if (slots < minimumsSum) {
+    if (slots < reservationsSum) {
       throw TargetRefusal.badRequest(
           "A slots total of "
               + slots
-              + " is below the minimums, which reserve "
-              + minimumsSum
+              + " is below the reservations, which reserve "
+              + reservationsSum
               + " slot(s)");
     }
   }
 
-  /** The sum of the minimums a request sets, absent members counted 0. */
-  public static int sum(Minimums minimums) {
-    return minimums == null
+  /** The sum of the reservations a request sets, absent members counted 0. */
+  public static int sum(Reservations reservations) {
+    return reservations == null
         ? 0
-        : orZero(minimums.ci()) + orZero(minimums.workspace()) + orZero(minimums.desk());
+        : orZero(reservations.ci()) + orZero(reservations.workspace()) + orZero(reservations.desk());
   }
 
   /** 400 or 409 for a create that could not be written; asked before anything is commissioned. */
-  public void requireCreatable(String name, String description, Minimums minimums) {
+  public void requireCreatable(String name, String description, Reservations reservations) {
     requireName(name);
     requireDescription(description);
-    requireMinimums(minimums);
+    requireReservations(reservations);
     boolean taken =
         QuarkusTransaction.requiringNew().call(() -> Target.count("name", name) > 0);
     if (taken) {
@@ -187,10 +187,10 @@ public class Targets {
       UUID id,
       String name,
       String description,
-      Minimums minimums,
+      Reservations reservations,
       String registrationTokenId,
       String registrationTokenSubject) {
-    Minimums given = minimums == null ? Minimums.NONE : minimums;
+    Reservations given = reservations == null ? Reservations.NONE : reservations;
     try {
       return QuarkusTransaction.requiringNew()
           .call(
@@ -200,9 +200,9 @@ public class Targets {
                 target.id = id;
                 target.name = name;
                 target.description = blankToNull(description);
-                target.minCi = orZero(given.ci());
-                target.minWorkspace = orZero(given.workspace());
-                target.minDesk = orZero(given.desk());
+                target.reservedCi = orZero(given.ci());
+                target.reservedWorkspace = orZero(given.workspace());
+                target.reservedDesk = orZero(given.desk());
                 target.registrationTokenId = registrationTokenId;
                 target.registrationTokenSubject = registrationTokenSubject;
                 target.loginClaude = LoginValue.UNKNOWN;
@@ -219,12 +219,12 @@ public class Targets {
   }
 
   /**
-   * A new description and minimums. 409 {@link TargetRefusal#MINIMUMS_EXCEED_TOTAL} when their sum
+   * A new description and reservations. 409 {@link TargetRefusal#RESERVATIONS_EXCEED_TOTAL} when their sum
    * is above a reported total ({@code slotsTotal > 0}); before the first {@code hello} any sum goes.
    */
-  public Target patch(UUID id, String description, Minimums minimums) {
+  public Target patch(UUID id, String description, Reservations reservations) {
     requireDescription(description);
-    requireMinimums(minimums);
+    requireReservations(reservations);
     Target patched =
         QuarkusTransaction.requiringNew()
             .call(
@@ -236,14 +236,14 @@ public class Targets {
                   if (description != null) {
                     target.description = blankToNull(description);
                   }
-                  if (minimums != null) {
-                    int ci = minimums.ci() == null ? target.minCi : minimums.ci();
-                    int ws = minimums.workspace() == null ? target.minWorkspace : minimums.workspace();
-                    int desk = minimums.desk() == null ? target.minDesk : minimums.desk();
+                  if (reservations != null) {
+                    int ci = reservations.ci() == null ? target.reservedCi : reservations.ci();
+                    int ws = reservations.workspace() == null ? target.reservedWorkspace : reservations.workspace();
+                    int desk = reservations.desk() == null ? target.reservedDesk : reservations.desk();
                     if (target.slotsTotal > 0 && ci + ws + desk > target.slotsTotal) {
                       throw TargetRefusal.conflict(
-                          TargetRefusal.MINIMUMS_EXCEED_TOTAL,
-                          "The minimums sum to "
+                          TargetRefusal.RESERVATIONS_EXCEED_TOTAL,
+                          "The reservations sum to "
                               + (ci + ws + desk)
                               + ", above the "
                               + target.slotsTotal
@@ -251,9 +251,9 @@ public class Targets {
                               + target.name
                               + " reports");
                     }
-                    target.minCi = ci;
-                    target.minWorkspace = ws;
-                    target.minDesk = desk;
+                    target.reservedCi = ci;
+                    target.reservedWorkspace = ws;
+                    target.reservedDesk = desk;
                   }
                   return target;
                 });
@@ -526,13 +526,13 @@ public class Targets {
     }
   }
 
-  static void requireMinimums(Minimums minimums) {
-    if (minimums == null) {
+  static void requireReservations(Reservations reservations) {
+    if (reservations == null) {
       return;
     }
-    for (Integer value : new Integer[] {minimums.ci(), minimums.workspace(), minimums.desk()}) {
+    for (Integer value : new Integer[] {reservations.ci(), reservations.workspace(), reservations.desk()}) {
       if (value != null && (value < 0 || value > 1024)) {
-        throw TargetRefusal.badRequest("A minimum is between 0 and 1024, not " + value);
+        throw TargetRefusal.badRequest("A reservation is between 0 and 1024, not " + value);
       }
     }
   }

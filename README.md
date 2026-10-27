@@ -142,9 +142,14 @@ socket on, each with a number of typed slots — CI, WORKSPACE, DESK — that qi
 qits-projects lease. This service decides which lease runs where (`SlotAllocator`) and pushes each
 runner its whole desired `estate`; the runner answers with an `inventory`.
 
+A reservation holds slots for one type. It is not a limit: a type may use more than its reservation
+while shared (unreserved) slots are free, so `ci 3/1` is valid when 2 shared slots were free. The
+API's old name `minimums` (target views, create and patch bodies, the `slots` health data) is a
+deprecated duplicate of `reservations` with the same values, kept for one release (qits-1682).
+
     POST   /system/api/targets                       declare one; answers its install line, once
-    GET    /system/api/targets[/{id}[/health]]       slots, minimums, used, login, connected, ...
-    PATCH  /system/api/targets/{id}                  description, minimums (409 MINIMUMS_EXCEED_TOTAL)
+    GET    /system/api/targets[/{id}[/health]]       slots, reservations, used, login, connected, ...
+    PATCH  /system/api/targets/{id}                  description, reservations (409 RESERVATIONS_EXCEED_TOTAL)
     DELETE /system/api/targets/{id}                  409 TARGET_BUSY while a lease is live; else Retire
     POST   /system/api/targets/{id}/registration-token | greenlight | healthcheck | login-check
     POST   /system/api/targets/{id}/sign-ins        {harness: claude|kimi}: 202 STARTING; the runner logs in

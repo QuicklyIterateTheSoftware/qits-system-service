@@ -3,6 +3,11 @@
   "name": "lab",
   "description": "the lab box",
   "slotsTotal": 6,
+  "reservations": {
+    "ci": 2,
+    "workspace": 2,
+    "desk": 1
+  },
   "minimums": {
     "ci": 2,
     "workspace": 2,

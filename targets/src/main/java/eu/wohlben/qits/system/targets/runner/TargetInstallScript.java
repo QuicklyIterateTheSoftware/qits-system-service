@@ -71,7 +71,7 @@ public class TargetInstallScript {
 
   /**
    * The one line that installs {@code target}'s runner, carrying {@code registrationToken}; its
-   * slots are the reported total, or the minimums' sum when that is more.
+   * slots are the reported total, or the reservations' sum when that is more.
    */
   public String line(Target target, String registrationToken) {
     return line(target, registrationToken, defaultSlots(target));
@@ -94,7 +94,7 @@ public class TargetInstallScript {
 
   /** The total an install line carries when the operator names none. */
   public static int defaultSlots(Target target) {
-    return Math.max(target.slotsTotal, target.minimumsSum());
+    return Math.max(target.slotsTotal, target.reservationsSum());
   }
 
   public static void requireCarriable(String registrationToken) {
