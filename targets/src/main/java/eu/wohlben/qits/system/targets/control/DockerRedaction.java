@@ -5,10 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
+import eu.wohlben.qits.systemrunner.protocol.SecretKeys;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 /**
  * The Docker API's own redaction (epic qits-1621, "Docker over the runner socket"): what an
@@ -28,19 +28,19 @@ import java.util.regex.Pattern;
  */
 public final class DockerRedaction {
 
-  /** A key whose value is never answered. */
-  public static final Pattern SECRET_KEY =
-      Pattern.compile("(?i)(TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|API_?KEY|PRIVATE_KEY|AUTH)");
-
   public static final String MASK = "***";
 
   private static final ObjectMapper JSON = new ObjectMapper();
 
   private DockerRedaction() {}
 
-  /** Whether {@code key}'s value is a secret. */
+  /**
+   * Whether {@code key}'s value is a secret: {@link SecretKeys}, the one rule the runner redacts a
+   * log or an exec by too, read by key segment so {@code GIT_AUTHOR_NAME} or {@code
+   * QITS_GIT_AUTH_HOST} is not mistaken for one (qits-1621 verify).
+   */
   public static boolean secretKey(String key) {
-    return key != null && SECRET_KEY.matcher(key).find();
+    return SecretKeys.isSecret(key);
   }
 
   /**

@@ -20,7 +20,12 @@ class DockerRedactionTest {
         }) {
       assertTrue(DockerRedaction.secretKey(key), key);
     }
-    for (String key : new String[] {"PATH", "HOME", "QITS_LEASE_ID", "qits.system.runner", "LANG"}) {
+    // qits-1621 verify: by key segment, so AUTH inside AUTHOR or a host's GIT_AUTH is no secret.
+    for (String key :
+        new String[] {
+          "PATH", "HOME", "QITS_LEASE_ID", "qits.system.runner", "LANG", "GIT_AUTHOR_NAME",
+          "GIT_AUTHOR_EMAIL", "QITS_GIT_AUTH_HOST", "GIT_COMMITTER_EMAIL"
+        }) {
       assertFalse(DockerRedaction.secretKey(key), key);
     }
   }
