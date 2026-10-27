@@ -54,6 +54,11 @@ public final class FakeTargetRunner implements AutoCloseable {
   private final WebSocket socket;
   private final LinkedBlockingQueue<RunnerMessage> inbox = new LinkedBlockingQueue<>();
   private final List<RunnerMessage> seen = new ArrayList<>();
+  /**
+   * Every {@code estate}'s {@code warmImages} as the raw text carried it (qits-1692) — a field the
+   * pinned protocol jar's {@code Estate} does not hold yet, so the decoded frame drops it.
+   */
+  private final LinkedBlockingQueue<Object> warmImages = new LinkedBlockingQueue<>();
   private final CountDownLatch closed = new CountDownLatch(1);
   private final AtomicInteger closeCode = new AtomicInteger(-1);
   private final AtomicReference<String> closeReason = new AtomicReference<>("");
@@ -161,6 +166,31 @@ public final class FakeTargetRunner implements AutoCloseable {
     return await(type, m -> true);
   }
 
+  /**
+   * The next {@code estate}'s raw {@code warmImages} that matches, waiting for it; the ones before
+   * it are dropped. A frame without the field reads as null.
+   */
+  @SuppressWarnings("unchecked")
+  public List<String> awaitWarmImages(Predicate<List<String>> matching)
+      throws InterruptedException {
+    long deadline = System.currentTimeMillis() + TIMEOUT.toMillis();
+    List<Object> got = new ArrayList<>();
+    while (System.currentTimeMillis() < deadline) {
+      Object next = warmImages.poll(50, TimeUnit.MILLISECONDS);
+      if (next == null) {
+        continue;
+      }
+      List<String> images = next == ABSENT ? null : (List<String>) next;
+      if (matching.test(images)) {
+        return images;
+      }
+      got.add(next);
+    }
+    throw new AssertionError("never received an estate with matching warmImages; got " + got);
+  }
+
+  private static final Object ABSENT = new Object();
+
   /** Whether any frame of {@code type} has arrived so far, without waiting for one. */
   public synchronized boolean received(Class<? extends RunnerMessage> type) {
     inbox.drainTo(seen);
@@ -196,7 +226,12 @@ public final class FakeTargetRunner implements AutoCloseable {
       partial.append(data);
       if (last) {
         try {
-          inbox.add(CODEC.decode(JSON.readValue(partial.toString(), Map.class)));
+          Map<String, Object> frame = JSON.readValue(partial.toString(), Map.class);
+          if (SystemRunnerProtocol.Type.ESTATE.equals(frame.get(SystemRunnerProtocol.Field.TYPE))) {
+            Object images = frame.get("warmImages");
+            warmImages.add(images == null ? ABSENT : images);
+          }
+          inbox.add(CODEC.decode(frame));
         } catch (Exception e) {
           throw new IllegalStateException("an undecodable frame: " + partial, e);
         }

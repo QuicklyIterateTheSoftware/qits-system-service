@@ -6,6 +6,7 @@ import eu.wohlben.qits.system.targets.entity.LoginValue;
 import eu.wohlben.qits.system.targets.entity.SlotType;
 import eu.wohlben.qits.system.targets.entity.Target;
 import eu.wohlben.qits.system.targets.entity.TargetAudit;
+import eu.wohlben.qits.system.targets.entity.WarmImage;
 import eu.wohlben.qits.system.targets.entity.WorkVolume;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import java.time.Instant;
@@ -18,12 +19,13 @@ public final class TargetRows {
 
   private TargetRows() {}
 
-  /** Removes every audit row, lease, work volume and target. */
+  /** Removes every audit row, warm image, lease, work volume and target. */
   public static void clear() {
     QuarkusTransaction.requiringNew()
         .run(
             () -> {
               TargetAudit.deleteAll();
+              WarmImage.deleteAll();
               Lease.deleteAll();
               WorkVolume.deleteAll();
               Target.deleteAll();
