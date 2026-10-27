@@ -47,6 +47,35 @@ public class TargetFrames {
     }
   }
 
+  /**
+   * The {@code estate} frame's JSON text for an estate the allocator read: the protocol jar's own
+   * encoding of {@link #estate}, plus {@value #WARM_IMAGES} (qits-1692).
+   *
+   * <p><b>The seam, and why it is here.</b> {@code warmImages} — the full image references the
+   * runner keeps pulled — is part of the system-runner wire contract, but the {@code
+   * qits-system-runner-protocol} this service pins predates it: its {@link Estate} record has no
+   * such component and its {@link SystemRunnerCodec} writes no such field. So the field is added to
+   * the codec's map here, after the jar has spelled everything else, and the text that leaves is
+   * the jar's frame with one more key. A runner on the pinned protocol ignores it (its codec reads
+   * through {@code WireMaps}, which ignores unknown fields); a runner on the new one reads it. Always
+   * written, as a list and never null: an empty list means "keep nothing warm". Once a protocol jar
+   * whose {@code Estate} carries {@code warmImages} is pinned, this method becomes {@code
+   * encode(estate(view))} with {@link #estate} passing {@code view.warmImages()} to the record, and
+   * the constant goes.
+   */
+  public String encodeEstate(TargetAllocation.EstateView view) {
+    Map<String, Object> map = new LinkedHashMap<>(CODEC.encode(estate(view)));
+    map.put(WARM_IMAGES, new ArrayList<>(view.warmImages()));
+    try {
+      return objectMapper.writeValueAsString(map);
+    } catch (Exception e) {
+      throw new IllegalStateException("Failed to encode a system-runner estate frame", e);
+    }
+  }
+
+  /** The {@code estate} field the pinned protocol jar does not spell yet; see {@link #encodeEstate}. */
+  public static final String WARM_IMAGES = "warmImages";
+
   @SuppressWarnings("unchecked")
   public RunnerMessage decode(String json) {
     try {

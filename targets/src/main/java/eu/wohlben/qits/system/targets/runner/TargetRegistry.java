@@ -666,15 +666,15 @@ public class TargetRegistry implements TargetPresence {
 
   /** {@code estate}, from a successful read only: a read that failed sends nothing. */
   void sendEstate(Session session) {
-    Estate estate;
+    String estate;
     try {
-      estate = frames.estate(allocation.estateOf(session.targetId));
+      estate = frames.encodeEstate(allocation.estateOf(session.targetId));
     } catch (RuntimeException e) {
       LOG.warnf(
           "Could not read target %s's leases; no estate sent: %s", session.targetName, e.toString());
       return;
     }
-    send(session, estate);
+    sendText(session, Estate.class.getSimpleName(), estate);
   }
 
   private void reAck(Session session) {
@@ -717,20 +717,26 @@ public class TargetRegistry implements TargetPresence {
 
   /** Sends one frame on a session, bounded. False when it could not leave. */
   public boolean send(Session session, RunnerMessage message) {
+    return sendText(session, message.getClass().getSimpleName(), () -> frames.encode(message));
+  }
+
+  /** {@link #send} for a frame already encoded as text (the estate, see {@code encodeEstate}). */
+  boolean sendText(Session session, String frame, String text) {
+    return sendText(session, frame, () -> text);
+  }
+
+  private boolean sendText(
+      Session session, String frame, java.util.function.Supplier<String> text) {
     WebSocketConnection connection = session.connection;
     if (!session.isOpen() || !connection.isOpen()) {
-      LOG.debugf(
-          "No live socket for target %s; dropped %s",
-          session.targetName, message.getClass().getSimpleName());
+      LOG.debugf("No live socket for target %s; dropped %s", session.targetName, frame);
       return false;
     }
     try {
-      connection.sendText(frames.encode(message)).await().atMost(SEND_TIMEOUT);
+      connection.sendText(text.get()).await().atMost(SEND_TIMEOUT);
       return true;
     } catch (RuntimeException e) {
-      LOG.warnf(
-          "Could not send %s to target %s: %s",
-          message.getClass().getSimpleName(), session.targetName, e.getMessage());
+      LOG.warnf("Could not send %s to target %s: %s", frame, session.targetName, e.getMessage());
       return false;
     }
   }

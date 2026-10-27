@@ -207,6 +207,16 @@ public final class SlotAllocator {
     return usedTotal + 1 + reserved <= total;
   }
 
+  /**
+   * Whether a target could ever be granted a lease of {@code type}: the rule on an empty target,
+   * {@code T − Σ_{u≠t} r[u] > 0} (and {@code T > 0} alone when {@code Σ r > T}). What decides which
+   * warm images its estate carries (qits-1692): a ci-only target is never asked to pull the
+   * workspace image.
+   */
+  public static boolean canEverRun(int total, Map<SlotType, Integer> reservations, SlotType type) {
+    return fits(total, reservations, Map.of(), type);
+  }
+
   /** {@code Σ r > T}: the reservations are ignored, and the {@code slots} check fails. */
   public static boolean reservationsExceedTotal(int total, Map<SlotType, Integer> reservations) {
     int sum = 0;

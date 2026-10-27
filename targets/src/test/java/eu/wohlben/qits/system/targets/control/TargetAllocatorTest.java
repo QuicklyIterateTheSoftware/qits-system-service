@@ -273,4 +273,32 @@ class TargetAllocatorTest {
     assertFalse(decisions.get(0).granted());
     assertTrue(decisions.get(1).granted());
   }
+
+  // --- which slot types a target can ever run (qits-1692: its warm images) ---------------------
+
+  @Test
+  void aCiOnlyTargetCanEverRunCiAlone() {
+    // T=2 all reserved for ci: workspace and desk have 2 - 2 = 0 and never fit.
+    Map<SlotType, Integer> ciOnly = counts(2, 0, 0);
+    assertTrue(SlotAllocator.canEverRun(2, ciOnly, SlotType.CI));
+    assertFalse(SlotAllocator.canEverRun(2, ciOnly, SlotType.WORKSPACE));
+    assertFalse(SlotAllocator.canEverRun(2, ciOnly, SlotType.DESK));
+  }
+
+  @Test
+  void aHostWithNoCiRoomRunsWorkspaceAndDeskOnly() {
+    // T=4, workspace 2, desk 2: CI has 4 - 4 = 0 and never fits; each agent type has 4 - 2 = 2.
+    Map<SlotType, Integer> agents = counts(0, 2, 2);
+    assertFalse(SlotAllocator.canEverRun(4, agents, SlotType.CI));
+    assertTrue(SlotAllocator.canEverRun(4, agents, SlotType.WORKSPACE));
+    assertTrue(SlotAllocator.canEverRun(4, agents, SlotType.DESK));
+  }
+
+  @Test
+  void reservationsAboveTheTotalAreIgnoredAndNoSlotsRunNothing() {
+    assertTrue(SlotAllocator.canEverRun(2, counts(3, 0, 0), SlotType.WORKSPACE));
+    for (SlotType type : SlotType.values()) {
+      assertFalse(SlotAllocator.canEverRun(0, counts(0, 0, 0), type));
+    }
+  }
 }

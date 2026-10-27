@@ -43,11 +43,11 @@ its schedules in it; `service/` discovers them through the jar's jandex index. T
 "Targets in qits-system: data, doors, allocation", "The runner: qits-system-runner-daemon" and
 "Leases and tokens per slot type" (epic qits-1481) are the spec; `qits-system-plan.md` pins the wire.
 
-    entity/    Target, Lease, WorkVolume, TargetAudit — named persistence unit `system`, flyway
-               db/system/migration
+    entity/    Target, Lease, WorkVolume, TargetAudit, WarmImage — named persistence unit `system`,
+               flyway db/system/migration
     control/   SlotAllocator (pure), TargetAllocation (runs it, writes grants, builds estates),
                Targets, Leases, WorkVolumes, OwnerIdentity, LeaseSpecs, TargetEvents, TargetsConfig,
-               LeaseEndingDeadline, TargetAuditLog, DockerRedaction (pure)
+               LeaseEndingDeadline, TargetAuditLog, DockerRedaction (pure), WarmImages
     api/       TargetController (/targets), LeaseController (/leases), WorkVolumeController,
                TargetDockerController (/targets/{id}/docker), LeaseLogsController
                (/leases/{id}/logs), DockerDoor (their audit and status mapping)
@@ -55,7 +55,8 @@ its schedules in it; `service/` discovers them through the jar's jandex index. T
                TargetAddresses, TargetLoginCommand, TargetInstallScript, TargetCommissionReconcile,
                SocketBearerLifetime, TargetSignIns
     idp/       TargetRunnerCommissioner (kinds target-runner, target-runner-registration)
-    events/    TargetLeaseChanged, TargetLoginChanged (qits-eventstream)
+    events/    TargetLeaseChanged, TargetLoginChanged (qits-eventstream), SoftwareReleaseListener
+               (durable, consumes qits-ci's SoftwareRelease)
 
 **The allocation rule is pure, and only `SlotAllocator` spells it.** `n_total < T and n_total + 1 +
 Σ_{u≠t} max(0, r[u] − n[u]) ≤ T`, reservations ignored when `Σ r > T`, one queue `priority desc,
@@ -98,6 +99,16 @@ whatever an estate does not list, so a lease read that failed sends nothing. `wo
 is the WORK KEY (the runner derives `qits-system-runner-work-<workKey>-<id8>`); `purges` and
 `inventory.volumes` are full names; an adopted lease carries `adopt` for its whole life. An EXITED
 lease stays `desired: RUNNING` (the runner never restarts one) until its owner ends it.
+
+**Every estate names the images its target keeps warm** (qits-1692). `events/SoftwareReleaseListener`
+(durable, consumer id `system.targets.warm-images`) hands a `docker` `SoftwareRelease` whose
+`packageName` is a `slot-images.<type>` value without its registry host to `control/WarmImages`,
+which moves that type's `warm_image` row to `<slot image>:<version>`, forward only (versions
+compared part by part as numbers). An estate carries `warmImages` for every type the target can
+ever run (`SlotAllocator.canEverRun`: `T − Σ_{u≠t} r[u] > 0`), and a move pushes the estate of
+every connected target that can run the type. The pinned protocol jar's `Estate` has no
+`warmImages` yet, so `TargetFrames.encodeEstate` adds the key to the codec's map; once a jar that
+carries it is pinned, that seam folds back into the record.
 
 **The login probe's image is chosen from the leases, never a `:latest`** (`runner/ProbeImages`):
 the newest non-ENDED WORKSPACE lease's image (QUEUED counts), else the newest DESK lease's, else

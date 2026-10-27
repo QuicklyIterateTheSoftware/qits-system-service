@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import eu.wohlben.qits.eventstream.QitsEvent;
 import eu.wohlben.qits.eventstream.control.EventEnvelope;
+import eu.wohlben.qits.eventstream.control.EventFrame;
+import eu.wohlben.qits.system.targets.events.SoftwareReleaseListener.SoftwareReleasePayload;
 import eu.wohlben.qits.system.targets.events.TargetLeaseChanged;
 import eu.wohlben.qits.system.targets.events.TargetLoginChanged;
 import io.quarkus.runtime.annotations.RegisterForReflection;
@@ -31,26 +33,61 @@ class TargetEventsReflectionTest {
   private static final String MIXIN =
       "eu.wohlben.qits.eventstream.control.CanonicalJson$QitsEventMixin";
 
+  private static final String PAGE = "eu.wohlben.qits.eventstream.control.EventPage";
+
   @Test
   void theRegisteredTargetsAreExactlyTheTypesThatCrossTheWire() {
     RegisterForReflection registration =
         EventWireReflection.class.getAnnotation(RegisterForReflection.class);
     assertNotNull(registration, "the annotation IS the class; without it this file is a no-op");
     assertEquals(
-        Set.of(TargetLeaseChanged.class, TargetLoginChanged.class, EventEnvelope.class),
+        Set.of(
+            TargetLeaseChanged.class,
+            TargetLoginChanged.class,
+            EventEnvelope.class,
+            EventFrame.class,
+            SoftwareReleasePayload.class),
         Set.of(registration.targets()),
-        "the two targets events, plus the PUT body — a new QitsEvent record in targets/events/"
-            + " joins here");
+        "the two targets events, the PUT body, the frame and every payload a listener binds — a"
+            + " new QitsEvent record in targets/events/ joins here");
+  }
+
+  /**
+   * qits-1692: {@code events/SoftwareReleaseListener} reads the stream and the catch-up log, so the
+   * library's package-private {@code EventPage} is registered by name, and must still resolve.
+   */
+  @Test
+  void theCatchUpPageNamedByStringStillExists() throws Exception {
+    Set<String> names =
+        Set.of(EventWireReflection.class.getAnnotation(RegisterForReflection.class).classNames());
+    assertEquals(Set.of(MIXIN, PAGE), names);
+    assertNotNull(Class.forName(PAGE));
+  }
+
+  /**
+   * The flow the listener depends on in the binary: a real {@code SoftwareRelease} payload, with
+   * fields this copy does not declare, bound through {@code CanonicalJson} into the registered
+   * record.
+   */
+  @Test
+  void aSoftwareReleasePayloadBindsIntoTheRegisteredRecord() {
+    SoftwareReleasePayload release =
+        eu.wohlben.qits.eventstream.control.CanonicalJson.payloadTo(
+            "{\"packageName\":\"qits/workspace\",\"packageType\":\"docker\","
+                + "\"version\":\"2026.1027.193351\",\"repository\":\"r-1\","
+                + "\"projectId\":\"p-1\",\"section\":\"artifacts\",\"runId\":\"x\"}",
+            SoftwareReleasePayload.class);
+    assertEquals("qits/workspace", release.packageName());
+    assertEquals("docker", release.packageType());
+    assertEquals("2026.1027.193351", release.version());
   }
 
   @Test
   void theMixinNamedByStringStillExistsAndStillHidesTheEnvelopesFields() throws Exception {
     Class<?> mixin = Class.forName(MIXIN);
-    assertEquals(
-        MIXIN,
+    assertTrue(
         Set.of(EventWireReflection.class.getAnnotation(RegisterForReflection.class).classNames())
-            .iterator()
-            .next());
+            .contains(MIXIN));
     Method eventId = mixin.getDeclaredMethod("eventId");
     assertNotNull(eventId.getAnnotation(JsonIgnore.class));
   }

@@ -252,17 +252,29 @@ public class TargetAllocation {
       String workKey,
       String adopt) {}
 
-  /** A target's whole desired state. */
-  public record EstateView(List<EstateEntry> leases, List<String> purges) {}
+  /**
+   * A target's whole desired state. {@code warmImages} are the full references its runner keeps
+   * pulled (qits-1692): the warm image of every slot type the target can ever run ({@link
+   * WarmImages#forTarget}).
+   */
+  public record EstateView(List<EstateEntry> leases, List<String> purges, List<String> warmImages) {
+
+    public EstateView {
+      warmImages = warmImages == null ? List.of() : List.copyOf(warmImages);
+    }
+  }
+
+  private record EstateRead(List<EstateEntry> leases, List<String> warmImages) {}
 
   /**
-   * {@code targetId}'s estate: every lease on it that has not ENDED, and the volumes it is to purge.
+   * {@code targetId}'s estate: every lease on it that has not ENDED, the volumes it is to purge, and
+   * the images it keeps warm.
    * GRANTED, RUNNING and EXITED leases are {@code desired: RUNNING} — the runner never restarts an
    * exited container, and keeping it listed keeps it on the node until its owner ends the lease;
    * ENDING and FAILED ones are {@code ENDED}, which the runner stops and removes.
    */
   public EstateView estateOf(UUID targetId) {
-    List<EstateEntry> entries =
+    EstateRead read =
         QuarkusTransaction.requiringNew()
             .call(
                 () -> {
@@ -286,9 +298,17 @@ public class TargetAllocation {
                             lease.workKey,
                             lease.adopt));
                   }
-                  return out;
+                  Target target = Target.findById(targetId);
+                  List<String> warm =
+                      target == null
+                          ? List.of()
+                          : WarmImages.forTarget(
+                              target.slotsTotal,
+                              target.reservations(),
+                              WarmImages.currentInTransaction());
+                  return new EstateRead(out, warm);
                 });
-    return new EstateView(entries, workVolumes.purgesOf(targetId));
+    return new EstateView(read.leases(), workVolumes.purgesOf(targetId), read.warmImages());
   }
 
   /** The estate's {@code desired} for a lease on a target; see {@link #estateOf}. */

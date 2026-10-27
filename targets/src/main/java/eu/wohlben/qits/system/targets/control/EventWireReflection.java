@@ -1,6 +1,8 @@
 package eu.wohlben.qits.system.targets.control;
 
 import eu.wohlben.qits.eventstream.control.EventEnvelope;
+import eu.wohlben.qits.eventstream.control.EventFrame;
+import eu.wohlben.qits.system.targets.events.SoftwareReleaseListener.SoftwareReleasePayload;
 import eu.wohlben.qits.system.targets.events.TargetLeaseChanged;
 import eu.wohlben.qits.system.targets.events.TargetLoginChanged;
 import io.quarkus.runtime.annotations.RegisterForReflection;
@@ -22,9 +24,14 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
  * publish.request.occurredAt must not be null} — the JVM suite stays green throughout, because the
  * JVM needs no such registration.
  *
- * <p><b>No {@code EventFrame}.</b> qits-system-service subscribes to no durable or raw event
- * listener and never reads {@code /events/stream}, so nothing here binds a frame; add it the day
- * that changes.
+ * <p><b>And what it reads (qits-1692).</b> {@code events/SoftwareReleaseListener} consumes qits-ci's
+ * {@code SoftwareRelease} durably, so three more types cross a hand-built mapper here: {@link
+ * EventFrame}, the live frame off {@code /events/stream} and every row of the catch-up log; {@code
+ * EventPage}, one page of {@code GET /events/api/events}, by name because it is package-private in
+ * the library — without it the stream works in the binary and catch-up alone fails; and {@link
+ * SoftwareReleasePayload}, what {@code CanonicalJson.payloadTo} binds the payload into. Left out,
+ * the binary binds an empty payload, no slot image is ever kept warm, and the JVM suite stays
+ * green. qits-maintenance-service registers the same three for its own listener.
  *
  * <p><b>And the mix-in by name.</b> {@code CanonicalJson$QitsEventMixin} keeps {@code QitsEvent}'s
  * declared methods — {@code eventId} above all — out of a payload, and Jackson finds its {@code
@@ -32,8 +39,17 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
  * payload, which is the worse failure. A string because the class is private.
  */
 @RegisterForReflection(
-    targets = {TargetLeaseChanged.class, TargetLoginChanged.class, EventEnvelope.class},
-    classNames = "eu.wohlben.qits.eventstream.control.CanonicalJson$QitsEventMixin")
+    targets = {
+      TargetLeaseChanged.class,
+      TargetLoginChanged.class,
+      EventEnvelope.class,
+      EventFrame.class,
+      SoftwareReleasePayload.class
+    },
+    classNames = {
+      "eu.wohlben.qits.eventstream.control.CanonicalJson$QitsEventMixin",
+      "eu.wohlben.qits.eventstream.control.EventPage"
+    })
 public final class EventWireReflection {
 
   private EventWireReflection() {}
