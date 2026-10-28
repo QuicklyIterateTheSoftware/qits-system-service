@@ -31,19 +31,20 @@ import java.util.stream.Stream;
  * <p>It asks the class loader for every {@code pacts/} directory, then lists each one: a {@code
  * jar:} URL by walking the jar's entries, a {@code file:} URL by listing the directory.
  *
- * <p><b>Finding nothing is allowed until the first consumer pins.</b> While {@link #REQUIRED} is
- * false, an empty classpath verifies nothing and says so in the log. When the first consumer's pact
- * jar is pinned in the pom, set {@link #REQUIRED} to true and drop {@code @IgnoreNoPactsToVerify}
- * from {@code ConsumerPactVerificationTest}: from then on finding nothing is an error, because a
- * provider whose pinned pacts vanished has lost its dependency, and a green run would claim the
- * opposite.
+ * <p><b>Finding nothing is an error</b> since qits-landing-app pinned the first consumer pact
+ * (qits-1674): a provider whose pinned pacts vanished has lost its dependency, and a green run
+ * would claim the opposite. {@link #REQUIRED} is the switch that once let an empty classpath pass
+ * with a log line, while no consumer pinned one; it stays true from here on.
  */
 public class ClasspathPactLoader implements PactLoader {
 
   static final String DIRECTORY = "pacts/";
 
-  /** Whether an empty classpath fails the build. False until the first consumer pact is pinned. */
-  static final boolean REQUIRED = false;
+  /**
+   * Whether an empty classpath fails the build. True since the first consumer pact was pinned
+   * (qits-landing-app, qits-1674).
+   */
+  static final boolean REQUIRED = true;
 
   private static final org.jboss.logging.Logger LOG =
       org.jboss.logging.Logger.getLogger(ClasspathPactLoader.class);

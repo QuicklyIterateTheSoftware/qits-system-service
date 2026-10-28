@@ -157,9 +157,18 @@
         </dependency>
         <dependency>
             <!-- contracts/ConsumerPactVerificationTest: verifies the consumer pacts this provider
-                 pins. No consumer publishes one yet; each pact jar goes beside this entry. -->
+                 pins; each pact jar goes beside this entry. -->
             <groupId>au.com.dius.pact.provider</groupId>
             <artifactId>junit5</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <!-- The consumer pacts ConsumerPactVerificationTest verifies: each jar carries one
+                 `pacts/<consumer>_qits-system-service.json`, and the test reads them off the
+                 classpath. The pinned jar IS the source of the pact; nothing is copied into this
+                 tree. -->
+            <groupId>${project.groupId}</groupId>
+            <artifactId>qits-landing-app-pacts-qits-system-service</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

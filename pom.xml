@@ -140,6 +140,14 @@
              the one provider this service calls, qits-idp (OIDC discovery and JWKS). Exact pins. -->
         <qits.pact-consumer.version>2026.1019.82625</qits.pact-consumer.version>
         <qits.idp-golden-masters.version>2026.1027.165632</qits.idp-golden-masters.version>
+        <!-- The provider half: each consumer's pact, published as a jar holding
+             `pacts/<consumer>_qits-system-service.json` and verified by
+             contracts/ConsumerPactVerificationTest. qits-landing-app is the first (its target
+             overview). Test scope at the declaration site; a pin in <properties> like every other
+             qits jar, so qits-maintenance bumps it when the consumer releases a changed pact (its
+             PomParser reads pins regardless of scope, and records this property as the line to
+             edit). Named like every pact pin on the estate: the artifactId without its `qits-`. -->
+        <qits.landing-app-pacts-qits-system-service.version>2026.1028.114136</qits.landing-app-pacts-qits-system-service.version>
 
         <compiler-plugin.version>3.15.0</compiler-plugin.version>
         <surefire-plugin.version>3.5.4</surefire-plugin.version>
@@ -310,6 +318,13 @@
                 <groupId>${project.groupId}</groupId>
                 <artifactId>qits-idp-golden-masters</artifactId>
                 <version>${qits.idp-golden-masters.version}</version>
+            </dependency>
+            <dependency>
+                <!-- Test scope at every declaration site: a consumer's pact, verified by
+                     ConsumerPactVerificationTest. -->
+                <groupId>${project.groupId}</groupId>
+                <artifactId>qits-landing-app-pacts-qits-system-service</artifactId>
+                <version>${qits.landing-app-pacts-qits-system-service.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
