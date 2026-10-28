@@ -212,6 +212,14 @@ class GoldenMasterRecordingTest {
                   + "\"limits\":{\"memory\":\"4g\",\"pidsLimit\":4096}}}",
               BEARER),
           call(ProviderStates.A_DECLARED_TARGET, "listTargets", "GET", API + "/targets", 200, null, Map.of()),
+          call(
+              ProviderStates.A_CONNECTED_TARGET_WITH_LEASES,
+              "listTargets",
+              "GET",
+              API + "/targets",
+              200,
+              null,
+              Map.of()),
           call(ProviderStates.A_DECLARED_TARGET, "getTarget", "GET", TARGET, 200, null, Map.of()),
           call(
               ProviderStates.A_DECLARED_TARGET,

@@ -110,6 +110,16 @@ public class ProviderStates {
   public static final String A_CONNECTED_TARGET = "a connected target";
 
   /**
+   * Target {@code lab} described as {@link #A_DECLARED_TARGET} is — six slots, reservations 2/2/1,
+   * a settled health check, signed in to claude — but its runner connected and served, with a
+   * RUNNING CI lease ({@link #CI_LEASE_ID}, qits-ci's {@code run-1}) and a RUNNING WORKSPACE lease
+   * ({@link #WORKSPACE_LEASE_ID}, qits-workspaces' {@code 17}) placed on it: param {@code targetId}.
+   * The one state whose target list says {@code connected: true} with slots in use, which the
+   * landing app's target overview draws (qits-1674).
+   */
+  public static final String A_CONNECTED_TARGET_WITH_LEASES = "a connected target with leases";
+
+  /**
    * The same target, a claude sign-in started and its runner reporting AWAITING_CODE with the url
    * {@link #CLAUDE_SIGN_IN_URL}: param {@code signInId}.
    */
@@ -141,6 +151,12 @@ public class ProviderStates {
   static final String TARGET_ID = Freezer.frozenId(1);
 
   static final String LEASE_ID = Freezer.frozenId(2);
+
+  /** {@link #A_CONNECTED_TARGET_WITH_LEASES}' CI lease. */
+  static final String CI_LEASE_ID = Freezer.frozenId(3);
+
+  /** {@link #A_CONNECTED_TARGET_WITH_LEASES}' WORKSPACE lease. */
+  static final String WORKSPACE_LEASE_ID = Freezer.frozenId(4);
 
   static final String REGISTRATION_BEARER = "Bearer qits_tok_contract-registration";
 
@@ -211,6 +227,7 @@ public class ProviderStates {
     states.put(AN_UNUSED_DESK_WORK_VOLUME, () -> tenantLease(PROJECTS, LeaseState.ENDED));
     states.put(A_CONNECTED_TARGET, this::aConnectedTarget);
     states.put(A_CLAUDE_SIGN_IN_AWAITING_ITS_CODE, this::aClaudeSignInAwaitingItsCode);
+    states.put(A_CONNECTED_TARGET_WITH_LEASES, this::aConnectedTargetWithLeases);
   }
 
   /** Hangs up the runner a sign-in state dialled, if one did. */
@@ -453,6 +470,97 @@ public class ProviderStates {
       throw new IllegalStateException(interrupted);
     }
     return new Setup(Map.of("targetId", TARGET_ID));
+  }
+
+  /**
+   * The row is described before the runner dials, so its {@code hello} writes what a runner says
+   * — slots, version, capabilities, credential volume, last seen — over a row that otherwise reads
+   * as {@link #aDeclaredTarget}'s. The leases go in after the estate arrived: nothing on the
+   * connection moves a RUNNING lease (an allocation pass grants QUEUED ones only, and the fake
+   * runner sends no {@code inventory} unless told to), so both are still RUNNING when the list is
+   * read. The pinned runner version the hello wrote is a unique token, frozen like {@link
+   * #noTarget}'s, so a pin bump does not move the recording.
+   */
+  private Setup aConnectedTargetWithLeases() {
+    if (base == null) {
+      throw new IllegalStateException(
+          "'" + A_CONNECTED_TARGET_WITH_LEASES + "' dials a runner: pass the base URI");
+    }
+    fresh();
+    UUID target = UUID.fromString(TARGET_ID);
+    TargetRows.target(target, "lab", 6, RUNNER_CLIENT, false);
+    QuarkusTransaction.requiringNew()
+        .run(
+            () -> {
+              Target row = Target.findById(target);
+              row.description = "the lab box";
+              row.reservedCi = 2;
+              row.reservedWorkspace = 2;
+              row.reservedDesk = 1;
+              row.loginClaude = LoginValue.PRESENT;
+              row.loginKimi = LoginValue.ABSENT;
+              row.loginCheckedAt = TargetRows.T0;
+              row.lastHealthCheckAt = TargetRows.T0;
+              row.lastHealthCheckOk = true;
+              row.health =
+                  "{\"at\":\"2026-01-01T00:00:00Z\",\"ok\":true,\"detail\":\"\",\"requestId\":null,"
+                      + "\"checks\":[{\"name\":\"docker\",\"ok\":true,\"detail\":null,\"data\":{}},"
+                      + "{\"name\":\"login\",\"ok\":true,\"detail\":null,\"data\":"
+                      + "{\"claude\":\"PRESENT\",\"kimi\":\"ABSENT\"}},"
+                      + "{\"name\":\"slots\",\"ok\":true,\"detail\":null,\"data\":"
+                      + "{\"reservations\":5,\"total\":6}}]}";
+            });
+    bearers.grant(RUNNER_BEARER, RUNNER_CLIENT, "qits:target-runner");
+    runner = FakeTargetRunner.dial(base, RUNNER_BEARER);
+    runner.hello(6, "qits-system-runner-dot-claude-00000000");
+    try {
+      runner.await(Ack.class);
+      runner.await(Estate.class);
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException(interrupted);
+    }
+    runningLease(
+        UUID.fromString(CI_LEASE_ID), SlotType.CI, "qits-ci", "run-1", null, CI_IMAGE, "1001");
+    runningLease(
+        UUID.fromString(WORKSPACE_LEASE_ID),
+        WORKSPACES.type(),
+        WORKSPACES.app(),
+        WORKSPACES.ownerRef(),
+        WORKSPACES.workKey(),
+        WORKSPACES.image(),
+        "1000");
+    return new Setup(Map.of("targetId", TARGET_ID), Set.of(SystemRunnerBinary.VERSION));
+  }
+
+  /** A RUNNING lease on target {@code lab}, filled as {@link #tenantLease} fills one, with its work volume. */
+  private static void runningLease(
+      UUID id, SlotType type, String app, String ownerRef, String workKey, String image, String user) {
+    UUID target = UUID.fromString(TARGET_ID);
+    TargetRows.lease(id, type, app, ownerRef, LeaseState.RUNNING, target);
+    QuarkusTransaction.requiringNew()
+        .run(
+            () -> {
+              Lease lease = Lease.findById(id);
+              lease.workKey = workKey;
+              lease.spec =
+                  "{\"env\":{\"QITS_TOKEN\":\"qits_tok_lease\"},\"image\":\""
+                      + image
+                      + "\",\"limits\":{\"memory\":\"4g\"},\"user\":\""
+                      + user
+                      + "\"}";
+              lease.specHash = "spec-hash-1";
+              lease.startedAt = TargetRows.T0;
+              if (workKey != null) {
+                WorkVolume volume = new WorkVolume();
+                volume.ownerApp = app;
+                volume.workKey = workKey;
+                volume.targetId = target;
+                volume.volumeName = "qits-system-runner-work-" + workKey + "-00000000";
+                volume.createdAt = TargetRows.T0;
+                volume.persist();
+              }
+            });
   }
 
   private Setup aClaudeSignInAwaitingItsCode() {

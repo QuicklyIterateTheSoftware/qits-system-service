@@ -106,6 +106,40 @@
       ]
     },
     {
+      "name": "a connected target with leases",
+      "slug": "a-connected-target-with-leases",
+      "params": {
+        "targetId": "00000000-0000-4000-8000-000000000001"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listTargets",
+          "method": "GET",
+          "path": "/system/api/targets",
+          "status": 200,
+          "file": "a-connected-target-with-leases/listTargets.json",
+          "frozen": {
+            "ids": [
+              "$[*].id"
+            ],
+            "instants": [
+              "$[*].login.checkedAt",
+              "$[*].connectedSince",
+              "$[*].registeredAt",
+              "$[*].lastSeenAt",
+              "$[*].lastHealthCheckAt",
+              "$[*].createdAt"
+            ],
+            "strings": [
+              "$[*].runnerVersion"
+            ],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a declared target",
       "slug": "a-declared-target",
       "params": {

@@ -179,6 +179,11 @@ class ConsumerPactVerificationTest {
     return states.params(ProviderStates.A_CONNECTED_TARGET);
   }
 
+  @State(ProviderStates.A_CONNECTED_TARGET_WITH_LEASES)
+  Map<String, String> aConnectedTargetWithLeases() {
+    return states.params(ProviderStates.A_CONNECTED_TARGET_WITH_LEASES);
+  }
+
   @State(ProviderStates.A_CLAUDE_SIGN_IN_AWAITING_ITS_CODE)
   Map<String, String> aClaudeSignInAwaitingItsCode() {
     return states.params(ProviderStates.A_CLAUDE_SIGN_IN_AWAITING_ITS_CODE);

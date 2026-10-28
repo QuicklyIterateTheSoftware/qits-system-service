@@ -1,0 +1,40 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000000000001",
+    "name": "lab",
+    "description": "the lab box",
+    "slotsTotal": 6,
+    "reservations": {
+      "ci": 2,
+      "workspace": 2,
+      "desk": 1
+    },
+    "used": {
+      "ci": 1,
+      "workspace": 1,
+      "desk": 0
+    },
+    "login": {
+      "claude": "PRESENT",
+      "kimi": "ABSENT",
+      "checkedAt": "2026-01-01T00:00:00Z"
+    },
+    "credentialVolume": "qits-system-runner-dot-claude-00000000",
+    "loginCommand": null,
+    "kimiLoginCommand": null,
+    "connected": true,
+    "connectedSince": "2026-01-01T00:00:00Z",
+    "quarantined": false,
+    "quarantineReason": null,
+    "quarantinedAt": null,
+    "runnerVersion": "frozen-token-1",
+    "hostname": "node-1",
+    "engineId": "ENGINE-1",
+    "registered": true,
+    "registeredAt": "2026-01-01T00:00:00Z",
+    "lastSeenAt": "2026-01-01T00:00:00Z",
+    "lastHealthCheckAt": "2026-01-01T00:00:00Z",
+    "lastHealthCheckOk": true,
+    "createdAt": "2026-01-01T00:00:00Z"
+  }
+]
