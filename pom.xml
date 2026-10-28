@@ -147,7 +147,7 @@
              qits jar, so qits-maintenance bumps it when the consumer releases a changed pact (its
              PomParser reads pins regardless of scope, and records this property as the line to
              edit). Named like every pact pin on the estate: the artifactId without its `qits-`. -->
-        <qits.landing-app-pacts-qits-system-service.version>2026.1028.114136</qits.landing-app-pacts-qits-system-service.version>
+        <qits.landing-app-pacts-qits-system-service.version>2026.1028.215301</qits.landing-app-pacts-qits-system-service.version>
 
         <compiler-plugin.version>3.15.0</compiler-plugin.version>
         <surefire-plugin.version>3.5.4</surefire-plugin.version>
