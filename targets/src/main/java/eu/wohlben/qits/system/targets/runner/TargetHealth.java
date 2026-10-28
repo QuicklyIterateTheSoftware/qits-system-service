@@ -215,8 +215,6 @@ public class TargetHealth {
     boolean slotsOk = sum <= row.slotsTotal;
     Map<String, Object> data = new LinkedHashMap<>();
     data.put("reservations", sum);
-    // Deprecated (qits-1682): the old key, same value. Remove one release on.
-    data.put("minimums", sum);
     data.put("total", row.slotsTotal);
     checks.add(
         new CheckResult(

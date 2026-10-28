@@ -299,7 +299,7 @@ public class ProviderStates {
                       + "{\"name\":\"login\",\"ok\":true,\"detail\":null,\"data\":"
                       + "{\"claude\":\"PRESENT\",\"kimi\":\"ABSENT\"}},"
                       + "{\"name\":\"slots\",\"ok\":true,\"detail\":null,\"data\":"
-                      + "{\"reservations\":5,\"minimums\":5,\"total\":6}}]}";
+                      + "{\"reservations\":5,\"total\":6}}]}";
             });
     return new Setup(Map.of("targetId", TARGET_ID));
   }
