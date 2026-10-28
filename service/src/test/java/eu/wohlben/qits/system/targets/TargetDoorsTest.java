@@ -142,48 +142,6 @@ class TargetDoorsTest {
   }
 
   @Test
-  void theDeprecatedMinimumsStillReadAndWriteTheReservations() {
-    // qits-1682: `minimums` is the old name of `reservations`, kept one release with the same values.
-    Response created =
-        admin()
-            .contentType("application/json")
-            .body("{\"name\":\"old\",\"minimums\":{\"ci\":2,\"desk\":1}}")
-            .post(API);
-    created
-        .then()
-        .statusCode(201)
-        .body("target.reservations.ci", equalTo(2))
-        .body("target.reservations.desk", equalTo(1))
-        .body("target.minimums.ci", equalTo(2))
-        .body("target.minimums.workspace", equalTo(0))
-        .body("target.minimums.desk", equalTo(1));
-    String id = created.path("target.id");
-    admin()
-        .contentType("application/json")
-        .body("{\"minimums\":{\"workspace\":3}}")
-        .patch(API + "/" + id)
-        .then()
-        .statusCode(200)
-        .body("reservations.workspace", equalTo(3))
-        .body("minimums.workspace", equalTo(3));
-    // Both sent: the new name wins.
-    admin()
-        .contentType("application/json")
-        .body("{\"reservations\":{\"ci\":4},\"minimums\":{\"ci\":7}}")
-        .patch(API + "/" + id)
-        .then()
-        .statusCode(200)
-        .body("reservations.ci", equalTo(4))
-        .body("minimums.ci", equalTo(4));
-    admin()
-        .get(API)
-        .then()
-        .statusCode(200)
-        .body("find { it.name == 'old' }.reservations.ci", equalTo(4))
-        .body("find { it.name == 'old' }.minimums.ci", equalTo(4));
-  }
-
-  @Test
   void beforeTheFirstHelloAnySumGoes() {
     UUID id = UUID.randomUUID();
     TargetRows.target(id, "fresh", 0, null, true);

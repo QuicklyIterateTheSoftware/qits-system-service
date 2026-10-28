@@ -124,33 +124,17 @@ public class TargetController {
                   "Slots reserved per type; absent is 0. Not a limit: a type may use more while"
                       + " shared slots are free")
           TargetViews.SlotCounts reservations,
-      // Deprecated (qits-1682): the old name of reservations; read only when reservations is absent.
-      @Schema(deprecated = true, description = "Deprecated: send reservations")
-          TargetViews.SlotCounts minimums,
       @Schema(
               description =
                   "The slots total the install line carries, 0..1024 and at least the reservations'"
                       + " sum; absent is the reservations' sum. Not stored: the runner reports its total")
-          Integer slots) {
-    /** The reservations sent, under the new name or else the deprecated one. */
-    TargetViews.SlotCounts reserved() {
-      return reservations != null ? reservations : minimums;
-    }
-  }
+          Integer slots) {}
 
   @Schema(name = "PatchTargetRequest")
   public record PatchTargetRequest(
       @Schema(description = "Blank clears it; absent leaves it") String description,
       @Schema(description = "Slots reserved per type; absent members leave theirs")
-          TargetViews.SlotCounts reservations,
-      // Deprecated (qits-1682): the old name of reservations; read only when reservations is absent.
-      @Schema(deprecated = true, description = "Deprecated: send reservations")
-          TargetViews.SlotCounts minimums) {
-    /** The reservations sent, under the new name or else the deprecated one. */
-    TargetViews.SlotCounts reserved() {
-      return reservations != null ? reservations : minimums;
-    }
-  }
+          TargetViews.SlotCounts reservations) {}
 
   @Schema(name = "RotateTargetRegistrationTokenRequest")
   public record RotateTargetRegistrationTokenRequest(
@@ -203,7 +187,7 @@ public class TargetController {
       throw TargetRefusal.badRequest("A target needs a name");
     }
     Targets.Reservations reservations =
-        request.reserved() == null ? null : request.reserved().reservations();
+        request.reservations() == null ? null : request.reservations().reservations();
     targets.requireCreatable(request.name(), request.description(), reservations);
     Targets.requireInstallSlots(request.slots(), Targets.sum(reservations));
     requireCommissioning();
@@ -292,14 +276,14 @@ public class TargetController {
   public TargetViews.TargetDto patch(@PathParam("id") String id, PatchTargetRequest request) {
     requireMachineAudience();
     PatchTargetRequest change =
-        request == null ? new PatchTargetRequest(null, null, null) : request;
+        request == null ? new PatchTargetRequest(null, null) : request;
     UUID targetId = targetId(id);
     Target patched =
         targets.patch(
             targetId,
             change.description(),
-            change.reserved() == null ? null : change.reserved().reservations());
-    if (change.reserved() != null) {
+            change.reservations() == null ? null : change.reservations().reservations());
+    if (change.reservations() != null) {
       registry.estateChanged(targetId);
     }
     return views.view(patched);

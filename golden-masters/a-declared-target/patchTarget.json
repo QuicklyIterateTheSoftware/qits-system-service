@@ -8,11 +8,6 @@
     "workspace": 2,
     "desk": 0
   },
-  "minimums": {
-    "ci": 2,
-    "workspace": 2,
-    "desk": 0
-  },
   "used": {
     "ci": 0,
     "workspace": 0,

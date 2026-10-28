@@ -143,9 +143,7 @@ qits-projects lease. This service decides which lease runs where (`SlotAllocator
 runner its whole desired `estate`; the runner answers with an `inventory`.
 
 A reservation holds slots for one type. It is not a limit: a type may use more than its reservation
-while shared (unreserved) slots are free, so `ci 3/1` is valid when 2 shared slots were free. The
-API's old name `minimums` (target views, create and patch bodies, the `slots` health data) is a
-deprecated duplicate of `reservations` with the same values, kept for one release (qits-1682).
+while shared (unreserved) slots are free, so `ci 3/1` is valid when 2 shared slots were free.
 
     POST   /system/api/targets                       declare one; answers its install line, once
     GET    /system/api/targets[/{id}[/health]]       slots, reservations, used, login, connected, ...
