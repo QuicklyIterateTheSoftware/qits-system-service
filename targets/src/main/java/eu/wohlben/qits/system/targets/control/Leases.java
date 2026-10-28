@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -434,8 +435,10 @@ public class Leases {
   /**
    * A runner's {@code inventory}: every lease it holds. Its reports move the leases of this target
    * — RUNNING, EXITED, FAILED, and ENDED for one that is ENDING — and an ENDING lease it no longer
-   * holds is ENDED. A report about a lease that is not this target's is ignored: the estate omits
-   * it, and the runner removes it. Answers the leases that changed.
+   * holds is ENDED. STARTING on a GRANTED lease never moves its state, only its {@code detail} (the
+   * image it is pulling); STARTING on a RUNNING lease (docker restarting its container) changes
+   * nothing. A report about a lease that is not this target's is ignored: the estate omits it, and
+   * the runner removes it. Answers the leases that changed.
    */
   public List<Lease> applyInventory(UUID targetId, List<Held> held) {
     Map<UUID, Held> reported = new LinkedHashMap<>();
@@ -485,7 +488,10 @@ public class Leases {
     return changed;
   }
 
-  /** One lease against one report (null: the runner does not hold it). True when it moved. */
+  /**
+   * One lease against one report (null: the runner does not hold it). True when it moved — a
+   * state change, or (STARTING, GRANTED) a changed {@code detail} with the state held.
+   */
   static boolean transition(Lease lease, Held report, Instant now) {
     if (report == null) {
       if (lease.state == LeaseState.ENDING) {
@@ -514,6 +520,17 @@ public class Leases {
             lease.state = LeaseState.RUNNING;
             lease.startedAt = now;
             lease.detail = null;
+            return true;
+          }
+          case "STARTING" -> {
+            if (lease.state != LeaseState.GRANTED) {
+              return false;
+            }
+            String detail = blankToNull(report.detail());
+            if (Objects.equals(detail, lease.detail)) {
+              return false;
+            }
+            lease.detail = detail;
             return true;
           }
           case "EXITED" -> {
@@ -546,6 +563,10 @@ public class Leases {
         return false;
       }
     }
+  }
+
+  private static String blankToNull(String value) {
+    return value == null || value.isBlank() ? null : value;
   }
 
   // --- internals --------------------------------------------------------------------------------

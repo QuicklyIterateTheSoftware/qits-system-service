@@ -5,10 +5,12 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * A lease's state moved, or a queued lease's {@code detail} changed (why it waits). Published on
+ * A lease's state moved, or its {@code detail} changed with the state held — a queued lease's (why
+ * it waits), or a granted one's (the image it is pulling, from a STARTING report). Published on
  * every such change; owners react to it and also reconcile every PT30S from {@code GET
  * /system/api/leases}, so a lost event only delays them. {@code targetId} is null while QUEUED,
- * {@code exitCode} is set for EXITED, {@code detail} names why a lease waits or failed.
+ * {@code exitCode} is set for EXITED, {@code detail} names why a lease waits, what it is doing, or
+ * why it failed.
  */
 public record TargetLeaseChanged(
     UUID eventId,

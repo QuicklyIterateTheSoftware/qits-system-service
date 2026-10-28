@@ -69,6 +69,10 @@ public class Lease extends PanacheEntityBase implements CausedRow {
   @Column(name = "exit_code")
   public Integer exitCode;
 
+  /**
+   * Why a lease waits (QUEUED), what it is doing (GRANTED: the image it is pulling), or why it
+   * ended (EXITED, FAILED); else null.
+   */
   public String detail;
 
   @Column(name = "requested_at", nullable = false)
