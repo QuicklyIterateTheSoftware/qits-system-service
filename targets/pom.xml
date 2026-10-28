@@ -58,8 +58,9 @@
             <artifactId>qits-db-core</artifactId>
         </dependency>
         <dependency>
-            <!-- TargetLeaseChanged and TargetLoginChanged, through the outbox; and CausationStamp
-                 for the rows' causation_id. Its own datasource (`eventstream`) comes with the jar. -->
+            <!-- TargetLeaseChanged, TargetLoginChanged and TargetConnectionChanged, through the
+                 outbox; and CausationStamp for the rows' causation_id. Its own datasource
+                 (`eventstream`) comes with the jar. -->
             <groupId>${project.groupId}</groupId>
             <artifactId>qits-eventstream</artifactId>
         </dependency>

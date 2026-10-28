@@ -90,6 +90,18 @@ import org.jboss.logging.Logger;
  * current connection ({@link #loginStateSeen}), the proof the probe image is on the node. A
  * harness sign-in runs on the serving connection and reports {@code signInProgress} ({@link
  * TargetSignIns}); a connection that closes fails whatever it was signing in.
+ *
+ * <p><b>Whether a target is served is announced when it FLIPS</b> ({@code TargetConnectionChanged},
+ * qits-1674): {@link #connected} is read after every change to a target's sessions — a {@code
+ * hello}, a close, a delete, a re-registration — and compared with what was last announced ({@link
+ * #announceConnection}), never inferred from which change it was. A {@code hello} at the pin on a
+ * target nobody served says {@code true}; the close of its last serving connection, or a serving
+ * connection's {@code hello} at another version (it drains), says {@code false}. A handover — a
+ * re-dialled runner replacing its connection, or a runner at the pin succeeding one being upgraded
+ * while the other serves — keeps the target served at every comparison and says nothing. Comparing
+ * the outcome rather than the path is what keeps {@code onHello}'s early returns (an upgrade, an
+ * unconfigured runner image) and {@code settle}'s replacement from each needing a rule of their own;
+ * a comparison made while a {@code hello} is still in flight is deferred to the one it ends with.
  */
 @ApplicationScoped
 public class TargetRegistry implements TargetPresence {
@@ -149,6 +161,16 @@ public class TargetRegistry implements TargetPresence {
 
   private final ConcurrentHashMap<UUID, Instant> droppedAt = new ConcurrentHashMap<>();
 
+  /**
+   * The targets last announced as served, with the version their serving runner said; absent is
+   * last announced as not served (or never). Changed only inside {@link #announceConnection}'s
+   * {@code compute}, which is what makes two racing changes to one target announce a flip once.
+   */
+  private final ConcurrentHashMap<UUID, Announced> announced = new ConcurrentHashMap<>();
+
+  /** What was announced for a served target: the runner version its serving connection said. */
+  private record Announced(String runnerVersion) {}
+
   private final ScheduledExecutorService pushes =
       Executors.newScheduledThreadPool(
           2,
@@ -171,6 +193,11 @@ public class TargetRegistry implements TargetPresence {
     private volatile boolean greeted;
     private volatile boolean draining;
     private volatile boolean loginSeen;
+    /**
+     * Inside {@link #onHello}: its outcome is not settled, and {@link #announceConnection} waits for
+     * the announce that hello ends with.
+     */
+    private volatile boolean greeting;
     private volatile String runnerVersion;
     private volatile Instant seenWrittenAt;
     /** The probe image this connection's newest {@code ack} named; null for none. */
@@ -254,6 +281,16 @@ public class TargetRegistry implements TargetPresence {
    * recorded (its slots are the target's total), the same-version rule settled, and it is answered.
    */
   public Greeting onHello(Session session, Hello hello) {
+    session.greeting = true;
+    try {
+      return greet(session, hello);
+    } finally {
+      session.greeting = false;
+      announceConnection(session.targetId, session.targetName);
+    }
+  }
+
+  private Greeting greet(Session session, Hello hello) {
     Optional<String> pin = pins.version();
     boolean current = pin.isEmpty() || pin.get().equals(hello.runnerVersion());
     boolean speaks = hello.capabilityVersion() == SystemRunnerProtocol.CAPABILITY_VERSION;
@@ -467,6 +504,7 @@ public class TargetRegistry implements TargetPresence {
           last[0] = kept.isEmpty();
           return kept.isEmpty() ? null : List.copyOf(kept);
         });
+    announceConnection(session.targetId, session.targetName);
     if (!last[0] || sessions.containsKey(session.targetId)) {
       return;
     }
@@ -612,7 +650,8 @@ public class TargetRegistry implements TargetPresence {
    * runner removes its own namespace from the node, and is closed 1008 {@code RUNNER_DELETED}.
    */
   public void deleted(UUID targetId) {
-    for (Session session : open(targetId)) {
+    List<Session> open = open(targetId);
+    for (Session session : open) {
       LOG.infof(
           "Target %s (%s) was deleted; retiring its connection %s for good",
           session.targetName, session.targetId, session.connection.id());
@@ -624,6 +663,9 @@ public class TargetRegistry implements TargetPresence {
           "the connection of deleted target " + session.targetName);
     }
     sessions.remove(targetId);
+    if (!open.isEmpty()) {
+      announceConnection(targetId, open.get(0).targetName);
+    }
     droppedAt.remove(targetId);
     connectedSince.remove(targetId);
     health.forget(targetId);
@@ -641,12 +683,12 @@ public class TargetRegistry implements TargetPresence {
     if (targetId == null || previousClientId == null) {
       return;
     }
-    boolean closed = false;
+    String closed = null;
     for (Session session : open(targetId)) {
       if (!previousClientId.equals(session.clientId)) {
         continue;
       }
-      closed = true;
+      closed = session.targetName;
       LOG.infof(
           "Target %s (%s) registered again; closing its connection %s of replaced client %s",
           session.targetName, session.targetId, session.connection.id(), previousClientId);
@@ -656,10 +698,47 @@ public class TargetRegistry implements TargetPresence {
           new CloseReason(CLOSE_POLICY, REREGISTERED),
           "the replaced connection of target " + session.targetName);
     }
-    if (closed && open(targetId).isEmpty()) {
+    if (closed == null) {
+      return;
+    }
+    announceConnection(targetId, closed);
+    if (open(targetId).isEmpty()) {
       connectedSince.remove(targetId);
       droppedAt.put(targetId, Instant.now());
     }
+  }
+
+  /**
+   * Announces {@code TargetConnectionChanged} when whether {@code targetId} is served differs from
+   * what was last announced for it, and records the new value. Called after every change to the
+   * target's sessions; a call that finds nothing changed is a no-op, which is why a handover, where
+   * some connection serves at every call, publishes nothing. On {@code false} the version is the one
+   * announced with the {@code true} before it: the connection that stopped serving is gone by now.
+   *
+   * <p><b>Nothing is announced while a {@code hello} on the target is in flight.</b> A re-dial
+   * replaces the old connection from inside its successor's hello ({@code settle}), and the old
+   * socket's close runs on another thread before the successor is greeted — compared then, the
+   * handover would read as a drop and a return. Deferring is safe because every hello ends with
+   * this same comparison, which sees the settled outcome and announces it if it is a flip.
+   */
+  private void announceConnection(UUID targetId, String targetName) {
+    announced.compute(
+        targetId,
+        (id, was) -> {
+          if (open(id).stream().anyMatch(s -> s.greeting)) {
+            return was;
+          }
+          Session now = serving(id);
+          if (now != null && was == null) {
+            events.connectionChanged(id, targetName, true, now.runnerVersion);
+            return new Announced(now.runnerVersion);
+          }
+          if (now == null && was != null) {
+            events.connectionChanged(id, targetName, false, was.runnerVersion());
+            return null;
+          }
+          return was;
+        });
   }
 
   // --- frames -----------------------------------------------------------------------------------

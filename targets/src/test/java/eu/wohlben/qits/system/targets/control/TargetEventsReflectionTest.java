@@ -9,6 +9,7 @@ import eu.wohlben.qits.eventstream.QitsEvent;
 import eu.wohlben.qits.eventstream.control.EventEnvelope;
 import eu.wohlben.qits.eventstream.control.EventFrame;
 import eu.wohlben.qits.system.targets.events.SoftwareReleaseListener.SoftwareReleasePayload;
+import eu.wohlben.qits.system.targets.events.TargetConnectionChanged;
 import eu.wohlben.qits.system.targets.events.TargetLeaseChanged;
 import eu.wohlben.qits.system.targets.events.TargetLoginChanged;
 import io.quarkus.runtime.annotations.RegisterForReflection;
@@ -44,11 +45,12 @@ class TargetEventsReflectionTest {
         Set.of(
             TargetLeaseChanged.class,
             TargetLoginChanged.class,
+            TargetConnectionChanged.class,
             EventEnvelope.class,
             EventFrame.class,
             SoftwareReleasePayload.class),
         Set.of(registration.targets()),
-        "the two targets events, the PUT body, the frame and every payload a listener binds — a"
+        "the three targets events, the PUT body, the frame and every payload a listener binds — a"
             + " new QitsEvent record in targets/events/ joins here");
   }
 
@@ -115,7 +117,9 @@ class TargetEventsReflectionTest {
               null,
               java.time.Instant.now()),
           new TargetLoginChanged(
-              "target-1", "runner-1", "PRESENT", "ABSENT", "2026-10-26T18:30:05Z", java.time.Instant.now())
+              "target-1", "runner-1", "PRESENT", "ABSENT", "2026-10-26T18:30:05Z", java.time.Instant.now()),
+          new TargetConnectionChanged(
+              "target-1", "runner-1", true, "2026.1028.124013", java.time.Instant.now())
         }) {
       assertEquals(event.getClass().getSimpleName(), event.name());
     }
@@ -193,5 +197,28 @@ class TargetEventsReflectionTest {
 
     assertEquals(out.targetId(), back.targetId());
     assertEquals(out.targetName(), back.targetName());
+  }
+
+  /**
+   * qits-1674: {@link TargetConnectionChanged} round trip — its wire name is its signature, and a
+   * {@code false} with a null version binds back as itself rather than as a default.
+   */
+  @Test
+  void targetConnectionChangedBindsBothWays() {
+    TargetConnectionChanged out =
+        new TargetConnectionChanged(
+            "target-1", "runner-1", false, null, java.time.Instant.parse("2026-10-28T18:30:05Z"));
+
+    EventEnvelope envelope = EventEnvelope.of(out);
+    assertEquals("TargetConnectionChanged", envelope.name());
+
+    TargetConnectionChanged back =
+        eu.wohlben.qits.eventstream.control.CanonicalJson.payloadTo(
+            envelope.payload(), TargetConnectionChanged.class);
+
+    assertEquals(out.targetId(), back.targetId());
+    assertEquals(out.targetName(), back.targetName());
+    assertEquals(false, back.connected());
+    assertEquals(null, back.runnerVersion());
   }
 }

@@ -223,7 +223,8 @@ while shared (unreserved) slots are free, so `ci 3/1` is valid when 2 shared slo
   TIMEOUT | NOT_CONNECTED | BAD_REQUEST` (an unknown target is NOT_FOUND with no target id); reading
   the audit is not itself audited.
 - **Events**: `TargetLeaseChanged` on every state change, `TargetLoginChanged` on every sign-in
-  change. Owners also reconcile from `GET /leases`.
+  change, `TargetConnectionChanged` when whether a target's runner serves it flips (a handover
+  publishes nothing). Owners also reconcile from `GET /leases`.
 - **Store**: postgres (`resources: postgresql:db, postgresql:eventstream:…` in deployments.yml),
   flyway `db/system/migration`, named persistence unit `system`.
 

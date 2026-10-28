@@ -46,9 +46,10 @@ navigation-entries: system.System:4
 # work_volume rows (flyway db/system/migration), the one exception to this service's "reads only"
 # rule that qits-system-plan.md records. `postgresql:db` has the deployer provision this
 # application's database and inject QITS_RESOURCE_DB_URL/_USERNAME/_PASSWORD; `postgresql:eventstream`
-# is the qits-eventstream outbox's own (TargetLeaseChanged, TargetLoginChanged), injected as
-# QITS_RESOURCE_EVENTSTREAM_*, named as every other service names its outbox. Both are new claims:
-# the renamed_from above moves no postgres claim, because qits-platform-system never had one.
+# is the qits-eventstream outbox's own (TargetLeaseChanged, TargetLoginChanged,
+# TargetConnectionChanged), injected as QITS_RESOURCE_EVENTSTREAM_*, named as every other service
+# names its outbox. Both are new claims: the renamed_from above moves no postgres claim, because
+# qits-platform-system never had one.
 #
 # idp:client ASKS QITS-DEPLOYMENTS TO PROVISION THIS APPLICATION'S OWN QITS-IDP SERVICE CLIENT — id
 # `dev-qits-system` (derived from env + application), roles fixed in qits-idp code. The deployer

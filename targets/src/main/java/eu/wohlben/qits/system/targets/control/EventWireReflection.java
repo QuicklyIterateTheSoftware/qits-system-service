@@ -3,6 +3,7 @@ package eu.wohlben.qits.system.targets.control;
 import eu.wohlben.qits.eventstream.control.EventEnvelope;
 import eu.wohlben.qits.eventstream.control.EventFrame;
 import eu.wohlben.qits.system.targets.events.SoftwareReleaseListener.SoftwareReleasePayload;
+import eu.wohlben.qits.system.targets.events.TargetConnectionChanged;
 import eu.wohlben.qits.system.targets.events.TargetLeaseChanged;
 import eu.wohlben.qits.system.targets.events.TargetLoginChanged;
 import io.quarkus.runtime.annotations.RegisterForReflection;
@@ -33,6 +34,10 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
  * the binary binds an empty payload, no slot image is ever kept warm, and the JVM suite stays
  * green. qits-maintenance-service registers the same three for its own listener.
  *
+ * <p><b>{@link TargetConnectionChanged} (qits-1674) joined the two above here</b>, in the commit
+ * that added it: a record the bus serializes and this list does not name is published empty by the
+ * native binary — {@code {}} for a payload — while the JVM suite stays green.
+ *
  * <p><b>And the mix-in by name.</b> {@code CanonicalJson$QitsEventMixin} keeps {@code QitsEvent}'s
  * declared methods — {@code eventId} above all — out of a payload, and Jackson finds its {@code
  * @JsonIgnore}s by reflection. Left out, nothing crashes: {@code eventId} simply appears in every
@@ -42,6 +47,7 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
     targets = {
       TargetLeaseChanged.class,
       TargetLoginChanged.class,
+      TargetConnectionChanged.class,
       EventEnvelope.class,
       EventFrame.class,
       SoftwareReleasePayload.class

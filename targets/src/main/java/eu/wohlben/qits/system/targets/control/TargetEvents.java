@@ -5,6 +5,7 @@ import eu.wohlben.qits.eventstream.QitsEvent;
 import eu.wohlben.qits.eventstream.QitsEventBus;
 import eu.wohlben.qits.system.targets.entity.Lease;
 import eu.wohlben.qits.system.targets.entity.Target;
+import eu.wohlben.qits.system.targets.events.TargetConnectionChanged;
 import eu.wohlben.qits.system.targets.events.TargetLeaseChanged;
 import eu.wohlben.qits.system.targets.events.TargetLoginChanged;
 import io.quarkus.arc.Arc;
@@ -21,7 +22,7 @@ import java.util.concurrent.TimeUnit;
 import org.jboss.logging.Logger;
 
 /**
- * The targets module's two events, handed to {@link QitsEventBus} on a thread of their own — never
+ * The targets module's three events, handed to {@link QitsEventBus} on a thread of their own — never
  * on the caller's, which may still be inside the transaction that made the change, and never in a
  * way that can fail it. qits-workspaces-service's {@code EventstreamLifecycleAnnouncer}, kept in
  * shape: the causation of the caller is captured here and carried over.
@@ -29,10 +30,10 @@ import org.jboss.logging.Logger;
  * <p>{@code QitsEventBus.publish} serializes these with Jackson, which the native-image build
  * cannot see through: the only JAX-RS-declared types it discovers reflection for are return types,
  * and an event handed to the bus is neither. {@link EventWireReflection} is where that
- * registration lives now — for these two records, the PUT body ({@code EventEnvelope}) and the
+ * registration lives now — for these three records, the PUT body ({@code EventEnvelope}) and the
  * canonical mix-in together, so there is one place a new wire type joins rather than two to keep in
  * sync. Without it the native binary logs "could not be published or recorded" for every lease or
- * login change while every JVM test stays green, because the JVM needs no such registration.
+ * login or connection change while every JVM test stays green, because the JVM needs no such registration.
  */
 @ApplicationScoped
 public class TargetEvents {
@@ -76,6 +77,18 @@ public class TargetEvents {
             target.loginKimi == null ? null : target.loginKimi.name(),
             checkedAt,
             Instant.now()));
+  }
+
+  /**
+   * {@link TargetConnectionChanged}: whether the target is served flipped to {@code connected}.
+   * The registry decides when ({@code TargetRegistry}), comparing before and after each change to
+   * its sessions; this only says it.
+   */
+  public void connectionChanged(
+      UUID targetId, String targetName, boolean connected, String runnerVersion) {
+    announce(
+        new TargetConnectionChanged(
+            targetId.toString(), targetName, connected, runnerVersion, Instant.now()));
   }
 
   void announce(QitsEvent event) {
