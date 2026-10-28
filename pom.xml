@@ -42,7 +42,7 @@
          is meant to be edited by hand. Deliberately NOT a -SNAPSHOT: the image build resolves this
          reactor from source, so a snapshot coordinate would only invite a resolver to look for one
          in a repository that will never hold it. -->
-    <version>2026.1028.203654</version>
+    <version>2026.1028.222333</version>
     <packaging>pom</packaging>
     <name>qits-platform-system</name>
 
