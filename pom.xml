@@ -82,7 +82,7 @@
              instrumented call sites for the terminal socket — or explicitly declared, which is
              reserved for the one hop no tap reaches: the unix socket behind the docker CLI. Never
              narrated. Do not go back below it — the story catalogue will not compile. -->
-        <qits.userflows.version>2026.1002.72731</qits.userflows.version>
+        <qits.userflows.version>2026.1028.231715</qits.userflows.version>
         <!-- The recording service mocks the story catalogue boots against (the generic MockService
              plus idp.MockIdp), published by qits-integrations-quarkus beside qits-auth-core and
              qits-arch-rules.
