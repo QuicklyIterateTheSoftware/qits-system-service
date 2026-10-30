@@ -107,7 +107,7 @@
         <!-- The qits-system-runner's own frames (qits-1481): SystemRunnerProtocol, SystemRunnerCodec
              and SystemRunnerBinary, whose VERSION is the runner image every target is pinned to.
              Published by qits-system-runner-daemon. -->
-        <qits.system-runner-protocol.version>2026.1029.220800</qits.system-runner-protocol.version>
+        <qits.system-runner-protocol.version>2026.1030.312</qits.system-runner-protocol.version>
         <!-- THE LOGIN PROBE'S LAST-RESORT IMAGE (qits-1593): qits-workspace-daemon-protocol's
              WorkspaceImage carries the `qits/workspace` tag of the release that published it, so a
              brand-new target with no WORKSPACE or DESK lease yet can still be probed and sign in,
