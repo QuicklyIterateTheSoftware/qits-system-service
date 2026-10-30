@@ -87,6 +87,10 @@ public class PackagedSurfaceIT {
       // The boot sweep would run its three calls against the fake on every launch; the sweep
       // has its own coverage and this IT is about the surface.
       overrides.put("qits.system.glances.pull-at-startup", "false");
+      // The packaged artifact runs in the PROD profile, where the machine-auth gate ships on; this
+      // IT is about the surface and has no idp, so the gate stays off here. StoryProfile, which
+      // extends this, turns it back on against its MockIdp.
+      overrides.put("qits.auth.machine.required", "false");
       // THE TARGETS MODULE'S TWO DATABASES (qits-1481), as the deployer injects them: the packaged
       // artifact opens both and runs Flyway at boot, so it gets the suite's embedded postgres.
       overrides.put("QITS_RESOURCE_DB_URL", EmbeddedPg.url("qits_system_packaged_it"));
