@@ -64,7 +64,7 @@
              qits-db-core, qits-eventstream and the runner jars are the targets module's, below. The url is a
              property so the image build can point it at the address the builder container can
              actually reach — see docker/Dockerfile and .qits-maven-settings.xml. -->
-        <qits.auth-core.version>2026.1012.173247</qits.auth-core.version>
+        <qits.auth-core.version>2026.1031.63225</qits.auth-core.version>
         <qits.arch-rules.version>2026.1030.30851</qits.arch-rules.version>
         <!-- CallerServerFilter/CallerClientFilter: jandex-indexed filters that record inbound
              X-Qits-Caller as the qits.caller span attribute and stamp it on outgoing REST-client
@@ -103,11 +103,11 @@
              One version for both: they are released together from qits-runner-javalib. -->
         <qits.eventstream.version>2026.1027.101950</qits.eventstream.version>
         <qits.db-core.version>2026.1002.70617</qits.db-core.version>
-        <qits.runner.version>2026.1030.144107</qits.runner.version>
+        <qits.runner.version>2026.1031.85104</qits.runner.version>
         <!-- The qits-system-runner's own frames (qits-1481): SystemRunnerProtocol, SystemRunnerCodec
              and SystemRunnerBinary, whose VERSION is the runner image every target is pinned to.
              Published by qits-system-runner-daemon. -->
-        <qits.system-runner-protocol.version>2026.1030.144920</qits.system-runner-protocol.version>
+        <qits.system-runner-protocol.version>2026.1031.102912</qits.system-runner-protocol.version>
         <!-- THE LOGIN PROBE'S LAST-RESORT IMAGE (qits-1593): qits-workspace-daemon-protocol's
              WorkspaceImage carries the `qits/workspace` tag of the release that published it, so a
              brand-new target with no WORKSPACE or DESK lease yet can still be probed and sign in,
