@@ -1,7 +1,6 @@
 package eu.wohlben.qits.system.api;
 
 import static io.restassured.RestAssured.given;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import eu.wohlben.qits.system.testdocker.FakeDocker;
@@ -81,9 +80,9 @@ class TerminalLingerTest {
 
     // The belt the grace exists to reach: `--rm` fires when a CONTAINER exits, and killing the CLI
     // attached to it is not that.
-    assertTrue(
-        FakeDocker.called("rm -f qits-system-glances-" + id),
-        "the glances container was not removed: " + FakeDocker.calls());
+    // The rm runs after the session leaves the map, once terminate() returns, so it is awaited
+    // rather than asserted.
+    awaitCalled("rm -f qits-system-glances-" + id, 10 * GRACE_MILLIS);
   }
 
   @Test
@@ -159,5 +158,23 @@ class TerminalLingerTest {
       Thread.sleep(50);
     }
     fail("terminal " + id + " was still running " + budgetMillis + "ms after its last viewer left");
+  }
+
+  /** Poll until the fake docker call happened, or fail saying how long it waited. */
+  private void awaitCalled(String fragment, long budgetMillis) throws InterruptedException {
+    long deadline = System.currentTimeMillis() + budgetMillis;
+    while (System.currentTimeMillis() < deadline) {
+      if (FakeDocker.called(fragment)) {
+        return;
+      }
+      Thread.sleep(50);
+    }
+    fail(
+        "docker call \""
+            + fragment
+            + "\" did not happen within "
+            + budgetMillis
+            + "ms: "
+            + FakeDocker.calls());
   }
 }
