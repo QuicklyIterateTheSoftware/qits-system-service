@@ -250,6 +250,9 @@ The targets module's keys are `qits.system.targets.*`, defaulted in
 DESK, lease's image first), `registry-mirrors.{registry-hosts,mirror-hosts,
 upstreams}`, `runner-version-override`, `reconnect-grace=PT2M`, `commission-reconcile-interval=1h`,
 `public-url` (wss base), `estate-interval=PT1M`, `healthcheck.schedule`, `healthcheck.timeout=PT5M`,
+`dialback.threshold=3` and `dialback.cooloff=PT30M` (qits-1809: that many RUNNING CI leases in a row
+ended `never-dialled-back` quarantine the target, and the gating `dialback` check holds it for the
+cool-off),
 `idp.{url,client-id,client-secret}`, `docker.timeout=PT30S`, `docker.exec-grace=PT10S`. Beside them, `qits.system.leases.ending-deadline=PT10M`,
 `ending-grace=PT2M` and `ending-check-interval=60s` (the ENDING deadline).
 

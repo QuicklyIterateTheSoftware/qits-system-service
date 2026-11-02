@@ -39,6 +39,8 @@ erDiagram
     instant created_at "not null"
     string credential_volume
     string description
+    instant dialback_failed_at
+    int dialback_failures "not null"
     jsonb health
     instant last_health_check_at
     boolean last_health_check_ok

@@ -1117,7 +1117,9 @@ paths:
         required: true
         schema:
           type: string
-      - description: Why; an operator's lands in the lease's detail and the audit
+      - description: "Why; it lands in the lease's detail, and an operator's in the\
+          \ audit too. An owner's never-dialled-back on a RUNNING CI lease counts\
+          \ toward its target's dial-back quarantine (qits-1809)"
         name: reason
         in: query
         schema:

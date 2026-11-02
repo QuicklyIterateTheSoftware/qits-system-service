@@ -63,6 +63,8 @@ public class Leases {
 
   @Inject TargetAuditLog audit;
 
+  @Inject Targets targets;
+
   /** What an owner asks for. {@code spec} is checked by {@link LeaseSpecs#require}. */
   public record NewLease(
       SlotType slotType,
@@ -213,13 +215,71 @@ public class Leases {
     return rolled;
   }
 
+  /** {@link #end(UUID, String, String)} without a reason. */
+  public Lease end(UUID id, String ownerApp) {
+    return end(id, ownerApp, null).lease();
+  }
+
+  /**
+   * The reason qits-ci ends a lease with when its run's step was {@code NEVER_STARTED}: the lease
+   * ran and its ci daemon never dialled back within qits-ci's register window (qits-1809).
+   */
+  public static final String NEVER_DIALLED_BACK = "never-dialled-back";
+
+  /**
+   * An owner's end, and the quarantine its dial-back streak began or renewed (null when it touched
+   * none).
+   */
+  public record OwnerEnd(Lease lease, Targets.Quarantine quarantine) {}
+
   /**
    * The owner is done with it: a QUEUED lease (or one with no target) is ENDED at once; any other is
    * ENDING until the runner reports its container gone. Ending an ENDING or ENDED lease is a no-op.
+   * A {@code reason} lands in the detail of a lease it moves.
+   *
+   * <p><b>The dial-back streak</b> (qits-1809). The end of a CI lease that was RUNNING tells whether
+   * its ci daemon dialled back: {@link #NEVER_DIALLED_BACK} counts one more failure on its target,
+   * any other reason or none resets the count, since a daemon that registered proves the link
+   * works. At {@code qits.system.targets.dialback.threshold} in a row the target is quarantined
+   * ({@link Targets#quarantineFor}, which only renews the reason of a standing one); the {@code
+   * dialback} health check then holds it there for the cool-off. Every other end leaves the count
+   * alone: a lease that never ran says nothing about the link.
    */
-  public Lease end(UUID id, String ownerApp) {
+  public OwnerEnd end(UUID id, String ownerApp, String reason) {
     owned(id, ownerApp);
-    return endOne(id, null).lease();
+    String why = reason == null || reason.isBlank() ? null : reason.strip();
+    Ended ended = endOne(id, false, why);
+    Lease lease = ended.lease();
+    if (lease.slotType != SlotType.CI
+        || ended.before() != LeaseState.RUNNING
+        || lease.state == ended.before()
+        || lease.targetId == null) {
+      return new OwnerEnd(lease, null);
+    }
+    boolean neverDialled = NEVER_DIALLED_BACK.equals(why);
+    Integer failures = targets.recordDialback(lease.targetId, neverDialled, Instant.now());
+    int threshold = config.dialback().threshold();
+    if (!neverDialled || failures == null || failures < threshold) {
+      if (neverDialled && failures != null) {
+        LOG.infof(
+            "CI lease %s (%s) on target %s never dialled back; %d in a row",
+            lease.id, lease.ownerRef, lease.targetId, failures);
+      }
+      return new OwnerEnd(lease, null);
+    }
+    String detail =
+        "dial-back: "
+            + failures
+            + " CI leases in a row never dialled back their ci daemon; last lease "
+            + lease.id
+            + " ("
+            + lease.ownerRef
+            + ")";
+    Targets.Quarantine quarantine = targets.quarantineFor(lease.targetId, detail);
+    LOG.warnf(
+        "Target %s is quarantined%s: %s",
+        lease.targetId, quarantine.began() ? "" : " (already, reason renewed)", detail);
+    return new OwnerEnd(lease, quarantine);
   }
 
   /** Who ends a lease as an operator, for its detail and its audit row. */
@@ -249,7 +309,7 @@ public class Leases {
       if (id == null) {
         throw TargetRefusal.notFound("No lease " + asWritten);
       }
-      ended = endOne(id, detail);
+      ended = endOne(id, true, detail);
     } catch (TargetRefusal refused) {
       audit.record(
           new TargetAuditLog.Entry(
@@ -292,11 +352,11 @@ public class Leases {
   private record Ended(Lease lease, LeaseState before) {}
 
   /**
-   * The one end transition. {@code operatorDetail} null is the owner's end, which leaves an ENDING
-   * lease alone; set, it is an operator's, which also ends an ENDING lease and leaves the detail on
-   * any lease it moves. Every entry into ENDING stamps {@code ending_since}.
+   * The one end transition. An owner's end ({@code byOperator} false) leaves an ENDING lease alone;
+   * an operator's also ends an ENDING lease. A non-null {@code detail} is left on any lease it
+   * moves. Every entry into ENDING stamps {@code ending_since}.
    */
-  private Ended endOne(UUID id, String operatorDetail) {
+  private Ended endOne(UUID id, boolean byOperator, String detail) {
     LeaseState[] before = {null};
     Lease ended =
         QuarkusTransaction.requiringNew()
@@ -309,7 +369,7 @@ public class Leases {
                   before[0] = lease.state;
                   Instant now = Instant.now();
                   if (lease.state == LeaseState.ENDED
-                      || (lease.state == LeaseState.ENDING && operatorDetail == null)) {
+                      || (lease.state == LeaseState.ENDING && !byOperator)) {
                     return lease;
                   }
                   if (lease.state == LeaseState.ENDING
@@ -322,8 +382,8 @@ public class Leases {
                     lease.endingSince = now;
                     lease.endingNudgedAt = null;
                   }
-                  if (operatorDetail != null) {
-                    lease.detail = operatorDetail;
+                  if (detail != null) {
+                    lease.detail = detail;
                   }
                   return lease;
                 });

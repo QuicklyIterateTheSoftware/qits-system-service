@@ -7,6 +7,7 @@ import eu.wohlben.qits.system.targets.entity.Target;
 import eu.wohlben.qits.system.targets.entity.WorkVolume;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceException;
 import java.time.Instant;
 import java.util.EnumMap;
@@ -472,7 +473,11 @@ public class Targets {
             });
   }
 
-  /** Lifts a quarantine (a no-op on a target that has none). */
+  /**
+   * Lifts a quarantine (a no-op on a target that has none), and resets its dial-back count
+   * (qits-1809): whether a passing check or an operator lifted it, the target starts its streak
+   * again from 0.
+   */
   public Target greenlight(UUID id) {
     Target lifted =
         QuarkusTransaction.requiringNew()
@@ -482,6 +487,7 @@ public class Targets {
                   if (target != null) {
                     target.quarantinedAt = null;
                     target.quarantineReason = null;
+                    target.dialbackFailures = 0;
                   }
                   return target;
                 });
@@ -489,6 +495,29 @@ public class Targets {
       throw TargetRefusal.notFound("No target " + id);
     }
     return lifted;
+  }
+
+  /**
+   * One more RUNNING CI lease that never dialled back ({@code neverDialled}), stamped {@code at}, or
+   * one that did, which resets the count to 0 (qits-1809). The row is locked, so two ends at once
+   * both count. Answers the count as it now is, or null when the target is gone.
+   */
+  public Integer recordDialback(UUID id, boolean neverDialled, Instant at) {
+    return QuarkusTransaction.requiringNew()
+        .call(
+            () -> {
+              Target target = Target.findById(id, LockModeType.PESSIMISTIC_WRITE);
+              if (target == null) {
+                return null;
+              }
+              if (neverDialled) {
+                target.dialbackFailures++;
+                target.dialbackFailedAt = at;
+              } else {
+                target.dialbackFailures = 0;
+              }
+              return target.dialbackFailures;
+            });
   }
 
   /** A settled check's verdict and report. Null when gone. */

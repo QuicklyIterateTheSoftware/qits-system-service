@@ -43,6 +43,8 @@ public interface TargetsConfig {
 
   Healthcheck healthcheck();
 
+  Dialback dialback();
+
   Idp idp();
 
   Docker docker();
@@ -62,6 +64,16 @@ public interface TargetsConfig {
     Duration timeout();
 
     String sweepInterval();
+  }
+
+  /**
+   * A target whose CI leases never dial back (qits-1809): {@code threshold} such ends in a row
+   * quarantine it, and the {@code dialback} health check fails for {@code cooloff} after the newest.
+   */
+  interface Dialback {
+    int threshold();
+
+    Duration cooloff();
   }
 
   /** The Docker API's wait for a runner's {@code docker-result} ({@code runner/TargetDocker}). */

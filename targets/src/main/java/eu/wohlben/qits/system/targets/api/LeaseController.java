@@ -5,9 +5,11 @@ import eu.wohlben.qits.system.targets.control.Leases;
 import eu.wohlben.qits.system.targets.control.OwnerIdentity;
 import eu.wohlben.qits.system.targets.control.TargetAuditLog;
 import eu.wohlben.qits.system.targets.control.TargetRefusal;
+import eu.wohlben.qits.system.targets.control.Targets;
 import eu.wohlben.qits.system.targets.entity.Lease;
 import eu.wohlben.qits.system.targets.entity.LeaseState;
 import eu.wohlben.qits.system.targets.entity.SlotType;
+import eu.wohlben.qits.system.targets.runner.TargetRegistry;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.annotation.security.RolesAllowed;
@@ -38,7 +40,9 @@ import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
  * never a body field. A {@code qits:system} caller reads its own leases; an administrator, the
  * delivery desk's administrator or an agent reads every lease. An operator ({@code qits:admin},
  * {@code qits:admin-agent}, {@code qits:desk-admin}) ends any lease, and every such end is a
- * {@code target_audit} row.
+ * {@code target_audit} row. An owner's {@code ?reason=} lands in the lease's detail; qits-ci's
+ * {@code never-dialled-back} feeds its target's dial-back streak, and a quarantine that streak
+ * begins is told to the runner here (qits-1809, {@link Leases#end(UUID, String, String)}).
  */
 @Path("/leases")
 @Produces(MediaType.APPLICATION_JSON)
@@ -69,6 +73,8 @@ public class LeaseController {
   @Inject OwnerIdentity owners;
 
   @Inject SecurityIdentity identity;
+
+  @Inject TargetRegistry registry;
 
   @Schema(name = "CreateLeaseRequest")
   public record CreateLeaseRequest(
@@ -197,14 +203,28 @@ public class LeaseController {
   @APIResponse(responseCode = "404", description = "No such lease")
   public TargetViews.LeaseDto end(
       @PathParam("id") String id,
-      @Parameter(description = "Why; an operator's lands in the lease's detail and the audit")
+      @Parameter(
+              description =
+                  "Why; it lands in the lease's detail, and an operator's in the audit too. An"
+                      + " owner's never-dialled-back on a RUNNING CI lease counts toward its"
+                      + " target's dial-back quarantine (qits-1809)")
           @QueryParam("reason")
           String reason) {
     if (reason != null && reason.length() > REASON_MAX) {
       throw TargetRefusal.badRequest("A reason is at most " + REASON_MAX + " characters");
     }
     if (!operates()) {
-      return TargetViews.view(leases.end(leaseId(id), owners.application(identity)));
+      Leases.OwnerEnd ended = leases.end(leaseId(id), owners.application(identity), reason);
+      Targets.Quarantine quarantine = ended.quarantine();
+      if (quarantine != null
+          && quarantine.target() != null
+          && (quarantine.began() || quarantine.reasonChanged())) {
+        registry.quarantined(
+            quarantine.target().id,
+            quarantine.target().quarantineReason,
+            quarantine.target().quarantinedAt);
+      }
+      return TargetViews.view(ended.lease());
     }
     UUID leaseId;
     try {

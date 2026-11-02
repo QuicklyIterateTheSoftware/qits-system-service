@@ -115,6 +115,21 @@ record SuiteTargetsConfig(String idpUrl, String clientId, String secret) impleme
   }
 
   @Override
+  public Dialback dialback() {
+    return new Dialback() {
+      @Override
+      public int threshold() {
+        return 3;
+      }
+
+      @Override
+      public Duration cooloff() {
+        return Duration.ofMinutes(30);
+      }
+    };
+  }
+
+  @Override
   public Idp idp() {
     return new Idp() {
       @Override

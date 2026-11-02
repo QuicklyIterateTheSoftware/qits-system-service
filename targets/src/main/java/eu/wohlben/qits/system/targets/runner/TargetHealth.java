@@ -40,7 +40,11 @@ import org.jboss.logging.Logger;
  *
  * <b>Both are reported and never quarantine</b> ({@link #REPORT_ONLY}): they fail the recorded
  * health and its detail, and are left out of the quarantine decision, so a signed-out target still
- * runs CI. And {@code buildkit} counts only when the target has {@code reserved_ci > 0} or runs a CI lease; a
+ * runs CI. A third, {@code dialback} (qits-1809), <b>gates</b>: it fails while the target's CI leases
+ * have never dialled back {@code dialback.threshold} times in a row and the newest of those is within
+ * {@code dialback.cooloff}. The streak quarantined the target ({@code Leases.end}); this check is
+ * what keeps the quarantine sweep from greenlighting it straight away, and the first check after the
+ * cool-off passes, greenlights it and so resets the count. And {@code buildkit} counts only when the target has {@code reserved_ci > 0} or runs a CI lease; a
  * failing one on any other target is kept in the report and does not fail it.
  *
  * <p><b>Quarantine.</b> A quarantined target's {@code ack} carries 0 slots and it is granted
@@ -72,6 +76,8 @@ public class TargetHealth {
   static final String SLOTS = "slots";
 
   static final String BUILDKIT = "buildkit";
+
+  static final String DIALBACK = "dialback";
 
   @Inject Targets targets;
 
@@ -137,9 +143,11 @@ public class TargetHealth {
       return;
     }
     List<CheckResult> checks = new ArrayList<>(report == null ? List.of() : report.checks());
-    checks.removeIf(c -> LOGIN.equals(c.name()) || SLOTS.equals(c.name()));
+    checks.removeIf(
+        c -> LOGIN.equals(c.name()) || SLOTS.equals(c.name()) || DIALBACK.equals(c.name()));
     boolean runnerNamedNone = checks.isEmpty();
-    checks.addAll(serverChecks(row));
+    checks.addAll(
+        serverChecks(row, config.dialback().threshold(), config.dialback().cooloff(), now));
     boolean buildkitCounts = row.reservedCi > 0 || targets.runsCi(targetId);
     Verdict verdict = verdict(checks, buildkitCounts, report, runnerNamedNone);
     settle(
@@ -193,8 +201,11 @@ public class TargetHealth {
         gating.isEmpty() ? passed : String.join("; ", gating));
   }
 
-  /** The checks this service judges, from the row alone. Pure. */
-  static List<CheckResult> serverChecks(Target row) {
+  /**
+   * The checks this service judges, from the row, the dial-back policy and the clock alone. Pure.
+   */
+  static List<CheckResult> serverChecks(
+      Target row, int dialbackThreshold, Duration dialbackCooloff, Instant now) {
     List<CheckResult> checks = new ArrayList<>();
     int agentReservations = row.reservedWorkspace + row.reservedDesk;
     boolean loginOk = agentReservations == 0 || row.signedIn();
@@ -228,7 +239,32 @@ public class TargetHealth {
                     + row.slotsTotal
                     + " slot(s) the runner reports; they are ignored",
             data));
+    checks.add(dialbackCheck(row, dialbackThreshold, dialbackCooloff, now));
     return checks;
+  }
+
+  /**
+   * {@code dialback}: fails while {@code dialback_failures >= threshold} and {@code
+   * dialback_failed_at + cooloff} is still ahead of {@code now} (qits-1809).
+   */
+  static CheckResult dialbackCheck(Target row, int threshold, Duration cooloff, Instant now) {
+    Map<String, Object> data = new LinkedHashMap<>();
+    data.put("failures", row.dialbackFailures);
+    data.put("threshold", threshold);
+    Instant until = row.dialbackFailedAt == null ? null : row.dialbackFailedAt.plus(cooloff);
+    boolean coolingOff =
+        row.dialbackFailures >= threshold && until != null && until.isAfter(now);
+    if (!coolingOff) {
+      return new CheckResult(DIALBACK, true, null, data);
+    }
+    data.put("until", until.toString());
+    return new CheckResult(
+        DIALBACK,
+        false,
+        row.dialbackFailures
+            + " CI lease(s) in a row never dialled back their ci daemon; cooling off until "
+            + until,
+        data);
   }
 
   private Pending claim(UUID targetId, String requestId) {

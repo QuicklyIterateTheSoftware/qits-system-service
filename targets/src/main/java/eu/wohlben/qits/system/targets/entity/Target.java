@@ -89,6 +89,18 @@ public class Target extends PanacheEntityBase implements CausedRow {
   @Column(columnDefinition = "jsonb")
   public String health;
 
+  /**
+   * How many RUNNING CI leases in a row their owner ended as {@code never-dialled-back}: the ci
+   * daemon never registered (qits-1809). Any other end of a RUNNING CI lease, and a greenlight,
+   * reset it to 0.
+   */
+  @Column(name = "dialback_failures", nullable = false)
+  public int dialbackFailures;
+
+  /** When the newest of those ended; the {@code dialback} check's cool-off counts from it. */
+  @Column(name = "dialback_failed_at")
+  public Instant dialbackFailedAt;
+
   @Column(name = "runner_version")
   public String runnerVersion;
 
