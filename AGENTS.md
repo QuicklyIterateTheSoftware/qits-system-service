@@ -98,7 +98,9 @@ not 30.
 whatever an estate does not list, so a lease read that failed sends nothing. `workVolume` on the wire
 is the WORK KEY (the runner derives `qits-system-runner-work-<workKey>-<id8>`); `purges` and
 `inventory.volumes` are full names; an adopted lease carries `adopt` for its whole life. An EXITED
-lease stays `desired: RUNNING` (the runner never restarts one) until its owner ends it.
+lease stays `desired: RUNNING` (the runner never restarts one) until its owner ends it, which
+makes it ENDED at once, never ENDING (qits-1813): its slot was freed at EXITED and may be granted
+again, and ENDING occupies one. Unlisted, its container is removed by the runner.
 
 **Every estate names the images its target keeps warm** (qits-1692). `events/SoftwareReleaseListener`
 (durable, consumer id `system.targets.warm-images`) hands a `docker` `SoftwareRelease` whose

@@ -191,8 +191,10 @@ while shared (unreserved) slots are free, so `ci 3/1` is valid when 2 shared slo
   launch starts without a setup screen.
 - **Ending a lease**: its owner (`qits:system`, 403 `NOT_YOUR_LEASE` on another's) or an operator
   (`qits:admin`, `qits:admin-agent`, `qits:desk-admin`; an operator role wins over `qits:system`),
-  who ends any lease. QUEUED or targetless is ENDED at once; GRANTED, RUNNING, EXITED or FAILED is
-  ENDING until the runner reports the container gone. An operator's end of an ENDING lease is ENDED
+  who ends any lease. QUEUED or targetless is ENDED at once, and so is EXITED or FAILED (qits-1813):
+  its slot was freed when it stopped and may be granted again, so it must not occupy one a second
+  time; the estate drops it and the runner removes the container. GRANTED or RUNNING is ENDING until
+  the runner reports the container gone. An operator's end of an ENDING lease is ENDED
   at once — the stuck-lease door — and a lease an operator moves carries `detail = "ended by
   <principal>[: <reason>]"`. Every operator call, a refused one too, is a `target_audit` row
   (`LEASE_END`; outcome ENDED, ENDING, NOOP or NOT_FOUND).

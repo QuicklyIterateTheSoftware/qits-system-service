@@ -270,7 +270,8 @@ public class TargetAllocation {
    * {@code targetId}'s estate: every lease on it that has not ENDED, the volumes it is to purge, and
    * the images it keeps warm.
    * GRANTED, RUNNING and EXITED leases are {@code desired: RUNNING} — the runner never restarts an
-   * exited container, and keeping it listed keeps it on the node until its owner ends the lease;
+   * exited container, and keeping it listed keeps it on the node until its owner ends the lease,
+   * which makes it ENDED and so unlisted, and the runner removes what its estate does not list;
    * ENDING and FAILED ones are {@code ENDED}, which the runner stops and removes.
    */
   public EstateView estateOf(UUID targetId) {
