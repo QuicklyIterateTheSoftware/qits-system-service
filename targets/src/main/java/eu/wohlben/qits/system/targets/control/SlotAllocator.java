@@ -15,11 +15,12 @@ import java.util.UUID;
  * database, no clock, no CDI — {@link TargetAllocation} reads the rows, calls {@link #allocate} and
  * writes what it answers, and {@code TargetAllocatorTest} drives it as a table.
  *
- * <p><b>The rule.</b> For a target with total {@code T}, reservations {@code r[u]} and used counts
- * {@code n[u]} (GRANTED, RUNNING or ENDING), a lease of type {@code t} fits when
+ * <p><b>The rule.</b> For a target with total {@code T}, reservations {@code r[u]}, optional
+ * maximums {@code m[u]} and used counts {@code n[u]} (GRANTED, RUNNING or ENDING), a lease of type
+ * {@code t} fits when
  *
  * <pre>
- *   n_total &lt; T  and  n_total + 1 + Σ_{u ≠ t} max(0, r[u] − n[u]) ≤ T
+ *   n_total &lt; T  and  n_total + 1 + Σ_{u ≠ t} max(0, r[u] − n[u]) ≤ T  and  (m[t] unset or n[t] &lt; m[t])
  * </pre>
  *
  * — what is reserved for the other types and not yet used by them stays free for them. A
@@ -28,6 +29,13 @@ import java.util.UUID;
  * Σ r > T} (the runner reported a smaller total than the reservations were set against) the
  * reservations are ignored and only {@code n_total < T} holds; the {@code slots} health check
  * reports that case.
+ *
+ * <p><b>A maximum is the limit</b> (qits-1813): a type at its maximum is granted nothing more on
+ * that target however many shared slots are free, so one type cannot borrow every free slot (four
+ * concurrent native CI builds took a node's memory). Unset is no ceiling, today's rule unchanged.
+ * It holds whether or not the reservations are ignored, and it never reserves anything: slots a
+ * type may not take stay shared for the others. The door keeps {@code m[t] ≥ r[t]}; one above
+ * {@code T} is harmless.
  *
  * <p><b>The order.</b> One queue across types, {@code priority desc, requested_at asc} (the lease id
  * breaks a tie, so a pass is deterministic). Each lease is considered on its own: one that cannot be
@@ -51,6 +59,7 @@ public final class SlotAllocator {
       String name,
       int total,
       Map<SlotType, Integer> reservations,
+      Map<SlotType, Integer> maximums,
       Map<SlotType, Integer> used,
       boolean connected,
       boolean quarantined,
@@ -58,7 +67,21 @@ public final class SlotAllocator {
 
     public TargetSlots {
       reservations = counts(reservations);
+      maximums = ceilings(maximums);
       used = counts(used);
+    }
+
+    /** A target with no maximums. */
+    public TargetSlots(
+        UUID id,
+        String name,
+        int total,
+        Map<SlotType, Integer> reservations,
+        Map<SlotType, Integer> used,
+        boolean connected,
+        boolean quarantined,
+        boolean signedIn) {
+      this(id, name, total, reservations, null, used, connected, quarantined, signedIn);
     }
 
     public int usedTotal() {
@@ -76,7 +99,8 @@ public final class SlotAllocator {
     TargetSlots plus(SlotType type) {
       Map<SlotType, Integer> next = new EnumMap<>(used);
       next.merge(type, 1, Integer::sum);
-      return new TargetSlots(id, name, total, reservations, next, connected, quarantined, signedIn);
+      return new TargetSlots(
+          id, name, total, reservations, maximums, next, connected, quarantined, signedIn);
     }
   }
 
@@ -163,6 +187,15 @@ public final class SlotAllocator {
     if (!target.connected()) {
       return "target " + target.name() + " is not connected";
     }
+    if (atMaximum(target.maximums(), target.used(), type)) {
+      return "target "
+          + target.name()
+          + " runs its maximum of "
+          + target.maximums().get(type)
+          + " "
+          + type.name()
+          + " lease(s)";
+    }
     if (!fits(target, type)) {
       return "target " + target.name() + " has no free " + type.name() + " slot";
     }
@@ -182,12 +215,25 @@ public final class SlotAllocator {
 
   /** The rule, see the class javadoc. */
   public static boolean fits(TargetSlots target, SlotType type) {
-    return fits(target.total(), target.reservations(), target.used(), type);
+    return fits(target.total(), target.reservations(), target.maximums(), target.used(), type);
   }
 
-  /** The rule over bare numbers. */
+  /** The rule over bare numbers, with no maximums. */
   public static boolean fits(
       int total, Map<SlotType, Integer> reservations, Map<SlotType, Integer> used, SlotType type) {
+    return fits(total, reservations, null, used, type);
+  }
+
+  /** The rule over bare numbers; a null map or a null value in {@code maximums} is no ceiling. */
+  public static boolean fits(
+      int total,
+      Map<SlotType, Integer> reservations,
+      Map<SlotType, Integer> maximums,
+      Map<SlotType, Integer> used,
+      SlotType type) {
+    if (atMaximum(maximums, used, type)) {
+      return false;
+    }
     int usedTotal = 0;
     for (SlotType u : SlotType.values()) {
       usedTotal += used.getOrDefault(u, 0);
@@ -226,12 +272,29 @@ public final class SlotAllocator {
     return sum > total;
   }
 
+  /** {@code m[t]} is set and {@code n[t] ≥ m[t]}: the type may take no more on this target. */
+  static boolean atMaximum(
+      Map<SlotType, Integer> maximums, Map<SlotType, Integer> used, SlotType type) {
+    Integer maximum = maximums == null ? null : maximums.get(type);
+    return maximum != null && used.getOrDefault(type, 0) >= maximum;
+  }
+
   /** More free slots first, then the name. */
   private static boolean better(TargetSlots candidate, TargetSlots incumbent) {
     if (candidate.free() != incumbent.free()) {
       return candidate.free() > incumbent.free();
     }
     return candidate.name().compareTo(incumbent.name()) < 0;
+  }
+
+  /** Every type as a key; a null value is no ceiling, a negative one is 0. */
+  private static Map<SlotType, Integer> ceilings(Map<SlotType, Integer> given) {
+    Map<SlotType, Integer> ceilings = new EnumMap<>(SlotType.class);
+    for (SlotType type : SlotType.values()) {
+      Integer value = given == null ? null : given.get(type);
+      ceilings.put(type, value == null ? null : Math.max(0, value));
+    }
+    return ceilings;
   }
 
   private static Map<SlotType, Integer> counts(Map<SlotType, Integer> given) {

@@ -42,6 +42,20 @@ public class Targets {
     public static final Reservations NONE = new Reservations(0, 0, 0);
   }
 
+  /**
+   * The maximums a request changes (qits-1813). A type present with a value sets its ceiling, one
+   * present with null clears it (no ceiling), an absent type keeps its current value.
+   */
+  public record Maximums(Map<SlotType, Integer> changes) {
+    public Maximums {
+      Map<SlotType, Integer> copy = new EnumMap<>(SlotType.class);
+      if (changes != null) {
+        copy.putAll(changes);
+      }
+      changes = copy;
+    }
+  }
+
   /** What a quarantine did: began it, or only changed the reason of one already standing. */
   public record Quarantine(Target target, boolean began, boolean reasonChanged) {}
 
@@ -219,13 +233,22 @@ public class Targets {
     }
   }
 
-  /**
-   * A new description and reservations. 409 {@link TargetRefusal#RESERVATIONS_EXCEED_TOTAL} when their sum
-   * is above a reported total ({@code slotsTotal > 0}); before the first {@code hello} any sum goes.
-   */
+  /** {@link #patch(UUID, String, Reservations, Maximums)} leaving the maximums as they are. */
   public Target patch(UUID id, String description, Reservations reservations) {
+    return patch(id, description, reservations, null);
+  }
+
+  /**
+   * A new description, reservations and maximums, each merged over the current values. 409 {@link
+   * TargetRefusal#RESERVATIONS_EXCEED_TOTAL} when the reservations' sum is above a reported total
+   * ({@code slotsTotal > 0}); before the first {@code hello} any sum goes. 409 {@link
+   * TargetRefusal#MAXIMUM_BELOW_RESERVATION} when a resulting maximum is below its type's resulting
+   * reservation. A maximum above the total is kept: it is harmless.
+   */
+  public Target patch(UUID id, String description, Reservations reservations, Maximums maximums) {
     requireDescription(description);
     requireReservations(reservations);
+    requireMaximums(maximums);
     Target patched =
         QuarkusTransaction.requiringNew()
             .call(
@@ -255,6 +278,21 @@ public class Targets {
                     target.reservedCi = ci;
                     target.reservedWorkspace = ws;
                     target.reservedDesk = desk;
+                  }
+                  if (maximums != null) {
+                    Map<SlotType, Integer> changes = maximums.changes();
+                    if (changes.containsKey(SlotType.CI)) {
+                      target.maxCi = changes.get(SlotType.CI);
+                    }
+                    if (changes.containsKey(SlotType.WORKSPACE)) {
+                      target.maxWorkspace = changes.get(SlotType.WORKSPACE);
+                    }
+                    if (changes.containsKey(SlotType.DESK)) {
+                      target.maxDesk = changes.get(SlotType.DESK);
+                    }
+                  }
+                  if (reservations != null || maximums != null) {
+                    requireMaximumsCoverReservations(target);
                   }
                   return target;
                 });
@@ -562,6 +600,38 @@ public class Targets {
     for (Integer value : new Integer[] {reservations.ci(), reservations.workspace(), reservations.desk()}) {
       if (value != null && (value < 0 || value > 1024)) {
         throw TargetRefusal.badRequest("A reservation is between 0 and 1024, not " + value);
+      }
+    }
+  }
+
+  static void requireMaximums(Maximums maximums) {
+    if (maximums == null) {
+      return;
+    }
+    for (Integer value : maximums.changes().values()) {
+      if (value != null && (value < 0 || value > 1024)) {
+        throw TargetRefusal.badRequest("A maximum is between 0 and 1024, or null for none, not " + value);
+      }
+    }
+  }
+
+  /** 409 {@link TargetRefusal#MAXIMUM_BELOW_RESERVATION} for the first type whose ceiling is below its reservation. */
+  static void requireMaximumsCoverReservations(Target target) {
+    Map<SlotType, Integer> reserved = target.reservations();
+    for (Map.Entry<SlotType, Integer> maximum : target.maximums().entrySet()) {
+      Integer ceiling = maximum.getValue();
+      int reservation = reserved.getOrDefault(maximum.getKey(), 0);
+      if (ceiling != null && ceiling < reservation) {
+        throw TargetRefusal.conflict(
+            TargetRefusal.MAXIMUM_BELOW_RESERVATION,
+            "The "
+                + maximum.getKey().name()
+                + " maximum of "
+                + ceiling
+                + " is below its reservation of "
+                + reservation
+                + " on target "
+                + target.name);
       }
     }
   }

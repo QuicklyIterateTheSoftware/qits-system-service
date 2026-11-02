@@ -43,6 +43,18 @@ public class Target extends PanacheEntityBase implements CausedRow {
   @Column(name = "reserved_desk", nullable = false)
   public int reservedDesk;
 
+  /** The most CI leases this target runs at once; null is no ceiling (qits-1813). */
+  @Column(name = "max_ci")
+  public Integer maxCi;
+
+  /** The most WORKSPACE leases this target runs at once; null is no ceiling. */
+  @Column(name = "max_workspace")
+  public Integer maxWorkspace;
+
+  /** The most DESK leases this target runs at once; null is no ceiling. */
+  @Column(name = "max_desk")
+  public Integer maxDesk;
+
   /** The {@code hello} capabilities extension as the runner sent it. */
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(columnDefinition = "jsonb")
@@ -145,6 +157,15 @@ public class Target extends PanacheEntityBase implements CausedRow {
     reservations.put(SlotType.WORKSPACE, reservedWorkspace);
     reservations.put(SlotType.DESK, reservedDesk);
     return reservations;
+  }
+
+  /** The ceilings per type; a null value (the type is always present as a key) is no ceiling. */
+  public Map<SlotType, Integer> maximums() {
+    Map<SlotType, Integer> maximums = new EnumMap<>(SlotType.class);
+    maximums.put(SlotType.CI, maxCi);
+    maximums.put(SlotType.WORKSPACE, maxWorkspace);
+    maximums.put(SlotType.DESK, maxDesk);
+    return maximums;
   }
 
   public int reservationsSum() {

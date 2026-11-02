@@ -12,6 +12,7 @@ public class TargetRefusal extends SystemException {
   private static final long serialVersionUID = 1L;
 
   public static final String RESERVATIONS_EXCEED_TOTAL = "RESERVATIONS_EXCEED_TOTAL";
+  public static final String MAXIMUM_BELOW_RESERVATION = "MAXIMUM_BELOW_RESERVATION";
   public static final String TARGET_BUSY = "TARGET_BUSY";
   public static final String TARGET_UNAVAILABLE = "TARGET_UNAVAILABLE";
   public static final String LEASE_EXISTS = "LEASE_EXISTS";

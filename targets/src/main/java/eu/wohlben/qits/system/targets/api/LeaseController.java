@@ -195,8 +195,9 @@ public class LeaseController {
   @Operation(
       operationId = "endLease",
       summary =
-          "End a lease: ENDING, then ENDED once the runner reports it gone. An operator (qits:admin,"
-              + " qits:admin-agent, qits:desk-admin) ends any lease, and an ENDING one at once")
+          "End a lease: ENDING, then ENDED once the runner reports it gone; a QUEUED, EXITED or"
+              + " FAILED one at once. An operator (qits:admin, qits:admin-agent, qits:desk-admin)"
+              + " ends any lease, and an ENDING one at once")
   @APIResponse(responseCode = "200", description = "The lease, ENDING or ENDED")
   @APIResponse(responseCode = "400", description = "A reason longer than " + REASON_MAX + " characters")
   @APIResponse(responseCode = "403", description = "NOT_YOUR_LEASE: a qits:system caller's end of another's lease")

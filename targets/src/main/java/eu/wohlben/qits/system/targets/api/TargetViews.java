@@ -37,6 +37,12 @@ public class TargetViews {
           counts.getOrDefault(SlotType.DESK, 0));
     }
 
+    /** Every type as it is, a null kept null: the maximums, where null is no ceiling. */
+    static SlotCounts ofNullable(Map<SlotType, Integer> counts) {
+      return new SlotCounts(
+          counts.get(SlotType.CI), counts.get(SlotType.WORKSPACE), counts.get(SlotType.DESK));
+    }
+
     Targets.Reservations reservations() {
       return new Targets.Reservations(ci, workspace, desk);
     }
@@ -56,6 +62,12 @@ public class TargetViews {
                   "Slots reserved per type. Not a limit: a type may use more while shared"
                       + " (unreserved) slots are free")
           SlotCounts reservations,
+      @Schema(
+              description =
+                  "The most leases per type the target runs at once; null is no ceiling. The"
+                      + " limit a reservation is not: a type at its maximum waits however many"
+                      + " shared slots are free")
+          SlotCounts maximums,
       @Schema(description = "GRANTED, RUNNING and ENDING leases per type") SlotCounts used,
       Login login,
       String credentialVolume,
@@ -167,6 +179,7 @@ public class TargetViews {
         target.description,
         target.slotsTotal,
         SlotCounts.of(target.reservations()),
+        SlotCounts.ofNullable(target.maximums()),
         SlotCounts.of(used == null ? Map.of() : used),
         new Login(
             target.loginClaude == null ? null : target.loginClaude.name(),

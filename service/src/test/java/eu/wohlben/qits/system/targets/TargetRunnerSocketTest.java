@@ -375,7 +375,7 @@ class TargetRunnerSocketTest {
   }
 
   @Test
-  void anExitedLeaseIsKeptRunningInTheEstateUntilItsOwnerEndsIt() throws Exception {
+  void anExitedLeaseIsKeptRunningInTheEstateUntilItsOwnerEndsItThenDropped() throws Exception {
     try (FakeTargetRunner runner = greetedRunner()) {
       String id =
           LeaseDoorsTest.lease("dev-qits-ci", "CI", "run-2", CI_IMAGE, "").path("id");
@@ -386,8 +386,14 @@ class TargetRunnerSocketTest {
       Lease exited = awaitState(id, LeaseState.EXITED);
       assertEquals(0, exited.exitCode);
       assertEquals("RUNNING", allocation.estateOf(target).leases().get(0).desired());
-      LeaseDoorsTest.service("dev-qits-ci").delete("/system/api/leases/" + id).then().statusCode(200);
-      assertEquals("ENDED", allocation.estateOf(target).leases().get(0).desired());
+      LeaseDoorsTest.service("dev-qits-ci")
+          .delete("/system/api/leases/" + id)
+          .then()
+          .statusCode(200)
+          .body("state", equalTo("ENDED"));
+      // ENDED at once (qits-1813: an exited lease's slot is free already), so the estate no longer
+      // lists it, and the runner removes a lease container its estate does not list.
+      assertTrue(allocation.estateOf(target).leases().isEmpty());
     }
   }
 

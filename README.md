@@ -144,10 +144,16 @@ runner its whole desired `estate`; the runner answers with an `inventory`.
 
 A reservation holds slots for one type. It is not a limit: a type may use more than its reservation
 while shared (unreserved) slots are free, so `ci 3/1` is valid when 2 shared slots were free.
+A maximum (qits-1813, optional per type, null by default) is the limit: a type at its maximum is
+granted nothing more on that target, however many shared slots are free. A patch's `maximums`
+merges like `reservations` — a member left out keeps its value, an explicit `null` clears it (no
+ceiling), and `0` is a ceiling (that type never runs there), never a clear. A maximum below its
+type's reservation is 409 `MAXIMUM_BELOW_RESERVATION`; one above the total is harmless.
 
     POST   /system/api/targets                       declare one; answers its install line, once
-    GET    /system/api/targets[/{id}[/health]]       slots, reservations, used, login, connected, ...
-    PATCH  /system/api/targets/{id}                  description, reservations (409 RESERVATIONS_EXCEED_TOTAL)
+    GET    /system/api/targets[/{id}[/health]]       slots, reservations, maximums, used, login, ...
+    PATCH  /system/api/targets/{id}                  description, reservations, maximums (409
+                                                     RESERVATIONS_EXCEED_TOTAL, MAXIMUM_BELOW_RESERVATION)
     DELETE /system/api/targets/{id}                  409 TARGET_BUSY while a lease is live; else Retire
     POST   /system/api/targets/{id}/registration-token | greenlight | healthcheck | login-check
     POST   /system/api/targets/{id}/sign-ins        {harness: claude|kimi}: 202 STARTING; the runner logs in
@@ -191,8 +197,10 @@ while shared (unreserved) slots are free, so `ci 3/1` is valid when 2 shared slo
   launch starts without a setup screen.
 - **Ending a lease**: its owner (`qits:system`, 403 `NOT_YOUR_LEASE` on another's) or an operator
   (`qits:admin`, `qits:admin-agent`, `qits:desk-admin`; an operator role wins over `qits:system`),
-  who ends any lease. QUEUED or targetless is ENDED at once; GRANTED, RUNNING, EXITED or FAILED is
-  ENDING until the runner reports the container gone. An operator's end of an ENDING lease is ENDED
+  who ends any lease. QUEUED or targetless is ENDED at once, and so is EXITED or FAILED (qits-1813):
+  its slot was freed when it stopped and may be granted again, so it must not occupy one a second
+  time; the estate drops it and the runner removes the container. GRANTED or RUNNING is ENDING until
+  the runner reports the container gone. An operator's end of an ENDING lease is ENDED
   at once — the stuck-lease door — and a lease an operator moves carries `detail = "ended by
   <principal>[: <reason>]"`. Every operator call, a refused one too, is a `target_audit` row
   (`LEASE_END`; outcome ENDED, ENDING, NOOP or NOT_FOUND).

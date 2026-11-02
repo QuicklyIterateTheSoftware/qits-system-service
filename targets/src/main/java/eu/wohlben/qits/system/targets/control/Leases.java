@@ -233,8 +233,10 @@ public class Leases {
   public record OwnerEnd(Lease lease, Targets.Quarantine quarantine) {}
 
   /**
-   * The owner is done with it: a QUEUED lease (or one with no target) is ENDED at once; any other is
-   * ENDING until the runner reports its container gone. Ending an ENDING or ENDED lease is a no-op.
+   * The owner is done with it: a QUEUED lease (or one with no target) is ENDED at once, and so is an
+   * EXITED or FAILED one, whose container has stopped and whose slot is free already — the estate no
+   * longer lists it, so the runner removes the container. A GRANTED or RUNNING lease is ENDING until
+   * the runner reports its container gone. Ending an ENDING or ENDED lease is a no-op.
    * A {@code reason} lands in the detail of a lease it moves.
    *
    * <p><b>The dial-back streak</b> (qits-1809). The end of a CI lease that was RUNNING tells whether
@@ -286,8 +288,8 @@ public class Leases {
   public record Operator(String actor, String roles) {}
 
   /**
-   * An operator ends any lease, whoever owns it — the stuck-lease door. QUEUED (or targetless) is
-   * ENDED and GRANTED, RUNNING, EXITED or FAILED is ENDING, as for its owner; an ENDING lease is
+   * An operator ends any lease, whoever owns it — the stuck-lease door. QUEUED (or targetless),
+   * EXITED or FAILED is ENDED and GRANTED or RUNNING is ENDING, as for its owner; an ENDING lease is
    * ENDED at once, without the runner's word. A lease it moves gets {@code detail = "ended by
    * <actor>[: <reason>]"}. Every call writes a {@link TargetAuditLog#LEASE_END} row, a refused one
    * too: outcome ENDED, ENDING, NOOP (already ENDED) or NOT_FOUND.
@@ -372,8 +374,14 @@ public class Leases {
                       || (lease.state == LeaseState.ENDING && !byOperator)) {
                     return lease;
                   }
+                  // EXITED and FAILED occupy nothing: their slot was freed when the runner
+                  // reported them and may already be granted again, so ENDING (which occupies)
+                  // would count it twice (qits-1813). ENDED drops them from the estate, and the
+                  // runner stops and removes a lease container its estate no longer lists.
                   if (lease.state == LeaseState.ENDING
                       || lease.state == LeaseState.QUEUED
+                      || lease.state == LeaseState.EXITED
+                      || lease.state == LeaseState.FAILED
                       || lease.targetId == null) {
                     lease.state = LeaseState.ENDED;
                     lease.endedAt = now;

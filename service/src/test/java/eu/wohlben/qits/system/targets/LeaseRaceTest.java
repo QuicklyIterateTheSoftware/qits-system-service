@@ -1,11 +1,13 @@
 package eu.wohlben.qits.system.targets;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import eu.wohlben.qits.runner.protocol.Ack;
 import eu.wohlben.qits.runner.protocol.Reinstated;
 import eu.wohlben.qits.system.targets.control.Leases;
 import eu.wohlben.qits.system.targets.control.TargetAllocation;
+import eu.wohlben.qits.system.targets.control.Targets;
 import eu.wohlben.qits.system.targets.entity.Lease;
 import eu.wohlben.qits.system.targets.entity.LeaseState;
 import eu.wohlben.qits.system.targets.entity.SlotType;
@@ -15,6 +17,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import java.net.URI;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CyclicBarrier;
@@ -39,6 +42,8 @@ class LeaseRaceTest {
   @Inject Leases leases;
 
   @Inject TargetAllocation allocation;
+
+  @Inject Targets targets;
 
   @Inject ContractBearers bearers;
 
@@ -97,9 +102,49 @@ class LeaseRaceTest {
       race(
           () -> leases.applyInventory(target, List.of(new Leases.Held(id, "EXITED", null, 0, null))),
           () -> leases.end(id, "qits-ci"));
-      // Either order ends ENDING: end first, and an EXITED report does not move an ENDING lease;
-      // the report first, and ending an EXITED lease makes it ENDING. EXITED would be a lost end.
-      assertEquals(LeaseState.ENDING, TargetRows.reload(id).state, "round " + round);
+      // End first: ENDING, and an EXITED report does not move an ENDING lease. The report first:
+      // ending an EXITED lease makes it ENDED at once, since its slot is free already and ENDING
+      // would occupy it again (qits-1813). EXITED would be a lost end.
+      LeaseState after = TargetRows.reload(id).state;
+      assertTrue(
+          after == LeaseState.ENDING || after == LeaseState.ENDED, "round " + round + ": " + after);
+    }
+  }
+
+  /**
+   * qits-1813, as ws-proof showed it (total 9/8): an EXITED lease's slot is free at once and may be
+   * granted to the next lease; its owner's end afterwards must not occupy that slot a second time.
+   */
+  @Test
+  void endingAnExitedLeaseWhoseSlotWasGrantedAgainNeverCountsItTwice() throws Exception {
+    bearers.grant("Bearer race", "target-runner-client-race", "qits:target-runner");
+    try (FakeTargetRunner runner = FakeTargetRunner.dial(base, "Bearer race")) {
+      runner.hello(2, "vol");
+      HealthCheck check = runner.await(HealthCheck.class);
+      runner.healthChecked(check.requestId(), true);
+      runner.await(Reinstated.class);
+      runner.await(Ack.class, a -> a.slots() == 2);
+      UUID exits = UUID.randomUUID();
+      UUID runs = UUID.randomUUID();
+      UUID queued = UUID.randomUUID();
+      TargetRows.lease(exits, SlotType.CI, "qits-ci", "run-1", LeaseState.RUNNING, target);
+      TargetRows.lease(runs, SlotType.CI, "qits-ci", "run-2", LeaseState.RUNNING, target);
+      TargetRows.lease(queued, SlotType.CI, "qits-ci", "run-3", LeaseState.QUEUED, null);
+      leases.applyInventory(
+          target,
+          List.of(
+              new Leases.Held(exits, "EXITED", "hash", 0, null),
+              new Leases.Held(runs, "RUNNING", "hash", null, null)));
+      assertEquals(LeaseState.EXITED, TargetRows.reload(exits).state);
+      allocation.pass();
+      assertEquals(LeaseState.GRANTED, TargetRows.reload(queued).state);
+      assertEquals(target, TargetRows.reload(queued).targetId);
+      leases.end(exits, "qits-ci");
+      int used =
+          targets.used().getOrDefault(target, Map.of()).values().stream()
+              .mapToInt(Integer::intValue)
+              .sum();
+      assertEquals(2, used, "the ended EXITED lease occupies its slot again");
     }
   }
 

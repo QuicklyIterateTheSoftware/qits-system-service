@@ -274,6 +274,111 @@ class TargetAllocatorTest {
     assertTrue(decisions.get(1).granted());
   }
 
+  // --- maximums (qits-1813): the ceiling a reservation is not ----------------------------------
+
+  /** A map with a null (no ceiling) where a type is unset. */
+  private static Map<SlotType, Integer> maximums(Integer ci, Integer workspace, Integer desk) {
+    Map<SlotType, Integer> maximums = new EnumMap<>(SlotType.class);
+    maximums.put(SlotType.CI, ci);
+    maximums.put(SlotType.WORKSPACE, workspace);
+    maximums.put(SlotType.DESK, desk);
+    return maximums;
+  }
+
+  /** ws-proof: T=8, reservations ci 2, workspace 1, workspace 4 used, ci at most {@code ciMax}. */
+  private static TargetSlots wsProof(Integer ciMax, int ciUsed) {
+    return new TargetSlots(
+        A,
+        "ws-proof",
+        8,
+        counts(2, 1, 0),
+        maximums(ciMax, null, null),
+        counts(ciUsed, 4, 0),
+        true,
+        false,
+        true);
+  }
+
+  private static List<Request> ciQueue(int n) {
+    List<Request> queue = new ArrayList<>();
+    for (int i = 0; i < n; i++) {
+      queue.add(request(SlotType.CI, 0, i));
+    }
+    return queue;
+  }
+
+  @Test
+  void aCiMaximumOfTwoGrantsExactlyTwoOfSixQueued() {
+    List<Decision> decisions = SlotAllocator.allocate(List.of(wsProof(2, 0)), ciQueue(6));
+    assertEquals(2, decisions.stream().filter(Decision::granted).count());
+    assertEquals(
+        List.of(true, true, false, false, false, false),
+        decisions.stream().map(Decision::granted).toList());
+    assertEquals("no target has a free CI slot", decisions.get(2).detail());
+  }
+
+  @Test
+  void withoutAMaximumCiBorrowsEveryFreeSlot() {
+    // Today's rule, unchanged: 8 − 4 workspace = 4 free, no reservation left unused but ci's own.
+    List<Decision> decisions = SlotAllocator.allocate(List.of(wsProof(null, 0)), ciQueue(6));
+    assertEquals(4, decisions.stream().filter(Decision::granted).count());
+  }
+
+  @Test
+  void theMaximumCountsGrantsWithinTheSamePass() {
+    // One CI already runs: the first grant of this pass reaches the maximum of 2.
+    assertTrue(SlotAllocator.fits(wsProof(2, 1), SlotType.CI));
+    List<Decision> decisions = SlotAllocator.allocate(List.of(wsProof(2, 1)), ciQueue(3));
+    assertEquals(List.of(true, false, false), decisions.stream().map(Decision::granted).toList());
+    assertFalse(SlotAllocator.fits(wsProof(2, 2), SlotType.CI));
+  }
+
+  @Test
+  void aTypeAtItsMaximumLeavesTheSharedSlotsToTheOthers() {
+    TargetSlots slots = wsProof(2, 2);
+    assertTrue(SlotAllocator.fits(slots, SlotType.WORKSPACE));
+    assertTrue(SlotAllocator.fits(slots, SlotType.DESK));
+    // A maximum on one type holds back no other: the workspace ceiling is unset.
+    List<Decision> decisions =
+        SlotAllocator.allocate(
+            List.of(slots),
+            List.of(
+                request(SlotType.WORKSPACE, 0, 0),
+                request(SlotType.WORKSPACE, 0, 1),
+                request(SlotType.WORKSPACE, 0, 2)));
+    assertEquals(List.of(true, true, false), decisions.stream().map(Decision::granted).toList());
+  }
+
+  @Test
+  void aPinnedLeaseAtTheMaximumSaysSo() {
+    Request pinned = new Request(UUID.randomUUID(), SlotType.CI, 0, T0, A);
+    assertEquals(
+        "target ws-proof runs its maximum of 2 CI lease(s)",
+        SlotAllocator.allocate(List.of(wsProof(2, 2)), List.of(pinned)).get(0).detail());
+  }
+
+  @Test
+  void theMaximumHoldsWhenTheReservationsAreIgnored() {
+    // Reservations 5 against a total of 4 are ignored; a ci maximum of 1 still holds.
+    TargetSlots shrunk =
+        new TargetSlots(
+            A, "alpha", 4, counts(2, 2, 1), maximums(2, null, null), counts(2, 0, 0), true, false, true);
+    assertFalse(SlotAllocator.fits(shrunk, SlotType.CI));
+    assertTrue(SlotAllocator.fits(shrunk, SlotType.WORKSPACE));
+  }
+
+  @Test
+  void aMaximumAboveTheTotalIsNoCeilingAtAll() {
+    TargetSlots generous =
+        new TargetSlots(
+            A, "alpha", 2, counts(0, 0, 0), maximums(9, null, null), counts(0, 0, 0), true, false, true);
+    assertEquals(
+        2,
+        SlotAllocator.allocate(List.of(generous), ciQueue(4)).stream()
+            .filter(Decision::granted)
+            .count());
+  }
+
   // --- which slot types a target can ever run (qits-1692: its warm images) ---------------------
 
   @Test

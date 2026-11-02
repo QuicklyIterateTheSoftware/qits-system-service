@@ -1,6 +1,7 @@
 package eu.wohlben.qits.system.targets;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.anyOf;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -49,7 +50,7 @@ class DialbackStreakTest {
         .delete(API + "/" + lease + (reason == null ? "" : "?reason=" + reason))
         .then()
         .statusCode(200)
-        .body("state", equalTo("ENDING"));
+        .body("state", anyOf(equalTo("ENDING"), equalTo("ENDED")));
   }
 
   @Test
