@@ -205,6 +205,47 @@ class TargetRunnerSocketTest {
     }
   }
 
+  /**
+   * qits-1809: a target the dial-back streak quarantined is kept there by its {@code dialback}
+   * check while it cools off, though every runner check passes; the first passing check after the
+   * cool-off greenlights it and resets the count.
+   */
+  @Test
+  void theDialbackCheckHoldsTheQuarantineUntilTheCoolOffHasPassed() throws Exception {
+    try (FakeTargetRunner runner = greetedRunner()) {
+      DialbackStreakTest.streak(target, 3, java.time.Instant.now());
+      String requestId = requestHealthCheck(runner);
+      runner.healthChecked(requestId, true);
+      Quarantined quarantined = runner.await(Quarantined.class);
+      assertTrue(
+          quarantined.reason().contains("dialback: 3 CI lease(s) in a row never dialled back"),
+          quarantined.reason());
+      assertTrue(TargetRows.reloadTarget(target).quarantined());
+
+      DialbackStreakTest.streak(target, 3, java.time.Instant.now().minus(java.time.Duration.ofMinutes(31)));
+      String after = requestHealthCheck(runner);
+      runner.healthChecked(after, true);
+      runner.await(Reinstated.class);
+      Target row = TargetRows.reloadTarget(target);
+      assertFalse(row.quarantined());
+      assertEquals(0, row.dialbackFailures, "the greenlight resets the count");
+    }
+  }
+
+  private String requestHealthCheck(FakeTargetRunner runner) throws InterruptedException {
+    String requestId =
+        given()
+            .header("X-Qits-User", "an-operator")
+            .header("X-Qits-Roles", "qits:admin")
+            .post("/system/api/targets/" + target + "/healthcheck")
+            .then()
+            .statusCode(202)
+            .extract()
+            .path("requestId");
+    runner.await(HealthCheck.class, c -> c.requestId().equals(requestId));
+    return requestId;
+  }
+
   private void awaitHealthCheck(String requestId) throws InterruptedException {
     long deadline = System.currentTimeMillis() + FakeTargetRunner.TIMEOUT.toMillis();
     while (System.currentTimeMillis() < deadline) {
