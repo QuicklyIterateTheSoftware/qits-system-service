@@ -16,6 +16,10 @@ erDiagram
     instant ending_since
     int exit_code
     instant granted_at
+    long memory_peak_bytes
+    long oom_events
+    boolean oom_killed
+    long oom_kills
     string owner_app "not null"
     string owner_ref "not null"
     uuid pin_target_id
@@ -42,6 +46,7 @@ erDiagram
     instant dialback_failed_at
     int dialback_failures "not null"
     jsonb health
+    long kernel_oom_kills
     instant last_health_check_at
     boolean last_health_check_ok
     instant last_seen_at
@@ -51,7 +56,10 @@ erDiagram
     int max_ci
     int max_desk
     int max_workspace
+    long memory_max_bytes
+    instant memory_reported_at
     string name "not null"
+    long node_oom_kills
     string quarantine_reason
     instant quarantined_at
     instant registered_at
