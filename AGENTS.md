@@ -59,11 +59,13 @@ its schedules in it; `service/` discovers them through the jar's jandex index. T
                SoftwareReleaseListener (durable, consumes qits-ci's SoftwareRelease)
 
 **The allocation rule is pure, and only `SlotAllocator` spells it.** `n_total < T and n_total + 1 +
-Σ_{u≠t} max(0, r[u] − n[u]) ≤ T`, reservations ignored when `Σ r > T`, one queue `priority desc,
+Σ_{u≠t} max(0, r[u] − n[u]) ≤ T and (m[t] unset or n[t] < m[t])`, reservations ignored when `Σ r >
+T` (the maximum `m` never is), one queue `priority desc,
 requested_at asc`, pins considered on their target only, the most free slots then the name, nothing
 for a quarantined or disconnected target, and the sign-in gate for WORKSPACE and DESK. A
 reservation holds slots for one type; it is not a limit, so a type may use more while shared
-slots are free. Change it in
+slots are free. A maximum (qits-1813) is the limit, per type and optional: null is no ceiling, and
+the patch door keeps it at or above its type's reservation. Change it in
 `TargetAllocatorTest` first: the dossier's worked example is the first table there.
 
 **`login` and `slots` are reported, never a quarantine** (`TargetHealth.REPORT_ONLY`). They fail

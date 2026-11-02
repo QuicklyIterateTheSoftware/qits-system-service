@@ -155,6 +155,7 @@ public class TargetAllocation {
               target.name,
               target.slotsTotal,
               target.reservations(),
+              target.maximums(),
               used.getOrDefault(target.id, Map.of()),
               presence.connected(target.id),
               target.quarantined(),

@@ -588,6 +588,22 @@ components:
           $ref: "#/components/schemas/SlotCounts"
           type: object
           description: Slots reserved per type; absent members leave theirs
+        maximums:
+          type: object
+          description: "The most leases per type the target runs at once, 0..1024\
+            \ and at least that type's reservation; absent members leave theirs, an\
+            \ explicit null clears one (no ceiling). 0 is a ceiling: that type never\
+            \ runs here"
+          properties:
+            ci:
+              type: integer
+              format: int32
+            workspace:
+              type: integer
+              format: int32
+            desk:
+              type: integer
+              format: int32
     RegisterTargetRequest:
       type: object
       properties:
@@ -759,6 +775,12 @@ components:
           type: object
           description: "Slots reserved per type. Not a limit: a type may use more\
             \ while shared (unreserved) slots are free"
+        maximums:
+          $ref: "#/components/schemas/SlotCounts"
+          type: object
+          description: "The most leases per type the target runs at once; null is\
+            \ no ceiling. The limit a reservation is not: a type at its maximum waits\
+            \ however many shared slots are free"
         used:
           $ref: "#/components/schemas/SlotCounts"
           type: object
@@ -1732,7 +1754,7 @@ paths:
         - qits:agent
   /system/api/targets/{id}:
     patch:
-      summary: Change a target's description or reservations
+      summary: "Change a target's description, reservations or maximums"
       operationId: patchTarget
       parameters:
       - name: id
@@ -1754,12 +1776,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/Target"
         "400":
-          description: A malformed description or reservation
+          description: "A malformed description, reservation or maximum"
         "404":
           description: No such target
         "409":
           description: "RESERVATIONS_EXCEED_TOTAL: their sum is above the total the\
-            \ runner reports"
+            \ runner reports; MAXIMUM_BELOW_RESERVATION: a type's maximum is below\
+            \ its reservation"
         "401":
           description: Not Authorized
         "403":

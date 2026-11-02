@@ -8,6 +8,11 @@
     "workspace": 2,
     "desk": 1
   },
+  "maximums": {
+    "ci": null,
+    "workspace": null,
+    "desk": null
+  },
   "used": {
     "ci": 0,
     "workspace": 0,

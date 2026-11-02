@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import eu.wohlben.qits.auth.MachineAuth;
 import eu.wohlben.qits.auth.MachineIdentity;
 import eu.wohlben.qits.system.targets.control.LeaseSpecs;
+import eu.wohlben.qits.system.targets.control.TargetAllocation;
 import eu.wohlben.qits.system.targets.control.TargetRefusal;
 import eu.wohlben.qits.system.targets.control.Targets;
 import eu.wohlben.qits.system.targets.entity.SlotType;
@@ -28,6 +29,7 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -101,6 +103,8 @@ public class TargetController {
 
   @Inject TargetRegistry registry;
 
+  @Inject TargetAllocation allocation;
+
   @Inject TargetHealth health;
 
   @Inject TargetSignIns signIns;
@@ -134,7 +138,14 @@ public class TargetController {
   public record PatchTargetRequest(
       @Schema(description = "Blank clears it; absent leaves it") String description,
       @Schema(description = "Slots reserved per type; absent members leave theirs")
-          TargetViews.SlotCounts reservations) {}
+          TargetViews.SlotCounts reservations,
+      @Schema(
+              implementation = TargetViews.SlotCounts.class,
+              description =
+                  "The most leases per type the target runs at once, 0..1024 and at least that"
+                      + " type's reservation; absent members leave theirs, an explicit null clears"
+                      + " one (no ceiling). 0 is a ceiling: that type never runs here")
+          JsonNode maximums) {}
 
   @Schema(name = "RotateTargetRegistrationTokenRequest")
   public record RotateTargetRegistrationTokenRequest(
@@ -266,25 +277,37 @@ public class TargetController {
   @Path("/{id}")
   @Consumes(MediaType.APPLICATION_JSON)
   @RolesAllowed({ADMIN, ADMIN_AGENT, DESK_ADMIN, DESK, SYSTEM})
-  @Operation(operationId = "patchTarget", summary = "Change a target's description or reservations")
+  @Operation(
+      operationId = "patchTarget",
+      summary = "Change a target's description, reservations or maximums")
   @APIResponse(responseCode = "200", description = "The target as it now is")
-  @APIResponse(responseCode = "400", description = "A malformed description or reservation")
+  @APIResponse(
+      responseCode = "400",
+      description = "A malformed description, reservation or maximum")
   @APIResponse(responseCode = "404", description = "No such target")
   @APIResponse(
       responseCode = "409",
-      description = "RESERVATIONS_EXCEED_TOTAL: their sum is above the total the runner reports")
+      description =
+          "RESERVATIONS_EXCEED_TOTAL: their sum is above the total the runner reports;"
+              + " MAXIMUM_BELOW_RESERVATION: a type's maximum is below its reservation")
   public TargetViews.TargetDto patch(@PathParam("id") String id, PatchTargetRequest request) {
     requireMachineAudience();
     PatchTargetRequest change =
-        request == null ? new PatchTargetRequest(null, null) : request;
+        request == null ? new PatchTargetRequest(null, null, null) : request;
     UUID targetId = targetId(id);
+    Targets.Maximums maximums = maximums(change.maximums());
     Target patched =
         targets.patch(
             targetId,
             change.description(),
-            change.reservations() == null ? null : change.reservations().reservations());
+            change.reservations() == null ? null : change.reservations().reservations(),
+            maximums);
     if (change.reservations() != null) {
       registry.estateChanged(targetId);
+    }
+    if (change.reservations() != null || maximums != null) {
+      // A lowered reservation or a raised or cleared maximum may admit a queued lease now.
+      allocation.requestPass();
     }
     return views.view(patched);
   }
@@ -583,6 +606,37 @@ public class TargetController {
   }
 
   // --- internals --------------------------------------------------------------------------------
+
+  /**
+   * A patch's {@code maximums}: absent or null changes none; a member left out keeps its value, an
+   * explicit null clears it, a whole number sets it. Members other than ci, workspace and desk are
+   * ignored, as for the reservations.
+   */
+  static Targets.Maximums maximums(JsonNode given) {
+    if (given == null || given.isMissingNode() || given.isNull()) {
+      return null;
+    }
+    if (!given.isObject()) {
+      throw TargetRefusal.badRequest("A target's maximums are a JSON object, not " + given);
+    }
+    Map<SlotType, Integer> changes = new EnumMap<>(SlotType.class);
+    for (SlotType type : SlotType.values()) {
+      String member = type.key();
+      JsonNode value = given.get(member);
+      if (value == null) {
+        continue;
+      }
+      if (value.isNull()) {
+        changes.put(type, null);
+      } else if (value.isInt()) {
+        changes.put(type, value.intValue());
+      } else {
+        throw TargetRefusal.badRequest(
+            "A maximum is a whole number, or null for none; " + member + " is " + value);
+      }
+    }
+    return new Targets.Maximums(changes);
+  }
 
   /** The {@code slots} of an optional rotate body: absent, empty, {@code {}} or null is none. */
   static Integer rotateSlots(String body) {

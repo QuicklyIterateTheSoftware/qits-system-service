@@ -141,6 +141,88 @@ class TargetDoorsTest {
         .body("description", equalTo("four slots"));
   }
 
+  private static Response patch(UUID id, String body) {
+    return admin().contentType("application/json").body(body).patch(API + "/" + id);
+  }
+
+  @Test
+  void maximumsAreSetReadBackMergedAndClearedByAnExplicitNull() {
+    UUID id = UUID.randomUUID();
+    TargetRows.target(id, "lab", 8, "client-lab", false);
+    admin()
+        .get(API + "/" + id)
+        .then()
+        .statusCode(200)
+        .body("maximums.ci", nullValue())
+        .body("maximums.workspace", nullValue())
+        .body("maximums.desk", nullValue());
+    patch(id, "{\"reservations\":{\"ci\":2,\"workspace\":1},\"maximums\":{\"ci\":2,\"desk\":3}}")
+        .then()
+        .statusCode(200)
+        .body("maximums.ci", equalTo(2))
+        .body("maximums.workspace", nullValue())
+        .body("maximums.desk", equalTo(3));
+    // A member left out keeps its value; a maximum above the total is allowed.
+    patch(id, "{\"maximums\":{\"workspace\":12}}")
+        .then()
+        .statusCode(200)
+        .body("maximums.ci", equalTo(2))
+        .body("maximums.workspace", equalTo(12))
+        .body("maximums.desk", equalTo(3));
+    Target row = targets.get(id);
+    assertEquals(Integer.valueOf(2), row.maxCi);
+    assertEquals(Integer.valueOf(12), row.maxWorkspace);
+    assertEquals(Integer.valueOf(3), row.maxDesk);
+    admin()
+        .get(API)
+        .then()
+        .statusCode(200)
+        .body("find { it.name == 'lab' }.maximums.ci", equalTo(2));
+    // An explicit null clears one; a patch naming no maximums keeps them all.
+    patch(id, "{\"maximums\":{\"desk\":null}}")
+        .then()
+        .statusCode(200)
+        .body("maximums.ci", equalTo(2))
+        .body("maximums.workspace", equalTo(12))
+        .body("maximums.desk", nullValue());
+    patch(id, "{\"description\":\"eight slots\"}")
+        .then()
+        .statusCode(200)
+        .body("maximums.ci", equalTo(2))
+        .body("maximums.desk", nullValue());
+    assertNull(targets.get(id).maxDesk);
+  }
+
+  @Test
+  void aMaximumBelowItsReservationOrMalformedIsRefused() {
+    UUID id = UUID.randomUUID();
+    TargetRows.target(id, "lab", 8, "client-lab", false);
+    patch(id, "{\"reservations\":{\"ci\":2}}").then().statusCode(200);
+    patch(id, "{\"maximums\":{\"ci\":1}}")
+        .then()
+        .statusCode(409)
+        .body("code", equalTo("MAXIMUM_BELOW_RESERVATION"));
+    // The resulting values decide: a reservation raised over a standing maximum is refused too,
+    // and nothing of a refused patch is kept.
+    patch(id, "{\"maximums\":{\"ci\":3}}").then().statusCode(200);
+    patch(id, "{\"reservations\":{\"ci\":4},\"description\":\"not kept\"}")
+        .then()
+        .statusCode(409)
+        .body("code", equalTo("MAXIMUM_BELOW_RESERVATION"));
+    Target row = targets.get(id);
+    assertEquals(2, row.reservedCi);
+    assertEquals(Integer.valueOf(3), row.maxCi);
+    assertNull(row.description);
+    // Both in one patch: the resulting pair is what is judged.
+    patch(id, "{\"reservations\":{\"ci\":4},\"maximums\":{\"ci\":4}}").then().statusCode(200);
+    patch(id, "{\"maximums\":{\"ci\":-1}}").then().statusCode(400);
+    patch(id, "{\"maximums\":{\"ci\":\"two\"}}").then().statusCode(400);
+    patch(id, "{\"maximums\":[2]}").then().statusCode(400);
+    // 0 is a ceiling, not a clear: a type reserved nothing may be held to none.
+    patch(id, "{\"maximums\":{\"desk\":0}}").then().statusCode(200).body("maximums.desk", equalTo(0));
+    assertEquals(Integer.valueOf(4), targets.get(id).maxCi);
+  }
+
   @Test
   void beforeTheFirstHelloAnySumGoes() {
     UUID id = UUID.randomUUID();
