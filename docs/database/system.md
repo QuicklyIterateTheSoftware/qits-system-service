@@ -46,6 +46,9 @@ erDiagram
     instant login_checked_at
     enum login_claude
     enum login_kimi
+    int max_ci
+    int max_desk
+    int max_workspace
     string name "not null"
     string quarantine_reason
     instant quarantined_at
