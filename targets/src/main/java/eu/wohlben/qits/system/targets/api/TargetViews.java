@@ -51,6 +51,27 @@ public class TargetViews {
   @Schema(name = "TargetLogin")
   public record Login(String claude, String kimi, Instant checkedAt) {}
 
+  /**
+   * The node's memory as its runner last reported it (qits-1818). Always present; every member null
+   * until a runner that reports them did.
+   */
+  @Schema(name = "TargetMemory")
+  @JsonInclude(JsonInclude.Include.ALWAYS)
+  public record Memory(
+      @Schema(
+              description =
+                  "Processes the OOM killer took in the node's cgroup tree (its root memory.events"
+                      + " oom_kill); null on a bare host, whose root has none")
+          Long nodeOomKills,
+      @Schema(
+              description =
+                  "The kernel's own count (/proc/vmstat oom_kill): every OOM kill on the physical"
+                      + " host, not only this node's")
+          Long kernelOomKills,
+      @Schema(description = "The node's memory limit (its root memory.max); null when none")
+          Long memoryMaxBytes,
+      @Schema(description = "When the runner last reported these") Instant reportedAt) {}
+
   @Schema(name = "Target")
   public record TargetDto(
       UUID id,
@@ -91,7 +112,9 @@ public class TargetViews {
       Instant lastSeenAt,
       Instant lastHealthCheckAt,
       Boolean lastHealthCheckOk,
-      Instant createdAt) {}
+      Instant createdAt,
+      @Schema(description = "The node's memory and OOM kills, as its runner last reported them")
+          Memory memory) {}
 
   @Schema(name = "TargetRegistration")
   public record TargetRegistrationDto(
@@ -164,7 +187,24 @@ public class TargetViews {
       Instant requestedAt,
       Instant grantedAt,
       Instant startedAt,
-      Instant endedAt) {}
+      Instant endedAt,
+      @Schema(
+              description =
+                  "Processes of this lease killed by any OOM killer (its container's cgroup"
+                      + " memory.events oom_kill); the last sample is kept after it exits. Null"
+                      + " until a runner reported one")
+          Long oomKills,
+      @Schema(
+              description =
+                  "LEASE (the lease hit its own memory limit) or NODE (the node or kernel ran out"
+                      + " and the killer picked a process in this lease); null when oomKills is"
+                      + " null or 0",
+              enumeration = {"LEASE", "NODE"})
+          String oomScope,
+      @Schema(description = "The lease container's peak memory (memory.peak); null when unread")
+          Long memoryPeakBytes,
+      @Schema(description = "docker's State.OOMKilled of the lease's exited container; else null")
+          Boolean oomKilled) {}
 
   @Schema(name = "WorkVolume")
   public record WorkVolumeDto(
@@ -201,7 +241,12 @@ public class TargetViews {
         target.lastSeenAt,
         target.lastHealthCheckAt,
         target.lastHealthCheckOk,
-        target.createdAt);
+        target.createdAt,
+        new Memory(
+            target.nodeOomKills,
+            target.kernelOomKills,
+            target.memoryMaxBytes,
+            target.memoryReportedAt));
   }
 
   /** One text member of the target's recorded {@code hello} capabilities, or null. */
@@ -248,6 +293,10 @@ public class TargetViews {
         lease.requestedAt,
         lease.grantedAt,
         lease.startedAt,
-        lease.endedAt);
+        lease.endedAt,
+        lease.oomKills,
+        lease.oomScope(),
+        lease.memoryPeakBytes,
+        lease.oomKilled);
   }
 }

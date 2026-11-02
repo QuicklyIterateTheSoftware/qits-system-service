@@ -12,6 +12,7 @@ import eu.wohlben.qits.system.targets.events.SoftwareReleaseListener.SoftwareRel
 import eu.wohlben.qits.system.targets.events.TargetConnectionChanged;
 import eu.wohlben.qits.system.targets.events.TargetLeaseChanged;
 import eu.wohlben.qits.system.targets.events.TargetLoginChanged;
+import eu.wohlben.qits.system.targets.events.TargetOomKilled;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 import java.lang.reflect.Method;
 import java.util.Set;
@@ -46,11 +47,12 @@ class TargetEventsReflectionTest {
             TargetLeaseChanged.class,
             TargetLoginChanged.class,
             TargetConnectionChanged.class,
+            TargetOomKilled.class,
             EventEnvelope.class,
             EventFrame.class,
             SoftwareReleasePayload.class),
         Set.of(registration.targets()),
-        "the three targets events, the PUT body, the frame and every payload a listener binds — a"
+        "the four targets events, the PUT body, the frame and every payload a listener binds — a"
             + " new QitsEvent record in targets/events/ joins here");
   }
 
@@ -115,11 +117,21 @@ class TargetEventsReflectionTest {
               "RUNNING",
               null,
               null,
+              null,
+              null,
               java.time.Instant.now()),
           new TargetLoginChanged(
               "target-1", "runner-1", "PRESENT", "ABSENT", "2026-10-26T18:30:05Z", java.time.Instant.now()),
           new TargetConnectionChanged(
-              "target-1", "runner-1", true, "2026.1028.124013", java.time.Instant.now())
+              "target-1", "runner-1", true, "2026.1028.124013", java.time.Instant.now()),
+          new TargetOomKilled(
+              java.util.UUID.randomUUID(),
+              "runner-1",
+              3L,
+              7L,
+              1,
+              java.util.List.of(),
+              java.time.Instant.now())
         }) {
       assertEquals(event.getClass().getSimpleName(), event.name());
     }
@@ -144,6 +156,8 @@ class TargetEventsReflectionTest {
             "RUNNING",
             null,
             null,
+            2L,
+            "LEASE",
             java.time.Instant.parse("2026-10-26T18:30:05Z"));
 
     EventEnvelope envelope = EventEnvelope.of(out);
@@ -161,6 +175,41 @@ class TargetEventsReflectionTest {
     assertTrue(back.leaseId().equals(out.leaseId()));
     assertEquals(out.ownerRef(), back.ownerRef());
     assertEquals(out.state(), back.state());
+    assertEquals(Long.valueOf(2), back.oomKills());
+    assertEquals("LEASE", back.oomScope());
+  }
+
+  /**
+   * qits-1818: {@link TargetOomKilled} round trip — its wire name is its signature, and the
+   * counters, the delta and the projects bind back as themselves.
+   */
+  @Test
+  void targetOomKilledBindsBothWays() {
+    java.util.UUID target = java.util.UUID.randomUUID();
+    java.util.UUID project = java.util.UUID.randomUUID();
+    TargetOomKilled out =
+        new TargetOomKilled(
+            target,
+            "runner-1",
+            null,
+            12L,
+            2,
+            java.util.List.of(project),
+            java.time.Instant.parse("2026-11-02T18:30:05Z"));
+
+    EventEnvelope envelope = EventEnvelope.of(out);
+    assertEquals("TargetOomKilled", envelope.name());
+
+    TargetOomKilled back =
+        eu.wohlben.qits.eventstream.control.CanonicalJson.payloadTo(
+            envelope.payload(), TargetOomKilled.class);
+
+    assertEquals(target, back.targetId());
+    assertEquals("runner-1", back.targetName());
+    assertEquals(null, back.nodeOomKills());
+    assertEquals(Long.valueOf(12), back.kernelOomKills());
+    assertEquals(2, back.delta());
+    assertEquals(java.util.List.of(project), back.projectIds());
   }
 
   /**

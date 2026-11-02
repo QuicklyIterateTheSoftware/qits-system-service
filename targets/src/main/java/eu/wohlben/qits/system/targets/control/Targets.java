@@ -1,5 +1,6 @@
 package eu.wohlben.qits.system.targets.control;
 
+import eu.wohlben.qits.system.targets.entity.Lease;
 import eu.wohlben.qits.system.targets.entity.LeaseState;
 import eu.wohlben.qits.system.targets.entity.LoginValue;
 import eu.wohlben.qits.system.targets.entity.SlotType;
@@ -482,6 +483,56 @@ public class Targets {
                 target.credentialVolume = volume;
               }
               return new LoginRecorded(target, changed);
+            });
+  }
+
+  /**
+   * What a node's memory report did (qits-1818): {@code delta} is by how much its OOM counter rose,
+   * 0 when it did not, and {@code projectIds} the projects of the leases then occupying it — read
+   * only when it rose.
+   */
+  public record MemoryRecorded(Target target, long delta, List<UUID> projectIds) {
+    public boolean killed() {
+      return delta > 0;
+    }
+  }
+
+  /**
+   * Writes the node's memory facts as its runner reported them, and stamps when. The OOM counter
+   * compared is {@code nodeOomKills}, or {@code kernelOomKills} when the report has no node counter;
+   * it rose when the stored value of that same counter was known and the new one is higher. A first
+   * value only sets the baseline, a lower one (the host rebooted) replaces it; neither is a kill.
+   * Null when the target is gone.
+   */
+  public MemoryRecorded recordMemory(
+      UUID id, Long nodeOomKills, Long kernelOomKills, Long memoryMaxBytes) {
+    return QuarkusTransaction.requiringNew()
+        .call(
+            () -> {
+              Target target = Target.findById(id, LockModeType.PESSIMISTIC_WRITE);
+              if (target == null) {
+                return null;
+              }
+              Long before = nodeOomKills != null ? target.nodeOomKills : target.kernelOomKills;
+              Long after = nodeOomKills != null ? nodeOomKills : kernelOomKills;
+              target.nodeOomKills = nodeOomKills;
+              target.kernelOomKills = kernelOomKills;
+              target.memoryMaxBytes = memoryMaxBytes;
+              target.memoryReportedAt = Instant.now();
+              if (before == null || after == null || after <= before) {
+                return new MemoryRecorded(target, 0, List.of());
+              }
+              List<UUID> projects =
+                  Lease.<Lease>find(
+                          "targetId = ?1 and state in ?2 and projectId is not null",
+                          id,
+                          LeaseState.OCCUPYING)
+                      .stream()
+                      .map(lease -> lease.projectId)
+                      .distinct()
+                      .sorted()
+                      .toList();
+              return new MemoryRecorded(target, after - before, projects);
             });
   }
 

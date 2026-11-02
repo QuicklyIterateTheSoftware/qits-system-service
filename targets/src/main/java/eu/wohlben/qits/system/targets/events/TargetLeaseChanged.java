@@ -6,11 +6,16 @@ import java.util.UUID;
 
 /**
  * A lease's state moved, or its {@code detail} changed with the state held — a queued lease's (why
- * it waits), or a granted one's (the image it is pulling, from a STARTING report). Published on
- * every such change; owners react to it and also reconcile every PT30S from {@code GET
+ * it waits), or a granted one's (the image it is pulling, from a STARTING report) — or its {@code
+ * oomKills} rose (qits-1818): the OOM killer took a process of it, whatever its state did. Published
+ * on every such change; owners react to it and also reconcile every PT30S from {@code GET
  * /system/api/leases}, so a lost event only delays them. {@code targetId} is null while QUEUED,
  * {@code exitCode} is set for EXITED, {@code detail} names why a lease waits, what it is doing, or
  * why it failed.
+ *
+ * <p>{@code oomKills} is the lease's count as last reported (null before a runner reported one),
+ * and {@code oomScope} whose memory ran out — {@code LEASE} (its own limit) or {@code NODE} — null
+ * while nothing was killed; the lease view's two fields, spelled by {@code Lease.oomScope}.
  */
 public record TargetLeaseChanged(
     UUID eventId,
@@ -22,6 +27,8 @@ public record TargetLeaseChanged(
     String state,
     Integer exitCode,
     String detail,
+    Long oomKills,
+    String oomScope,
     Instant occurredAt)
     implements QitsEvent {
 
@@ -41,8 +48,21 @@ public record TargetLeaseChanged(
       String state,
       Integer exitCode,
       String detail,
+      Long oomKills,
+      String oomScope,
       Instant occurredAt) {
     this(
-        null, leaseId, ownerApp, ownerRef, slotType, targetId, state, exitCode, detail, occurredAt);
+        null,
+        leaseId,
+        ownerApp,
+        ownerRef,
+        slotType,
+        targetId,
+        state,
+        exitCode,
+        detail,
+        oomKills,
+        oomScope,
+        occurredAt);
   }
 }

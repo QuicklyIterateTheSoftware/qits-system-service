@@ -58,6 +58,7 @@ import org.jboss.logging.Logger;
       TargetViews.TargetDto.class,
       TargetViews.SlotCounts.class,
       TargetViews.Login.class,
+      TargetViews.Memory.class,
       TargetViews.TargetRegistrationDto.class,
       TargetViews.RegisteredTarget.class,
       TargetViews.HealthCheckRequested.class,

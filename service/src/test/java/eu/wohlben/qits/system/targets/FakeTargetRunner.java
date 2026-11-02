@@ -15,6 +15,7 @@ import eu.wohlben.qits.systemrunner.protocol.LeaseReport;
 import eu.wohlben.qits.systemrunner.protocol.LeaseState;
 import eu.wohlben.qits.systemrunner.protocol.LoginPresence;
 import eu.wohlben.qits.systemrunner.protocol.LoginState;
+import eu.wohlben.qits.systemrunner.protocol.NodeMemory;
 import eu.wohlben.qits.systemrunner.protocol.SignInProgress;
 import eu.wohlben.qits.systemrunner.protocol.SignInState;
 import eu.wohlben.qits.systemrunner.protocol.SystemRunnerBinary;
@@ -111,8 +112,33 @@ public final class FakeTargetRunner implements AutoCloseable {
     send(new Inventory(leases, volumes));
   }
 
+  /** An inventory carrying the node's memory facts (qits-1818); null is a runner that read none. */
+  public void inventory(List<LeaseReport> leases, List<String> volumes, NodeMemory node) {
+    send(new Inventory(leases, volumes, node));
+  }
+
   public static LeaseReport report(String leaseId, LeaseState state) {
     return new LeaseReport(leaseId, state, null, state == LeaseState.EXITED ? 0 : null, null);
+  }
+
+  /** A report carrying the lease's memory facts (qits-1818). */
+  public static LeaseReport report(
+      String leaseId,
+      LeaseState state,
+      Long oomKills,
+      Long oomEvents,
+      Long memoryPeakBytes,
+      Boolean oomKilled) {
+    return new LeaseReport(
+        leaseId,
+        state,
+        null,
+        state == LeaseState.EXITED ? 137 : null,
+        null,
+        oomKills,
+        oomEvents,
+        memoryPeakBytes,
+        oomKilled);
   }
 
   public void healthChecked(String requestId, boolean ok) {

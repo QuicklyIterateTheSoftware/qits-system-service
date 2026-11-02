@@ -40,7 +40,13 @@
     "lastSeenAt": null,
     "lastHealthCheckAt": null,
     "lastHealthCheckOk": null,
-    "createdAt": "2026-01-01T00:00:00Z"
+    "createdAt": "2026-01-01T00:00:00Z",
+    "memory": {
+      "nodeOomKills": null,
+      "kernelOomKills": null,
+      "memoryMaxBytes": null,
+      "reportedAt": null
+    }
   },
   "registrationToken": "qits_tok_suite-1",
   "installLine": "curl -fsSL -H 'Authorization: Bearer qits_tok_suite-1' https://system.qits.wohlben.eu/system/api/targets/install.sh | sudo env QITS_SYSTEM_RUNNER_URL='https://system.qits.wohlben.eu' QITS_SYSTEM_RUNNER_ID='00000000-0000-4000-8000-000000000001' QITS_SYSTEM_RUNNER_REGISTRATION_TOKEN='qits_tok_suite-1' QITS_SYSTEM_RUNNER_SLOTS='1' sh"

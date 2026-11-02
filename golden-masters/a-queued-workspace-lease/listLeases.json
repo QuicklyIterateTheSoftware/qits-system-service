@@ -27,6 +27,10 @@
     "requestedAt": "2026-01-01T00:00:00Z",
     "grantedAt": null,
     "startedAt": null,
-    "endedAt": null
+    "endedAt": null,
+    "oomKills": null,
+    "oomScope": null,
+    "memoryPeakBytes": null,
+    "oomKilled": null
   }
 ]

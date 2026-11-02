@@ -6,6 +6,7 @@ import eu.wohlben.qits.system.targets.events.SoftwareReleaseListener.SoftwareRel
 import eu.wohlben.qits.system.targets.events.TargetConnectionChanged;
 import eu.wohlben.qits.system.targets.events.TargetLeaseChanged;
 import eu.wohlben.qits.system.targets.events.TargetLoginChanged;
+import eu.wohlben.qits.system.targets.events.TargetOomKilled;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 
 /**
@@ -38,6 +39,8 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
  * that added it: a record the bus serializes and this list does not name is published empty by the
  * native binary — {@code {}} for a payload — while the JVM suite stays green.
  *
+ * <p><b>{@link TargetOomKilled} (qits-1818) likewise</b>, in the commit that added it.
+ *
  * <p><b>And the mix-in by name.</b> {@code CanonicalJson$QitsEventMixin} keeps {@code QitsEvent}'s
  * declared methods — {@code eventId} above all — out of a payload, and Jackson finds its {@code
  * @JsonIgnore}s by reflection. Left out, nothing crashes: {@code eventId} simply appears in every
@@ -48,6 +51,7 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
       TargetLeaseChanged.class,
       TargetLoginChanged.class,
       TargetConnectionChanged.class,
+      TargetOomKilled.class,
       EventEnvelope.class,
       EventFrame.class,
       SoftwareReleasePayload.class

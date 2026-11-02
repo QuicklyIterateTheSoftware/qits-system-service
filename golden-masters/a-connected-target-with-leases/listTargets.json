@@ -40,6 +40,12 @@
     "lastSeenAt": "2026-01-01T00:00:00Z",
     "lastHealthCheckAt": "2026-01-01T00:00:00Z",
     "lastHealthCheckOk": true,
-    "createdAt": "2026-01-01T00:00:00Z"
+    "createdAt": "2026-01-01T00:00:00Z",
+    "memory": {
+      "nodeOomKills": null,
+      "kernelOomKills": null,
+      "memoryMaxBytes": null,
+      "reportedAt": null
+    }
   }
 ]

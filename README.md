@@ -230,9 +230,19 @@ type's reservation is 409 `MAXIMUM_BELOW_RESERVATION`; one above the total is ha
   or volume, `args {tail, since, argv, timeoutSeconds}`, outcome `OK | NOT_FOUND | REFUSED | FAILED |
   TIMEOUT | NOT_CONNECTED | BAD_REQUEST` (an unknown target is NOT_FOUND with no target id); reading
   the audit is not itself audited.
-- **Events**: `TargetLeaseChanged` on every state change, `TargetLoginChanged` on every sign-in
-  change, `TargetConnectionChanged` when whether a target's runner serves it flips (a handover
-  publishes nothing). Owners also reconcile from `GET /leases`.
+- **OOM kills** (qits-1818): an `inventory` carries the node's memory (`nodeOomKills`,
+  `kernelOomKills`, `memoryMaxBytes`) and each lease's (`oomKills`, `oomEvents`, `memoryPeakBytes`,
+  `oomKilled`), all nullable. A target shows them as `memory {nodeOomKills, kernelOomKills,
+  memoryMaxBytes, reportedAt}`, a lease as `oomKills`, `oomScope` (`LEASE` when it hit its own limit,
+  `NODE` otherwise, null without a kill — `Lease.oomScope`), `memoryPeakBytes`, `oomKilled`. A
+  lease's counters and peak never move down and a missing value keeps the stored one, so an EXITED
+  lease keeps its last sample; an old-shaped inventory changes none of them.
+- **Events**: `TargetLeaseChanged` on every state change, and when a lease's `oomKills` rose (with
+  `oomKills`, `oomScope`; a sample without a kill publishes nothing); `TargetOomKilled` when a
+  target's node counter (`nodeOomKills`, else `kernelOomKills`) rose — `delta`, and the `projectIds`
+  of the leases occupying it then; a first value is the baseline and a drop (a reboot) the new one;
+  `TargetLoginChanged` on every sign-in change, `TargetConnectionChanged` when whether a target's
+  runner serves it flips (a handover publishes nothing). Owners also reconcile from `GET /leases`.
 - **Store**: postgres (`resources: postgresql:db, postgresql:eventstream:…` in deployments.yml),
   flyway `db/system/migration`, named persistence unit `system`.
 

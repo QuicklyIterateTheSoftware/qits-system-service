@@ -55,7 +55,8 @@ its schedules in it; `service/` discovers them through the jar's jandex index. T
                TargetAddresses, TargetLoginCommand, TargetInstallScript, TargetCommissionReconcile,
                SocketBearerLifetime, TargetSignIns
     idp/       TargetRunnerCommissioner (kinds target-runner, target-runner-registration)
-    events/    TargetLeaseChanged, TargetLoginChanged, TargetConnectionChanged (qits-eventstream),
+    events/    TargetLeaseChanged, TargetLoginChanged, TargetConnectionChanged, TargetOomKilled
+               (qits-eventstream),
                SoftwareReleaseListener (durable, consumes qits-ci's SoftwareRelease)
 
 **The allocation rule is pure, and only `SlotAllocator` spells it.** `n_total < T and n_total + 1 +

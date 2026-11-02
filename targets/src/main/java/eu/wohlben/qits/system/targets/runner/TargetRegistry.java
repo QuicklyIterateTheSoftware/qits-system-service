@@ -29,6 +29,7 @@ import eu.wohlben.qits.systemrunner.protocol.HealthChecked;
 import eu.wohlben.qits.systemrunner.protocol.Inventory;
 import eu.wohlben.qits.systemrunner.protocol.LeaseReport;
 import eu.wohlben.qits.systemrunner.protocol.LoginState;
+import eu.wohlben.qits.systemrunner.protocol.NodeMemory;
 import eu.wohlben.qits.systemrunner.protocol.ProbeLogin;
 import eu.wohlben.qits.systemrunner.protocol.SignInProgress;
 import eu.wohlben.qits.systemrunner.protocol.SlotImages;
@@ -428,7 +429,11 @@ public class TargetRegistry implements TargetPresence {
     }
   }
 
-  /** What the runner holds: its leases move, and its purged volumes' rows go. */
+  /**
+   * What the runner holds: its leases move, its purged volumes' rows go, and the node's memory facts
+   * (qits-1818) are written to the target — a rise of its OOM counter announced as {@code
+   * TargetOomKilled}. An inventory without them (a runner before qits-1818) leaves them as they were.
+   */
   public void onInventory(Session session, Inventory inventory) {
     List<Leases.Held> held = new ArrayList<>();
     for (LeaseReport lease : inventory.leases()) {
@@ -436,13 +441,44 @@ public class TargetRegistry implements TargetPresence {
       if (id != null) {
         held.add(
             new Leases.Held(
-                id, lease.state().name(), lease.specHash(), lease.exitCode(), lease.detail()));
+                id,
+                lease.state().name(),
+                lease.specHash(),
+                lease.exitCode(),
+                lease.detail(),
+                lease.oomKills(),
+                lease.oomEvents(),
+                lease.memoryPeakBytes(),
+                lease.oomKilled()));
       }
     }
     try {
       leases.applyInventory(session.targetId, held);
     } catch (RuntimeException e) {
       LOG.warnf("Target %s's inventory was not applied: %s", session.targetName, e.toString());
+    }
+    NodeMemory node = inventory.node();
+    if (node != null) {
+      try {
+        Targets.MemoryRecorded recorded =
+            targets.recordMemory(
+                session.targetId,
+                node.nodeOomKills(),
+                node.kernelOomKills(),
+                node.memoryMaxBytes());
+        if (recorded != null && recorded.killed()) {
+          LOG.warnf(
+              "Target %s lost %d process(es) to the OOM killer (node %s, kernel %s); projects %s",
+              session.targetName,
+              recorded.delta(),
+              recorded.target().nodeOomKills,
+              recorded.target().kernelOomKills,
+              recorded.projectIds());
+          events.oomKilled(recorded);
+        }
+      } catch (RuntimeException e) {
+        LOG.warnf("Target %s's memory was not recorded: %s", session.targetName, e.toString());
+      }
     }
     try {
       if (workVolumes.onVolumes(session.targetId, inventory.volumes()) > 0) {

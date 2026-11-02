@@ -89,6 +89,16 @@ public final class TargetRows {
             });
   }
 
+  /** Sets a lease's project, as its owner's create would have. */
+  public static void project(UUID leaseId, UUID projectId) {
+    QuarkusTransaction.requiringNew()
+        .run(
+            () -> {
+              Lease lease = Lease.findById(leaseId);
+              lease.projectId = projectId;
+            });
+  }
+
   /** An ENDING lease on {@code targetId}, ENDING since {@code since}. */
   public static Lease ending(
       UUID id, SlotType type, String ownerApp, String ownerRef, UUID targetId, Instant since) {

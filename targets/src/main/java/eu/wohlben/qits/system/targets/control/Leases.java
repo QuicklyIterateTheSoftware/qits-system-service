@@ -497,8 +497,26 @@ public class Leases {
 
   // --- the runner's reports ---------------------------------------------------------------------
 
-  /** One held lease as a runner's {@code inventory} names it. */
-  public record Held(UUID leaseId, String state, String specHash, Integer exitCode, String detail) {}
+  /**
+   * One held lease as a runner's {@code inventory} names it, with its memory facts (qits-1818) —
+   * each null when the runner read none, and from a runner before them.
+   */
+  public record Held(
+      UUID leaseId,
+      String state,
+      String specHash,
+      Integer exitCode,
+      String detail,
+      Long oomKills,
+      Long oomEvents,
+      Long memoryPeakBytes,
+      Boolean oomKilled) {
+
+    /** A report without the memory facts: the shape before qits-1818. */
+    public Held(UUID leaseId, String state, String specHash, Integer exitCode, String detail) {
+      this(leaseId, state, specHash, exitCode, detail, null, null, null, null);
+    }
+  }
 
   /**
    * A runner's {@code inventory}: every lease it holds. Its reports move the leases of this target
@@ -507,6 +525,11 @@ public class Leases {
    * image it is pulling); STARTING on a RUNNING lease (docker restarting its container) changes
    * nothing. A report about a lease that is not this target's is ignored: the estate omits it, and
    * the runner removes it. Answers the leases that changed.
+   *
+   * <p>Each report's memory facts (qits-1818) are written to its row by {@link #recordMemory}: on
+   * their own they are not a change and publish nothing, except an {@code oomKills} that rose — a
+   * process of the lease was just killed — which is announced like a state change, on a lease whose
+   * state held too.
    */
   public List<Lease> applyInventory(UUID targetId, List<Held> held) {
     Map<UUID, Held> reported = new LinkedHashMap<>();
@@ -533,7 +556,8 @@ public class Leases {
                   Instant now = Instant.now();
                   for (Lease lease : mine) {
                     Held report = reported.get(lease.id);
-                    if (transition(lease, report, now)) {
+                    boolean killed = recordMemory(lease, report);
+                    if (transition(lease, report, now) | killed) {
                       moved.add(lease);
                     }
                   }
@@ -541,13 +565,16 @@ public class Leases {
                 });
     for (Lease lease : changed) {
       LOG.infof(
-          "Lease %s (%s %s of %s) is %s%s",
+          "Lease %s (%s %s of %s) is %s%s%s",
           lease.id,
           lease.slotType,
           lease.ownerRef,
           lease.ownerApp,
           lease.state,
-          lease.detail == null ? "" : ": " + lease.detail);
+          lease.detail == null ? "" : ": " + lease.detail,
+          lease.oomScope() == null
+              ? ""
+              : " (" + lease.oomKills + " OOM kill(s), " + lease.oomScope() + ")");
       events.leaseChanged(lease);
     }
     if (changed.stream().anyMatch(l -> !LeaseState.OCCUPYING.contains(l.state))) {
@@ -631,6 +658,33 @@ public class Leases {
         return false;
       }
     }
+  }
+
+  /**
+   * A report's memory facts onto its lease's row (qits-1818). A null leaves the stored value — an
+   * EXITED lease keeps the last sample its container gave — and the counters and the peak never
+   * move down: a lower value is a stale or coarser read, not a new truth. True when {@code
+   * oomKills} rose, a first report above 0 included.
+   */
+  static boolean recordMemory(Lease lease, Held report) {
+    if (report == null) {
+      return false;
+    }
+    Long before = lease.oomKills;
+    lease.oomKills = highest(lease.oomKills, report.oomKills());
+    lease.oomEvents = highest(lease.oomEvents, report.oomEvents());
+    lease.memoryPeakBytes = highest(lease.memoryPeakBytes, report.memoryPeakBytes());
+    if (report.oomKilled() != null) {
+      lease.oomKilled = report.oomKilled();
+    }
+    return lease.oomKills != null && lease.oomKills > (before == null ? 0 : before);
+  }
+
+  private static Long highest(Long stored, Long reported) {
+    if (reported == null) {
+      return stored;
+    }
+    return stored == null ? reported : Math.max(stored, reported);
   }
 
   private static String blankToNull(String value) {

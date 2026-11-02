@@ -113,6 +113,25 @@ public class Target extends PanacheEntityBase implements CausedRow {
   @Column(name = "dialback_failed_at")
   public Instant dialbackFailedAt;
 
+  /**
+   * The node's OOM kills as its runner last reported them (qits-1818): its cgroup tree's root
+   * {@code memory.events} {@code oom_kill}; null on a bare host, whose root has none.
+   */
+  @Column(name = "node_oom_kills")
+  public Long nodeOomKills;
+
+  /** The kernel's own count ({@code /proc/vmstat} {@code oom_kill}): the whole physical host's. */
+  @Column(name = "kernel_oom_kills")
+  public Long kernelOomKills;
+
+  /** The node's memory limit (its root {@code memory.max}); null when none or unreadable. */
+  @Column(name = "memory_max_bytes")
+  public Long memoryMaxBytes;
+
+  /** When those three last arrived; null before a runner reported any. */
+  @Column(name = "memory_reported_at")
+  public Instant memoryReportedAt;
+
   @Column(name = "runner_version")
   public String runnerVersion;
 

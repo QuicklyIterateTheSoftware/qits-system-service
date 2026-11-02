@@ -87,6 +87,26 @@ public class Lease extends PanacheEntityBase implements CausedRow {
   @Column(name = "ended_at")
   public Instant endedAt;
 
+  /**
+   * Processes the OOM killer took in the lease container's cgroup ({@code memory.events}' {@code
+   * oom_kill}), as the runner last reported it (qits-1818); never lowered, kept after the lease
+   * exits. Null until a runner reported one.
+   */
+  @Column(name = "oom_kills")
+  public Long oomKills;
+
+  /** Times the lease hit its own memory limit ({@code memory.events}' {@code oom}); never lowered. */
+  @Column(name = "oom_events")
+  public Long oomEvents;
+
+  /** The lease container's peak memory ({@code memory.peak}), never lowered; else null. */
+  @Column(name = "memory_peak_bytes")
+  public Long memoryPeakBytes;
+
+  /** docker's {@code State.OOMKilled} of the container of an exited lease; else null. */
+  @Column(name = "oom_killed")
+  public Boolean oomKilled;
+
   /** When it last went ENDING; {@code LeaseEndingDeadline} counts from here. */
   @Column(name = "ending_since")
   public Instant endingSince;
@@ -97,6 +117,24 @@ public class Lease extends PanacheEntityBase implements CausedRow {
 
   @Column(name = "causation_id")
   public UUID causationId;
+
+  /** {@link #oomScope(Long, Long)} of this row. */
+  public String oomScope() {
+    return oomScope(oomKills, oomEvents);
+  }
+
+  /**
+   * Whose memory ran out when a lease lost processes to an OOM killer (qits-1818), the one spelling
+   * the lease view and {@code TargetLeaseChanged} share: null when nothing was killed ({@code
+   * oomKills} null or 0); {@code LEASE} when the lease hit its own limit ({@code oomEvents} above 0);
+   * else {@code NODE} — the node or the kernel ran out, and the killer picked a process in this lease.
+   */
+  public static String oomScope(Long oomKills, Long oomEvents) {
+    if (oomKills == null || oomKills <= 0) {
+      return null;
+    }
+    return oomEvents != null && oomEvents > 0 ? "LEASE" : "NODE";
+  }
 
   @Override
   public UUID causationId() {
