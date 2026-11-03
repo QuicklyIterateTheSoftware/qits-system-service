@@ -104,6 +104,15 @@
             <artifactId>quarkus-oidc</artifactId>
         </dependency>
         <dependency>
+            <!-- The named client `qits` (qits-428): this service's own qits:system bearer, minted
+                 by client credentials from the deployer's idp:client resource (quarkus.oidc-client.qits
+                 in application.properties). The pinned qits-eventstream does not read it yet — that
+                 lands with a later bump of its own (qits-543's QitsClientBearer) — so the extension is
+                 declared here explicitly rather than arriving transitively. -->
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-oidc-client</artifactId>
+        </dependency>
+        <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-smallrye-openapi</artifactId>
         </dependency>
