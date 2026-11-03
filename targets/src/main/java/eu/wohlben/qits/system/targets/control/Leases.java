@@ -616,8 +616,27 @@ public class Leases {
    * last lease and its runner's detail. Nothing else here touches the count: a RUNNING lease that
    * failed or exited ran, so its target can start leases, and a GRANTED one that EXITED is no
    * start failure. The state before is kept per lease inside the transaction, no column.
+   *
+   * <p>The leases alone, for a caller with no runner to tell; {@link #apply} also answers the
+   * quarantine.
    */
   public List<Lease> applyInventory(UUID targetId, List<Held> held) {
+    return apply(targetId, held).changed();
+  }
+
+  /**
+   * An inventory's outcome: the leases that changed, and the quarantine a start failure among them
+   * began or renewed (null when none touched one; the last of several wins).
+   */
+  public record Applied(List<Lease> changed, Targets.Quarantine quarantine) {}
+
+  /**
+   * {@link #applyInventory}, answering the quarantine too: a quarantine its start failures began is
+   * the target's runner's to hear (its {@code quarantined} frame and an ack of 0 slots), as an
+   * owner's end hands its own to its door. That is the runner socket's to send — it holds the
+   * session this inventory came on — so the quarantine is handed back rather than sent from here.
+   */
+  public Applied apply(UUID targetId, List<Held> held) {
     Map<UUID, Held> reported = new LinkedHashMap<>();
     for (Held report : held) {
       if (report.leaseId() != null) {
@@ -665,28 +684,32 @@ public class Leases {
               : " (" + lease.oomKills + " OOM kill(s), " + lease.oomScope() + ")");
       events.leaseChanged(lease);
     }
+    Targets.Quarantine quarantine = null;
     for (Lease lease : changed) {
       if (lease.slotType == SlotType.CI
           && lease.targetId != null
           && before.get(lease.id) == LeaseState.GRANTED
           && lease.state == LeaseState.FAILED) {
-        startFailed(lease);
+        Targets.Quarantine began = startFailed(lease);
+        if (began != null) {
+          quarantine = began;
+        }
       }
     }
     if (changed.stream().anyMatch(l -> !LeaseState.OCCUPYING.contains(l.state))) {
       allocation.requestPass();
     }
-    return changed;
+    return new Applied(changed, quarantine);
   }
 
   /**
    * A GRANTED CI lease its runner reported FAILED: one more failure in its target's dial-back
-   * streak (qits-525), and the quarantine at the threshold.
+   * streak (qits-525), and the quarantine at the threshold — answered, null below it.
    */
-  private void startFailed(Lease lease) {
+  private Targets.Quarantine startFailed(Lease lease) {
     Integer failures = targets.recordDialback(lease.targetId, true, Instant.now());
     if (failures == null) {
-      return;
+      return null;
     }
     String detail =
         "start: "
@@ -697,7 +720,7 @@ public class Leases {
             + lease.ownerRef
             + "): "
             + lease.detail;
-    streakCounted(lease, failures, "failed to start", detail);
+    return streakCounted(lease, failures, "failed to start", detail);
   }
 
   /**

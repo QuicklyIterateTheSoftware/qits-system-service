@@ -440,6 +440,8 @@ public class TargetRegistry implements TargetPresence {
    * What the runner holds: its leases move, its purged volumes' rows go, and the node's memory facts
    * (qits-1818) are written to the target — a rise of its OOM counter announced as {@code
    * TargetOomKilled}. An inventory without them (a runner before qits-1818) leaves them as they were.
+   * A quarantine its start failures began or renewed (qits-525, {@link Leases#apply}) is sent back
+   * to this session: {@code quarantined}, then an ack of 0 slots.
    */
   public void onInventory(Session session, Inventory inventory) {
     List<Leases.Held> held = new ArrayList<>();
@@ -460,7 +462,18 @@ public class TargetRegistry implements TargetPresence {
       }
     }
     try {
-      leases.applyInventory(session.targetId, held);
+      Targets.Quarantine quarantine = leases.apply(session.targetId, held).quarantine();
+      // A start failure that quarantined the target (qits-525) is this runner's to hear, as an
+      // owner's end tells it through LeaseController: the frame, then an ack of 0 slots.
+      if (quarantine != null
+          && quarantine.target() != null
+          && (quarantine.began() || quarantine.reasonChanged())) {
+        send(
+            session,
+            quarantinedFrame(
+                quarantine.target().quarantineReason, quarantine.target().quarantinedAt));
+        reAck(session);
+      }
     } catch (RuntimeException e) {
       LOG.warnf("Target %s's inventory was not applied: %s", session.targetName, e.toString());
     }

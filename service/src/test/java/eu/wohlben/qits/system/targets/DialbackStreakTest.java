@@ -10,17 +10,24 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import eu.wohlben.qits.runner.protocol.Ack;
+import eu.wohlben.qits.runner.protocol.Quarantined;
+import eu.wohlben.qits.runner.protocol.Reinstated;
 import eu.wohlben.qits.system.targets.control.Leases;
 import eu.wohlben.qits.system.targets.entity.Lease;
 import eu.wohlben.qits.system.targets.entity.LeaseState;
 import eu.wohlben.qits.system.targets.entity.SlotType;
 import eu.wohlben.qits.system.targets.entity.Target;
+import eu.wohlben.qits.systemrunner.protocol.HealthCheck;
 import io.quarkus.narayana.jta.QuarkusTransaction;
+import io.quarkus.test.common.http.TestHTTPResource;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
+import java.net.URI;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -37,6 +44,11 @@ class DialbackStreakTest {
 
   @Inject Leases leases;
 
+  @Inject ContractBearers bearers;
+
+  @TestHTTPResource("/")
+  URI base;
+
   private UUID target;
 
   @BeforeEach
@@ -44,6 +56,11 @@ class DialbackStreakTest {
     TargetRows.clear();
     target = UUID.randomUUID();
     TargetRows.target(target, "workstation", 6, "client-workstation", false);
+  }
+
+  @AfterEach
+  void disarm() {
+    bearers.reset();
   }
 
   private UUID running(String ownerRef) {
@@ -229,6 +246,34 @@ class DialbackStreakTest {
     assertEquals(1, TargetRows.reloadTarget(target).dialbackFailures);
     end(running("run-2"), null);
     assertEquals(0, TargetRows.reloadTarget(target).dialbackFailures);
+  }
+
+  @Test
+  void aStartFailureThatQuarantinesTheTargetTellsItsRunner() throws Exception {
+    target = UUID.randomUUID();
+    TargetRows.target(target, "lab", 0, "target-runner-client-streak", true);
+    bearers.grant("Bearer streak", "target-runner-client-streak", "qits:target-runner");
+    try (FakeTargetRunner runner = FakeTargetRunner.dial(base, "Bearer streak")) {
+      runner.hello(2, "vol");
+      HealthCheck check = runner.await(HealthCheck.class);
+      runner.healthChecked(check.requestId(), true);
+      runner.await(Reinstated.class);
+      runner.await(Ack.class, a -> a.slots() == 2);
+      failedToStart(granted(SlotType.CI, "run-1"));
+      failedToStart(granted(SlotType.CI, "run-2"));
+      UUID last = granted(SlotType.CI, "run-3");
+      runner.inventory(
+          List.of(
+              FakeTargetRunner.report(
+                  last.toString(), eu.wohlben.qits.systemrunner.protocol.LeaseState.FAILED)),
+          List.of());
+      Quarantined told = runner.await(Quarantined.class, q -> q.reason().startsWith("start: "));
+      assertTrue(told.reason().contains(last.toString()), told.reason());
+      assertEquals(0, runner.await(Ack.class, a -> a.slots() == 0).slots());
+      Target row = TargetRows.reloadTarget(target);
+      assertTrue(row.quarantined());
+      assertEquals(row.quarantineReason, told.reason());
+    }
   }
 
   /** Sets the streak directly, for the socket test's health checks. */
