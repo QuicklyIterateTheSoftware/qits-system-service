@@ -2250,6 +2250,7 @@ paths:
         - qits:admin-agent
         - qits:desk-admin
         - qits:desk
+        - qits:system
   /system/api/targets/{id}/health:
     get:
       summary: A target's newest settled health check
