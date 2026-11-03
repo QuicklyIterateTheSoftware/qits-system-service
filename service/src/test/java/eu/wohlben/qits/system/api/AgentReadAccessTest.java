@@ -7,6 +7,7 @@ import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
+import eu.wohlben.qits.system.targets.ContractBearers;
 import eu.wohlben.qits.system.testdocker.TerminalClient;
 import io.quarkus.test.common.http.TestHTTPResource;
 import io.quarkus.test.junit.QuarkusTest;
@@ -21,20 +22,17 @@ import org.junit.jupiter.api.Test;
  * {@code qits:agent}, a commissioned agent's own role: it reads the host like {@code qits:system}
  * does, and may not open, end or attach to a terminal.
  *
- * <p>Each request names its identity in {@code X-Qits-User} / {@code X-Qits-Roles}, so the {@code
- * %test} dev user does not apply and the identity holds exactly the role sent.
+ * <p>Each request carries a bearer standing for exactly the role it names ({@link
+ * ContractBearers#bearer}), so the identity holds that role and nothing else.
  */
 @QuarkusTest
 class AgentReadAccessTest {
-
-  private static final Map<String, String> AGENT =
-      Map.of("X-Qits-User", "dyn-workspace-agent", "X-Qits-Roles", "qits:agent");
 
   @TestHTTPResource("/")
   URI base;
 
   private static RequestSpecification as(String role) {
-    return given().header("X-Qits-User", "dyn-workspace-agent").header("X-Qits-Roles", role);
+    return given().header("Authorization", ContractBearers.bearer("dyn-workspace-agent", role));
   }
 
   private static RequestSpecification agent() {
@@ -92,7 +90,9 @@ class AgentReadAccessTest {
   void anAgentIsRefusedTheTerminalSocket() {
     URI uri = TerminalClient.socketUri(base, "/system/api/terminals/" + UUID.randomUUID());
     try {
-      TerminalClient.connect(uri, AGENT);
+      TerminalClient.connect(
+          uri,
+          Map.of("Authorization", ContractBearers.bearer("dyn-workspace-agent", "qits:agent")));
       throw new AssertionError("an agent must not attach to a terminal");
     } catch (RuntimeException thrown) {
       Throwable cause = thrown.getCause() == null ? thrown : thrown.getCause();

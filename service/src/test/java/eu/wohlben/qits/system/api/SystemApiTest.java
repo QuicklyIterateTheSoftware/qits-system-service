@@ -4,6 +4,7 @@ import static io.restassured.RestAssured.given;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.security.TestSecurity;
 import io.restassured.http.ContentType;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.Test;
  * (a foreign node is a 409 with a code, and an environment value never leaves this service).
  */
 @QuarkusTest
+@TestSecurity(user = "an-operator", roles = "qits:admin")
 class SystemApiTest {
 
   /** This node, as the fake `docker info` reports it. */

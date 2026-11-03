@@ -53,7 +53,7 @@ class TargetDoorsTest {
   }
 
   private static RequestSpecification as(String user, String roles) {
-    return given().header("X-Qits-User", user).header("X-Qits-Roles", roles);
+    return given().header("Authorization", ContractBearers.bearer(user, roles));
   }
 
   private static RequestSpecification admin() {
@@ -416,8 +416,7 @@ class TargetDoorsTest {
             .send(
                 java.net.http.HttpRequest.newBuilder(
                         base.resolve(API.substring(1) + "/" + id + "/registration-token"))
-                    .header("X-Qits-User", "an-operator")
-                    .header("X-Qits-Roles", "qits:admin")
+                    .header("Authorization", ContractBearers.bearer("an-operator", "qits:admin"))
                     .POST(java.net.http.HttpRequest.BodyPublishers.noBody())
                     .build(),
                 java.net.http.HttpResponse.BodyHandlers.ofString());

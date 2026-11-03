@@ -82,6 +82,9 @@ class GoldenMasterRecordingTest {
   private static final String API = "/system/api";
   private static final String CONTAINER =
       API + "/nodes/local/containers/" + ProviderStates.CONTAINER_ID;
+  /** Who a recorded call without a bearer stands for: a signed-in operator. */
+  private static final String OPERATOR = "an-operator";
+
   private static final Map<String, String> BEARER = Map.of("Authorization", "{authorization}");
 
   private static final String TARGET = API + "/targets/{targetId}";
@@ -495,6 +498,12 @@ class GoldenMasterRecordingTest {
             .header("Accept", "application/json, text/plain");
     for (Map.Entry<String, String> header : interaction.headers().entrySet()) {
       request.header(header.getKey(), expand(header.getValue(), params));
+    }
+    if (!interaction.headers().containsKey("Authorization")) {
+      // A recorded call without a bearer is a signed-in operator's (the landing app, the CLI). The
+      // suite names that caller rather than leaning on a forward-auth dev user (epic qits-543); the
+      // header is sent, not recorded, so the golden master stays the consumer's shape.
+      request.header("Authorization", ContractBearers.bearer(OPERATOR, "qits:admin"));
     }
     if (interaction.body() != null) {
       request

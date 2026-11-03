@@ -87,7 +87,7 @@ class TargetDockerDoorsTest {
   }
 
   private static RequestSpecification as(String user, String roles) {
-    return given().header("X-Qits-User", user).header("X-Qits-Roles", roles);
+    return given().header("Authorization", ContractBearers.bearer(user, roles));
   }
 
   private static RequestSpecification operator() {

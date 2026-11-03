@@ -7,15 +7,13 @@ import java.util.Map;
 /**
  * The two kinds of caller this service has, and how a story hands each of them to a request.
  *
- * <h2>A person is a pair of headers</h2>
+ * <h2>A person is a bearer too</h2>
  *
- * <p>{@link #operator(RequestSpecification)} sends {@code X-Qits-User} and {@code X-Qits-Roles},
- * which is what the platform edge asserts for a logged-in operator and the whole of this service's
- * relationship with human authentication — it authenticates no person itself. That is not a
- * shortcut around the bearer: the OIDC tenant this catalogue turns on is <b>bearer-only</b>, so a
- * request carrying no {@code Authorization} header is never challenged by it and falls through to
- * qits-auth-core's header mechanism, exactly as it does behind the edge. Using it is what lets a
- * read story say "an operator" honestly rather than dressing a person up as a machine.
+ * <p>{@link #operator(RequestSpecification)} presents a person's token from this run's idp: the
+ * operator's name in {@code sub}, the platform audience and {@code qits:admin} in {@code groups}.
+ * Forward-auth — the {@code X-Qits-User} / {@code X-Qits-Roles} pair the edge used to assert —
+ * leaves qits-auth-core with qits-1338 (epic qits-543), so a signed-in person reaches this service
+ * the way a machine does, and the roles are what tell them apart.
  *
  * <h2>A machine is a bearer this run's idp minted</h2>
  *
@@ -34,12 +32,6 @@ import java.util.Map;
  */
 public final class StoryIdentities {
 
-  /** The header the edge names the logged-in person in. */
-  public static final String USER_HEADER = "X-Qits-User";
-
-  /** The header the edge asserts that person's roles in, comma-separated. */
-  public static final String ROLES_HEADER = "X-Qits-Roles";
-
   /** The role a person needs for everything here, including a shell. */
   public static final String ADMIN_ROLE = "qits:admin";
 
@@ -52,29 +44,39 @@ public final class StoryIdentities {
   /** …and a platform peer holding a bearer. */
   public static final String PEER = "a platform service";
 
-  /** The operator, by name — the value the edge would carry in {@code X-Qits-User}. */
+  /** The operator, by name — the {@code sub} of the operator's token. */
   private static final String OPERATOR_NAME = "alice";
 
   private StoryIdentities() {}
 
-  /** {@code given()} with the two headers the edge asserts for a logged-in operator. */
+  /** {@code given()} carrying a signed-in operator's bearer. */
   public static RequestSpecification operator(RequestSpecification request) {
-    return request.header(USER_HEADER, OPERATOR_NAME).header(ROLES_HEADER, ADMIN_ROLE);
+    return withRole(request, ADMIN_ROLE);
   }
 
   /** The same person, with a role this service's routes have never heard of. */
   public static RequestSpecification withRole(RequestSpecification request, String role) {
-    return request.header(USER_HEADER, OPERATOR_NAME).header(ROLES_HEADER, role);
+    return bearer(request, personToken(role));
   }
 
-  /** The same two headers, on a WebSocket handshake. */
+  /** The operator's bearer, on a WebSocket handshake. */
   public static Map<String, String> operatorHeaders() {
-    return Map.of(USER_HEADER, OPERATOR_NAME, ROLES_HEADER, ADMIN_ROLE);
+    return headersWithRole(ADMIN_ROLE);
   }
 
   /** The handshake headers of a person holding some other role. */
   public static Map<String, String> headersWithRole(String role) {
-    return Map.of(USER_HEADER, OPERATOR_NAME, ROLES_HEADER, role);
+    return Map.of("Authorization", "Bearer " + personToken(role));
+  }
+
+  /** A freshly minted person's bearer: the operator's name, the platform audience, {@code role}. */
+  private static String personToken(String role) {
+    return MockIdp.attach()
+        .token()
+        .subject(OPERATOR_NAME)
+        .audience(StoryProfile.AUDIENCE)
+        .groups(role)
+        .mint();
   }
 
   /** A freshly minted platform-peer bearer: the platform audience, {@code qits:system}. */

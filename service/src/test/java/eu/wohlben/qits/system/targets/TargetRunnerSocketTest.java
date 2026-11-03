@@ -130,8 +130,7 @@ class TargetRunnerSocketTest {
     try (FakeTargetRunner runner = greetedRunner()) {
       String requestId =
           given()
-              .header("X-Qits-User", "an-operator")
-              .header("X-Qits-Roles", "qits:admin")
+              .header("Authorization", ContractBearers.bearer("an-operator", "qits:admin"))
               .post("/system/api/targets/" + target + "/healthcheck")
               .then()
               .statusCode(202)
@@ -163,8 +162,7 @@ class TargetRunnerSocketTest {
       // A later scheduled check that fails only login keeps it admitted.
       String requestId =
           given()
-              .header("X-Qits-User", "an-operator")
-              .header("X-Qits-Roles", "qits:admin")
+              .header("Authorization", ContractBearers.bearer("an-operator", "qits:admin"))
               .post("/system/api/targets/" + target + "/healthcheck")
               .then()
               .statusCode(202)
@@ -186,8 +184,7 @@ class TargetRunnerSocketTest {
     try (FakeTargetRunner runner = greetedRunner()) {
       String requestId =
           given()
-              .header("X-Qits-User", "an-operator")
-              .header("X-Qits-Roles", "qits:admin")
+              .header("Authorization", ContractBearers.bearer("an-operator", "qits:admin"))
               .post("/system/api/targets/" + target + "/healthcheck")
               .then()
               .statusCode(202)
@@ -235,8 +232,7 @@ class TargetRunnerSocketTest {
   private String requestHealthCheck(FakeTargetRunner runner) throws InterruptedException {
     String requestId =
         given()
-            .header("X-Qits-User", "an-operator")
-            .header("X-Qits-Roles", "qits:admin")
+            .header("Authorization", ContractBearers.bearer("an-operator", "qits:admin"))
             .post("/system/api/targets/" + target + "/healthcheck")
             .then()
             .statusCode(202)
@@ -272,8 +268,7 @@ class TargetRunnerSocketTest {
       assertEquals(LeaseState.QUEUED, waiting.state);
       assertEquals(SlotAllocator.notSignedIn("lab"), waiting.detail);
       given()
-          .header("X-Qits-User", "an-operator")
-          .header("X-Qits-Roles", "qits:admin")
+          .header("Authorization", ContractBearers.bearer("an-operator", "qits:admin"))
           .get("/system/api/targets/" + target)
           .then()
           .body("loginCommand", nullValue());
@@ -295,8 +290,7 @@ class TargetRunnerSocketTest {
       Target row = TargetRows.reloadTarget(target);
       assertEquals(LoginValue.PRESENT, row.loginClaude);
       given()
-          .header("X-Qits-User", "an-operator")
-          .header("X-Qits-Roles", "qits:admin")
+          .header("Authorization", ContractBearers.bearer("an-operator", "qits:admin"))
           .get("/system/api/targets/" + target)
           .then()
           .body(
@@ -420,8 +414,7 @@ class TargetRunnerSocketTest {
   void aDeletedTargetsRunnerIsRetired() throws Exception {
     try (FakeTargetRunner runner = greetedRunner()) {
       given()
-          .header("X-Qits-User", "an-operator")
-          .header("X-Qits-Roles", "qits:admin")
+          .header("Authorization", ContractBearers.bearer("an-operator", "qits:admin"))
           .delete("/system/api/targets/" + target)
           .then()
           .statusCode(204);

@@ -270,11 +270,27 @@ initialisation of `ForeignPty`, `setsid` being present in the runtime image, and
 served with a matching `<base href>`. Run it with `-DskipITs=false`, or with `-Dnative`, which flips
 the flag itself.
 
-**`TokenValidationBootstrapIT` is the only place the OIDC tenant is ever ON.** The shipped tenant is
-gated on `qits.auth.machine.required`, which every surefire suite here leaves false, so the whole
-`quarkus.oidc.*` block runs nowhere else. `stories/support/StoryProfile` is what turns it on. Its far
-side is qits-service-mock's `MockIdp`, which serves a real JWKS for a generated keypair, mints tokens
-against it and records what it answered.
+**The packaged ITs are the only places the OIDC tenant is ever ON.** The shipped tenant is gated on
+`qits.auth.machine.required`, which every surefire suite here leaves false, so the whole
+`quarkus.oidc.*` block runs nowhere else. `stories/support/StoryProfile` turns the gate on, and
+`PackagedSurfaceIT.PackagedWithIdp` turns the tenant on with the gate off. Their far side is
+qits-service-mock's `MockIdp`, which serves a real JWKS for a generated keypair, mints tokens against
+it and records what it answered.
+
+**No test uses forward-auth (epic qits-543, qits-1371).** `X-Qits-User` / `X-Qits-Roles` and the
+`%test` dev user leave qits-auth-core with qits-1338, and the suite already runs without them: the
+test config blanks the dev user and renames the forward headers (`%test.qits.auth.forward.*` in
+`service/src/test/resources/application.properties`, which go with qits-1338). A `@QuarkusTest`
+with one caller names it with `@TestSecurity` and the roles it means; one with several callers in a
+method sends each one's bearer from `ContractBearers.bearer(subject, roles...)`, which the suite's
+`ContractBearers` augmentor turns into that identity. The packaged ITs send `MockIdp` bearers, for a
+person (`qits:admin`) as for a machine (`qits:system`).
+
+**Dev mode needs a bearer.** The `%dev` dev user goes with qits-1338, and `%dev` keeps the OIDC
+tenant off, so `quarkus:dev` answers 401 until the tenant is pointed at an idp
+(`-Dquarkus.oidc.tenant-enabled=true -Dquarkus.oidc.auth-server-url=...`); then call it with a
+person's token, for example `curl -H "Authorization: Bearer $(qits-token qits-platform)" ...`, or
+through the `qits` CLI.
 
 **Never run two native builds on this platform's host at once.** They OOM a 16 GB machine and take
 it down with them.

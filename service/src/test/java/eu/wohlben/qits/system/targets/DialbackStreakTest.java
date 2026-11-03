@@ -159,8 +159,7 @@ class DialbackStreakTest {
     end(running("run-1"), "never-dialled-back");
     UUID lease = running("run-2");
     given()
-        .header("X-Qits-User", "an-operator")
-        .header("X-Qits-Roles", "qits:admin")
+        .header("Authorization", ContractBearers.bearer("an-operator", "qits:admin"))
         .delete(API + "/" + lease + "?reason=never-dialled-back")
         .then()
         .statusCode(200);
@@ -174,8 +173,7 @@ class DialbackStreakTest {
     }
     assertTrue(TargetRows.reloadTarget(target).quarantined());
     given()
-        .header("X-Qits-User", "an-operator")
-        .header("X-Qits-Roles", "qits:admin")
+        .header("Authorization", ContractBearers.bearer("an-operator", "qits:admin"))
         .post("/system/api/targets/" + target + "/greenlight")
         .then()
         .statusCode(200)

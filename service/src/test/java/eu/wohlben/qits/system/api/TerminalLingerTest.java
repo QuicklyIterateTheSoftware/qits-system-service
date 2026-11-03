@@ -9,6 +9,7 @@ import io.quarkus.test.common.http.TestHTTPResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
+import io.quarkus.test.security.TestSecurity;
 import io.restassured.http.ContentType;
 import java.net.URI;
 import java.util.Map;
@@ -31,6 +32,7 @@ import org.junit.jupiter.api.condition.OS;
 @QuarkusTest
 @TestProfile(TerminalLingerTest.ShortGlancesGrace.class)
 @EnabledOnOs(OS.LINUX)
+@TestSecurity(user = "an-operator", roles = "qits:admin")
 class TerminalLingerTest {
 
   private static final String CONTAINER = "dev-qits-ci.1.k4g0nn1ld7o272jl7fciatg6m";

@@ -47,7 +47,7 @@ class LeaseDoorsTest {
   }
 
   static RequestSpecification service(String clientId) {
-    return given().header("X-Qits-User", clientId).header("X-Qits-Roles", "qits:system");
+    return given().header("Authorization", ContractBearers.bearer(clientId, "qits:system"));
   }
 
   static Response lease(String clientId, String type, String ownerRef, String image, String extra) {
@@ -152,15 +152,13 @@ class LeaseDoorsTest {
     service("dev-qits-ci").get(API).then().statusCode(200).body("$", hasSize(1)).body("[0].ownerRef", equalTo("run-1"));
     service("dev-qits-ci").get(API + "/" + workspace).then().statusCode(404);
     given()
-        .header("X-Qits-User", "an-operator")
-        .header("X-Qits-Roles", "qits:admin")
+        .header("Authorization", ContractBearers.bearer("an-operator", "qits:admin"))
         .get(API + "?slotType=WORKSPACE&state=QUEUED")
         .then()
         .statusCode(200)
         .body("$", hasSize(1));
     given()
-        .header("X-Qits-User", "dyn-agent")
-        .header("X-Qits-Roles", "qits:agent")
+        .header("Authorization", ContractBearers.bearer("dyn-agent", "qits:agent"))
         .get(API)
         .then()
         .statusCode(200)
@@ -178,15 +176,13 @@ class LeaseDoorsTest {
     String workspace =
         lease("dev-qits-workspaces", "WORKSPACE", "17", WORKSPACE_IMAGE, "").path("id");
     given()
-        .header("X-Qits-User", "delivery-desk-admin")
-        .header("X-Qits-Roles", "qits:desk-admin")
+        .header("Authorization", ContractBearers.bearer("delivery-desk-admin", "qits:desk-admin"))
         .get(API)
         .then()
         .statusCode(200)
         .body("$", hasSize(2));
     given()
-        .header("X-Qits-User", "delivery-desk-admin")
-        .header("X-Qits-Roles", "qits:desk-admin")
+        .header("Authorization", ContractBearers.bearer("delivery-desk-admin", "qits:desk-admin"))
         .get(API + "/" + workspace)
         .then()
         .statusCode(200)
@@ -214,7 +210,7 @@ class LeaseDoorsTest {
     assertEquals(hash, created.path("specHash"), "the hash is the real spec's");
 
     RequestSpecification agent =
-        given().header("X-Qits-User", "dyn-agent").header("X-Qits-Roles", "qits:agent");
+        given().header("Authorization", ContractBearers.bearer("dyn-agent", "qits:agent"));
     RequestSpecification owner = service("dev-qits-workspaces");
     for (RequestSpecification caller : new RequestSpecification[] {agent, owner}) {
       Response list = given().spec(caller).get(API);
@@ -271,7 +267,7 @@ class LeaseDoorsTest {
   }
 
   static RequestSpecification operator(String principal, String roles) {
-    return given().header("X-Qits-User", principal).header("X-Qits-Roles", roles);
+    return given().header("Authorization", ContractBearers.bearer(principal, roles));
   }
 
   @Test

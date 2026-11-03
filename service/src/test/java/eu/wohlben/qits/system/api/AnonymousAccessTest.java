@@ -4,11 +4,9 @@ import static io.restassured.RestAssured.given;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 
-import eu.wohlben.qits.system.security.NoDevUserProfile;
 import eu.wohlben.qits.system.testdocker.TerminalClient;
 import io.quarkus.test.common.http.TestHTTPResource;
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.TestProfile;
 import java.net.URI;
 import java.net.http.WebSocketHandshakeException;
 import java.util.Map;
@@ -17,16 +15,14 @@ import org.junit.jupiter.api.Test;
 /**
  * THERE IS NO ANONYMOUS SURFACE HERE, and this is the test that says so.
  *
- * <p>Every other {@code @QuarkusTest} in this module runs under the {@code test} profile, where
- * qits-auth-core ships a dev user — which is convenient and makes every one of them useless as
- * proof of the identity rule. This one blanks that fallback and asks the same questions with no
- * identity at all.
+ * <p>Every other {@code @QuarkusTest} in this module names its caller ({@code @TestSecurity} or a
+ * suite bearer), which makes every one of them useless as proof of the identity rule. This one asks
+ * the same questions with no identity at all.
  *
  * <p>What this service reads is the whole machine, and what it can open is a shell on it. A route
  * here that answered anonymously would be the worst defect this repository could have.
  */
 @QuarkusTest
-@TestProfile(NoDevUserProfile.class)
 class AnonymousAccessTest {
 
   @TestHTTPResource("/")

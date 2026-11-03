@@ -17,6 +17,7 @@ import java.net.URI;
 import java.net.URL;
 import java.util.List;
 import java.util.Map;
+import org.apache.hc.core5.http.ClassicHttpRequest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
@@ -103,7 +104,14 @@ class ConsumerPactVerificationTest {
 
   @TestTemplate
   @ExtendWith(PactVerificationInvocationContextProvider.class)
-  void consumerPactHolds(PactVerificationContext context) {
+  void consumerPactHolds(PactVerificationContext context, ClassicHttpRequest request) {
+    if (!request.containsHeader("Authorization")) {
+      // An interaction without a bearer is a signed-in operator's (the landing app, the CLI). The
+      // suite names that caller rather than leaning on a forward-auth dev user (epic qits-543).
+      request.setHeader(
+          "Authorization",
+          eu.wohlben.qits.system.targets.ContractBearers.bearer("an-operator", "qits:admin"));
+    }
     context.verifyInteraction();
   }
 

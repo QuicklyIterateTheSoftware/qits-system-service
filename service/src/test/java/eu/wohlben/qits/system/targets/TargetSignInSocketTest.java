@@ -68,7 +68,7 @@ class TargetSignInSocketTest {
   }
 
   private static RequestSpecification admin() {
-    return given().header("X-Qits-User", "an-operator").header("X-Qits-Roles", "qits:admin");
+    return given().header("Authorization", ContractBearers.bearer("an-operator", "qits:admin"));
   }
 
   /** Dials and says hello; served once its estate arrived, which follows the greeting. */

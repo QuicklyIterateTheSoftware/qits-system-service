@@ -320,8 +320,7 @@ class LeaseRequeueTest {
       // A health check that passes is what reinstates it.
       String requestId =
           given()
-              .header("X-Qits-User", "an-operator")
-              .header("X-Qits-Roles", "qits:admin")
+              .header("Authorization", ContractBearers.bearer("an-operator", "qits:admin"))
               .post("/system/api/targets/" + target + "/healthcheck")
               .then()
               .statusCode(202)

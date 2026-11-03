@@ -66,11 +66,9 @@ public class StoryProfile extends PackagedSurfaceIT.PackagedUnderTarget {
     // suite in this repository turns it on at all, which is why the whole quarkus.oidc.* block —
     // the boot-time discovery and JWKS fetch, audience enforcement, groups→roles mapping — runs nowhere else.
     //
-    // It leaves a PERSON's door exactly where it was: the tenant is bearer-only, so a request
-    // carrying no Authorization header is never challenged by it and falls through to
-    // qits-auth-core's X-Qits-User mechanism, which is how an operator reaches this service behind
-    // the platform edge. Both doors are open here, which is what lets one catalogue tell the
-    // machine's ceiling from the person's.
+    // A PERSON comes through the same door: forward-auth leaves qits-auth-core with qits-1338
+    // (epic qits-543), so an operator's request carries the person's bearer from the same idp, and
+    // the roles in it are what let one catalogue tell the machine's ceiling from the person's.
     overrides.put("qits.auth.machine.required", "true");
     // Where the idp is. Runtime key, so the packaged artifact is otherwise exactly what ships:
     // quarkus-oidc reads the mock's discovery document under this URL and follows its jwks_uri.

@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import eu.wohlben.qits.system.testdocker.FakeDocker;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.security.TestSecurity;
 import io.restassured.http.ContentType;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.Test;
  * is the shipped code.
  */
 @QuarkusTest
+@TestSecurity(user = "an-operator", roles = "qits:admin")
 class TerminalApiTest {
 
   private static final String CONTAINER = "dev-qits-ci.1.k4g0nn1ld7o272jl7fciatg6m";

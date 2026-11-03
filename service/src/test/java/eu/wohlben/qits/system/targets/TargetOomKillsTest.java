@@ -86,7 +86,7 @@ class TargetOomKillsTest {
   }
 
   private static RequestSpecification agent() {
-    return given().header("X-Qits-User", "dyn-agent").header("X-Qits-Roles", "qits:agent");
+    return given().header("Authorization", ContractBearers.bearer("dyn-agent", "qits:agent"));
   }
 
   private UUID lease(LeaseState state, UUID project) {

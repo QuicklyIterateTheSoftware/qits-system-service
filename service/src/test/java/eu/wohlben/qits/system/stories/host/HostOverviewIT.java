@@ -54,12 +54,9 @@ import org.junit.jupiter.api.TestMethodOrder;
  *       only, because that is where a platform service's injected database password lives.
  * </ul>
  *
- * <p><b>The operator is a person, and a person is a pair of headers.</b> This service authenticates
- * nobody: the platform edge performs the login, strips every client-supplied {@code X-Qits-*}
- * header and injects the identity it decided on. The OIDC tenant this catalogue turns on is
- * bearer-only, so a request carrying no {@code Authorization} falls straight through to that
- * mechanism — which is why these stories can say "an operator" honestly rather than dressing a
- * person up as a machine.
+ * <p><b>The operator is a person, and a person carries a bearer.</b> The idp signs the person's
+ * token; this service validates it with the keys it fetched at boot, and the {@code qits:admin} in
+ * its {@code groups} is what makes the caller an operator rather than a machine.
  *
  * <p><b>The docker hop is observed and the socket behind it is declared</b>, and the split is the
  * whole discipline. {@code DockerProcess} forks the CLI and reads its pipes, so {@link StoryDocker}
@@ -375,8 +372,8 @@ public class HostOverviewIT {
         CATEGORY_SLUG,
         MACHINE_SLUG,
         List.of(StoryIdentities.OPERATOR, StoryTarget.SERVICE, StoryDocker.DOCKER));
-    // A person's identity arrives in a header the edge asserted, so nothing here re-asks the idp
-    // who they are — not once, not on a cache miss, not at all.
+    // A person's bearer is checked against the keys fetched at boot, so nothing here re-asks the
+    // idp who they are — not once, not on a cache miss, not at all.
     ReportAssertions.assertNoEdgesTo(CATEGORY_SLUG, MACHINE_SLUG, "qits-platform-idp");
     // And the value behind the environment key reached no label, no note and no transcript.
     ReportAssertions.assertNotLeaked(CATEGORY_SLUG, MACHINE_SLUG, StoryTarget.SCRUBBED_SECRET);
