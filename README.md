@@ -209,6 +209,17 @@ type's reservation is 409 `MAXIMUM_BELOW_RESERVATION`; one above the total is ha
   `+ ending-grace` (PT2M) — or at the deadline, when the target is not connected — it is ENDED with
   `detail = "ENDING deadline passed: the runner on <target> never reported the container gone (since
   <ending_since>)"`, announced, and audited as `LEASE_ENDING_DEADLINE` by `qits-system`.
+  When the lease was nudged and its target is still connected, the runner has stopped acting on
+  its estate: the target is quarantined first (`its runner did not act on its estate: lease <id>
+  stayed ENDING past the deadline`), its GRANTED leases are queued again, and only then is the lease
+  ENDED, so the pass that follows cannot grant the freed slot back to it (qits-1829). A health check
+  that passes reinstates it.
+- **A GRANTED lease on a target that is gone goes back to QUEUED** (qits-1829, same sweep): no open
+  connection for `qits.system.targets.reconnect-grace` (counted from this process's start for a
+  target it has not seen) and no work key — a work volume pins its lease to its target, so that one
+  is left GRANTED. `target_id` and `granted_at` are cleared, `detail = "target <name> went away
+  before it started the lease (granted <grantedAt>); queued again"`, announced, and audited as
+  `LEASE_REQUEUED` by `qits-system`. RUNNING, EXITED, FAILED and ENDING leases are left alone.
 - **`target_audit`**: who did what to a target or lease beyond its owner's doors (`TargetAuditLog`,
   its own transaction per row): actor, `qits:*` roles, target, lease, operation, outcome, detail.
 - **Docker on a target, over the runner socket** (epic qits-1621, `api/TargetDockerController`,

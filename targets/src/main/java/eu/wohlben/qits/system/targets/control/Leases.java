@@ -476,6 +476,66 @@ public class Leases {
     return ended;
   }
 
+  // --- the requeue (LeaseEndingDeadline) -------------------------------------------------------
+
+  /** A GRANTED lease as the requeue reads it. */
+  public record Granted(UUID id, UUID targetId, Instant grantedAt) {}
+
+  /**
+   * Every GRANTED lease without a work key, in id order: the ones a requeue may move. A lease with a
+   * work key is left out, since its work volume's row pins it to its target ({@link
+   * TargetAllocation}) and queuing it again would change nothing but its detail.
+   */
+  public List<Granted> grantedWithoutWorkKey() {
+    return QuarkusTransaction.requiringNew()
+        .call(
+            () ->
+                Lease.<Lease>find(
+                        "state = ?1 and workKey is null and targetId is not null order by id",
+                        LeaseState.GRANTED)
+                    .stream()
+                    .map(lease -> new Granted(lease.id, lease.targetId, lease.grantedAt))
+                    .toList());
+  }
+
+  /**
+   * QUEUED again, with {@code detail}, when it is still the GRANTED lease {@code granted} read — on
+   * the same target, granted at the same instant, without a work key: its target never started it
+   * and never will. {@code target_id} and {@code granted_at} are cleared and {@code requested_at}
+   * kept, so it takes its old place in the queue. Announced; its old target's estate is pushed (it no
+   * longer lists the lease, so a runner that had begun on it removes what it made) and a pass is
+   * asked for. Answers the lease as QUEUED, or null when something else moved it first.
+   */
+  public Lease requeue(Granted granted, String detail) {
+    Lease queued =
+        QuarkusTransaction.requiringNew()
+            .call(
+                () -> {
+                  Lease lease = Lease.findById(granted.id(), LockModeType.PESSIMISTIC_WRITE);
+                  if (lease == null
+                      || lease.state != LeaseState.GRANTED
+                      || lease.workKey != null
+                      || !Objects.equals(lease.targetId, granted.targetId())
+                      || !Objects.equals(lease.grantedAt, granted.grantedAt())) {
+                    return null;
+                  }
+                  lease.state = LeaseState.QUEUED;
+                  lease.targetId = null;
+                  lease.grantedAt = null;
+                  lease.detail = detail;
+                  return lease;
+                });
+    if (queued != null) {
+      LOG.warnf(
+          "Lease %s (%s %s of %s) is QUEUED again: %s",
+          queued.id, queued.slotType, queued.ownerRef, queued.ownerApp, detail);
+      events.leaseChanged(queued);
+      allocation.estateChanged(granted.targetId());
+      allocation.requestPass();
+    }
+    return queued;
+  }
+
   /**
    * The image of the newest lease of {@code type} that has not ENDED — QUEUED included, since a
    * queued lease already carries the owner's real, pinned image — or empty.
