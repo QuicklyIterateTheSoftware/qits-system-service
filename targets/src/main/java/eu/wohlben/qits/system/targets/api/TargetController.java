@@ -389,7 +389,7 @@ public class TargetController {
 
   @POST
   @Path("/{id}/greenlight")
-  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK_ADMIN, DESK})
+  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK_ADMIN, DESK, SYSTEM})
   @Operation(operationId = "greenlightTarget", summary = "Lift a target's quarantine")
   @APIResponse(responseCode = "200", description = "The target as it now is")
   @APIResponse(responseCode = "404", description = "No such target")

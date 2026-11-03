@@ -355,11 +355,27 @@ class TargetDoorsTest {
   }
 
   @Test
-  void aGreenlightLiftsTheQuarantineAndOnlyAnAdministratorGivesOne() {
+  void aGreenlightLiftsTheQuarantineForAnOperatorOrAService() {
     UUID id = UUID.randomUUID();
     TargetRows.target(id, "q", 4, "client-q", true);
-    as("a-service", "qits:system").post(API + "/" + id + "/greenlight").then().statusCode(403);
+    as("an-agent", "qits:agent").post(API + "/" + id + "/greenlight").then().statusCode(403);
     admin().post(API + "/" + id + "/greenlight").then().statusCode(200).body("quarantined", is(false));
+  }
+
+  /**
+   * {@code qits:system} opens every service door (owner ruling, epic qits-543): the bootstrap
+   * greenlights the target it commissioned with its own machine bearer, never a forwarded
+   * administrator identity (qits-1333).
+   */
+  @Test
+  void aServiceGreenlightsAQuarantinedTarget() {
+    UUID id = UUID.randomUUID();
+    TargetRows.target(id, "q", 4, "client-q", true);
+    as("qits-bootstrap", "qits:system")
+        .post(API + "/" + id + "/greenlight")
+        .then()
+        .statusCode(200)
+        .body("quarantined", is(false));
   }
 
   /**
