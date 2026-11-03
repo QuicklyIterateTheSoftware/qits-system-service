@@ -50,7 +50,12 @@ public final class TerminalSession {
 
   private static final Logger LOG = Logger.getLogger(TerminalSession.class);
 
-  /** How long after {@code destroy} before escalating to SIGKILL. */
+  /**
+   * How long after {@code destroy} before escalating to SIGKILL, and also the bound {@link
+   * #drainReader()} gives the reader to pick up the dead child's last output before the hang-up:
+   * a grandchild (the far side of {@code docker -t}) can still hold the slave open, and then EOF
+   * never comes.
+   */
   private static final long TERMINATE_GRACE_MILLIS = 2000;
 
   /**
@@ -100,6 +105,9 @@ public final class TerminalSession {
 
   private boolean terminal;
   private int exitCode = -1;
+
+  /** The reader thread, set once by {@link #startReader()}; read by {@link #drainReader()}. */
+  private volatile Thread reader;
 
   public TerminalSession(
       UUID id,
@@ -170,6 +178,7 @@ public final class TerminalSession {
   public void startReader() {
     Thread thread = new Thread(this::readLoop, "terminal-" + id);
     thread.setDaemon(true);
+    reader = thread;
     thread.start();
   }
 
@@ -270,14 +279,36 @@ public final class TerminalSession {
    * delivers SIGHUP), the child destroyed, and — after a short grace — killed.
    *
    * <p>Closing the PTY is also what unblocks the reader thread: its {@code read} on the master fd
-   * is a blocking native call, and the master is the only handle that ends it.
+   * is a blocking native call, and the master is the only handle that ends it. But closing it is
+   * also destructive: once the child has exited, whatever of its last output the reader has not
+   * read yet — its own teardown text — is sitting in the master's buffer, and a close throws that
+   * away instead of handing it to {@code read}. {@link #drainReader()} gives the reader a short
+   * window to pick it up first.
    */
   public void terminate() {
     politeGoodbye();
+    drainReader();
     pty.close();
     process.destroy();
     if (!waitQuietly(TERMINATE_GRACE_MILLIS)) {
       process.destroyForcibly();
+    }
+  }
+
+  /**
+   * Give the reader a bounded chance to pick up the dead child's last output before {@link
+   * #terminate()} closes the master out from under it. A no-op while the child is still alive —
+   * its output is not done yet, and the escalation steps below will reach it in time.
+   */
+  private void drainReader() {
+    Thread r = reader;
+    if (process.isAlive() || r == null) {
+      return;
+    }
+    try {
+      r.join(TERMINATE_GRACE_MILLIS);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
     }
   }
 

@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntConsumer;
 import org.junit.jupiter.api.Test;
@@ -259,5 +260,55 @@ class TerminalSessionTest {
     assertTrue(ended.await(AWAIT_MILLIS, TimeUnit.MILLISECONDS));
     assertEquals(7, exitCode.get(), "the child exited on its own terms, not on SIGKILL");
     assertTrue(sink.text().contains("tidied-up"), sink.text());
+  }
+
+  /**
+   * THE REASON THE READER IS DRAINED BEFORE THE HANG-UP. A slow client holds the reader inside
+   * {@code sink.write} while the child's teardown text ({@code tidied-up}) is already sitting
+   * unread in the PTY master's buffer; closing the master out from under that read throws the text
+   * away instead of handing it to the next one. Every sink, slow or fast, must see it.
+   */
+  @Test
+  void terminateDeliversTheTeardownOutputEvenToASlowClient() throws Exception {
+    CountDownLatch ended = new CountDownLatch(1);
+    AtomicInteger exitCode = new AtomicInteger(-99);
+    TerminalSession session =
+        session(
+            "trap 'echo tidied-up; exit 7' INT; while true; do sleep 0.1; done",
+            code -> {
+              exitCode.set(code);
+              ended.countDown();
+            });
+    CapturingSink fast = new CapturingSink();
+    AtomicBoolean slow = new AtomicBoolean(false);
+    TerminalOutputSink slowSink =
+        new TerminalOutputSink() {
+          @Override
+          public void write(String data) {
+            if (slow.get()) {
+              try {
+                Thread.sleep(800);
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+              }
+            }
+          }
+
+          @Override
+          public boolean isOpen() {
+            return true;
+          }
+        };
+    session.attach(fast, code -> {});
+    session.attach(slowSink, code -> {});
+    session.startReader();
+    Thread.sleep(300);
+    slow.set(true);
+
+    session.terminate();
+
+    assertTrue(ended.await(AWAIT_MILLIS, TimeUnit.MILLISECONDS));
+    assertEquals(7, exitCode.get());
+    assertTrue(fast.text().contains("tidied-up"), fast.text());
   }
 }
