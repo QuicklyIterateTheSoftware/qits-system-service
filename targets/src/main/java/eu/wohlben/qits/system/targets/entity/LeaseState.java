@@ -4,7 +4,9 @@ import java.util.Set;
 
 /**
  * A lease's life. QUEUED until the allocator grants it a target; GRANTED once it has one (the
- * runner is starting it); RUNNING once the runner reports its container running; EXITED or FAILED
+ * runner is starting it), and QUEUED again, without one, when that target is gone past its
+ * reconnect grace or its runner stopped acting on its estate before it started it (only a lease
+ * without a work key, whose work volume would pin it there, qits-1829); RUNNING once the runner reports its container running; EXITED or FAILED
  * when the container stopped by itself or could not start; ENDING once its owner deleted a GRANTED
  * or RUNNING one and the runner has not yet reported it gone; ENDED for good (an EXITED or FAILED
  * one at its owner's end: its slot is free already, qits-1813).

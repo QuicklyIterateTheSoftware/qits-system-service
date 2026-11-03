@@ -81,10 +81,14 @@ import org.jboss.logging.Logger;
  * #estateChanged}) and every {@code estate-interval}, always from a successful read: the runner
  * removes whatever is not on it.
  *
- * <p><b>A dropped runner is still present for {@code qits.system.targets.reconnect-grace}</b>: its
- * leases are left exactly as they are (they run on the node whatever this socket does), and a
- * socket inside the grace is not a comeback. One after it is, and is quarantined until a health
- * check passes. A disconnected target is granted nothing.
+ * <p><b>A dropped runner is still present for {@code qits.system.targets.reconnect-grace}</b>
+ * ({@link #present}): its leases are left exactly as they are (they run on the node whatever this
+ * socket does), and a socket inside the grace is not a comeback. One after it is, and is quarantined
+ * until a health check passes. A disconnected target is granted nothing. Once the grace has passed
+ * its GRANTED leases without a work key go back to QUEUED ({@code LeaseEndingDeadline}, qits-1829):
+ * nothing was started for them, so nothing would ever report them; RUNNING, EXITED, FAILED and
+ * ENDING ones are still left as they are. A process that just started has seen no runner yet, and
+ * gives each the same grace from its own start.
  *
  * <p><b>Sign-in.</b> {@code loginState} is written to the row ({@link Targets#recordLogin}) and
  * announced when it changed; the login commands are rendered only once one has arrived on the
@@ -161,6 +165,9 @@ public class TargetRegistry implements TargetPresence {
   private final ConcurrentHashMap<UUID, Instant> connectedSince = new ConcurrentHashMap<>();
 
   private final ConcurrentHashMap<UUID, Instant> droppedAt = new ConcurrentHashMap<>();
+
+  /** When this registry began: the drop of every target it has not seen since (qits-1829). */
+  private final Instant started = Instant.now();
 
   /**
    * The targets last announced as served, with the version their serving runner said; absent is
@@ -563,13 +570,20 @@ public class TargetRegistry implements TargetPresence {
     return targetId == null || open(targetId).isEmpty() ? null : connectedSince.get(targetId);
   }
 
-  /** Connected, or dropped less than the reconnect grace ago. */
-  public boolean presence(UUID targetId) {
+  /**
+   * Connected, or dropped less than the reconnect grace before {@code now}; a target with no drop on
+   * record (not seen since this process started, or deleted) counts from {@link #started}.
+   */
+  @Override
+  public boolean present(UUID targetId, Instant now) {
+    if (targetId == null) {
+      return false;
+    }
     if (!open(targetId).isEmpty()) {
       return true;
     }
-    Instant dropped = targetId == null ? null : droppedAt.get(targetId);
-    return dropped != null && dropped.plus(config.reconnectGrace()).isAfter(Instant.now());
+    Instant dropped = droppedAt.getOrDefault(targetId, started);
+    return dropped.plus(config.reconnectGrace()).isAfter(now);
   }
 
   /** Whether a {@code loginState} arrived on the target's serving connection. */
@@ -673,6 +687,7 @@ public class TargetRegistry implements TargetPresence {
     allocation.requestPass();
   }
 
+  @Override
   public void quarantined(UUID targetId, String reason, Instant since) {
     Session session = serving(targetId);
     if (session != null) {

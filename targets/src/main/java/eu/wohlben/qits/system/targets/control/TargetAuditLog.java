@@ -30,6 +30,9 @@ public class TargetAuditLog {
   public static final String LEASE_END = "LEASE_END";
   public static final String LEASE_ENDING_DEADLINE = "LEASE_ENDING_DEADLINE";
 
+  /** A GRANTED lease queued again because its target never started it (qits-1829). */
+  public static final String LEASE_REQUEUED = "LEASE_REQUEUED";
+
   /** The most rows one read answers. */
   public static final int MAX_READ = 500;
 

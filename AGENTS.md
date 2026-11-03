@@ -84,7 +84,10 @@ decides by role, and an operator role (`qits:admin`, `qits:admin-agent`, `qits:d
 lease at once with `detail = "ended by <principal>[: <reason>]"`, and writes a `target_audit` row for
 every call, refused ones included. `TargetAuditLog` writes each row in its own transaction and never
 throws. ENDING has a deadline, `LeaseEndingDeadline` — one nudge (the estate again), then ENDED
-after the grace; its `sweep(Instant)` takes the clock, which is how the suite drives it.
+after the grace; its `sweep(Instant)` takes the clock, which is how the suite drives it. A nudged
+lease ENDED on a still-connected target quarantines that target BEFORE the end (whose pass would grant
+the slot back), and the same sweep queues again every GRANTED lease without a work key whose target
+is not `TargetPresence.present` (qits-1829).
 
 **Docker on a target is a request/answer pair on the runner socket, and every call is audited**
 (epic qits-1621). `runner/TargetDocker` sends `Docker` and waits on a future keyed by `requestId`
