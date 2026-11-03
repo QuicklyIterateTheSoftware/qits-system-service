@@ -22,9 +22,9 @@ import org.junit.jupiter.api.Test;
  * moved. A rewrite still writes the version it served.
  *
  * <p>{@code openIdConnectUrl} is left out too, for a different reason: it is {@code
- * quarkus.oidc.auth-server-url}, which names the environment's own idp ({@code
- * http://${QITS_ENVIRONMENT:dev}-qits-idp:8080/idp}), so a runner with {@code QITS_ENVIRONMENT} set
- * would serve another line than a clone without it. It is configuration, not the API; a rewrite
+ * quarkus.oidc.auth-server-url}, which under {@code %test} names a qits-net idp ({@code
+ * http://${QITS_ENVIRONMENT:dev}-qits-idp:8080/idp}; the shipped value is the edge host), so a
+ * runner with {@code QITS_ENVIRONMENT} set would serve another line than a clone without it. It is configuration, not the API; a rewrite
  * writes whatever the run served.
  *
  * <p>The test classpath is indexed too, so any {@code @Path} resource under {@code src/test} of a
