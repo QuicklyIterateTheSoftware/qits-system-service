@@ -587,9 +587,11 @@ public class Targets {
   }
 
   /**
-   * One more RUNNING CI lease that never dialled back ({@code neverDialled}), stamped {@code at}, or
-   * one that did, which resets the count to 0 (qits-1809). The row is locked, so two ends at once
-   * both count. Answers the count as it now is, or null when the target is gone.
+   * One more failure in the dial-back streak ({@code neverDialled}), stamped {@code at} — a RUNNING
+   * CI lease that never dialled back (qits-1809), or a GRANTED CI lease its runner failed to start
+   * (qits-525) — or a RUNNING CI lease that did dial back, which resets the count to 0 for both
+   * causes. The row is locked, so two counts at once both land. Answers the count as it now is, or
+   * null when the target is gone.
    */
   public Integer recordDialback(UUID id, boolean neverDialled, Instant at) {
     return QuarkusTransaction.requiringNew()

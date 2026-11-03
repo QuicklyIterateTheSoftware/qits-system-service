@@ -10,12 +10,16 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import eu.wohlben.qits.system.targets.control.Leases;
+import eu.wohlben.qits.system.targets.entity.Lease;
 import eu.wohlben.qits.system.targets.entity.LeaseState;
 import eu.wohlben.qits.system.targets.entity.SlotType;
 import eu.wohlben.qits.system.targets.entity.Target;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
+import jakarta.inject.Inject;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,12 +27,15 @@ import org.junit.jupiter.api.Test;
 /**
  * The dial-back streak (qits-1809): an owner's end of a RUNNING CI lease with {@code
  * never-dialled-back} counts on its target, any other end of one resets the count, three in a row
- * quarantine the target, and a greenlight resets it.
+ * quarantine the target, and a greenlight resets it. A GRANTED CI lease its runner reports FAILED
+ * counts in the same streak (qits-525).
  */
 @QuarkusTest
 class DialbackStreakTest {
 
   private static final String API = "/system/api/leases";
+
+  @Inject Leases leases;
 
   private UUID target;
 
@@ -159,6 +166,69 @@ class DialbackStreakTest {
     Target row = TargetRows.reloadTarget(target);
     assertEquals(0, row.dialbackFailures);
     assertFalse(row.quarantined());
+  }
+
+  private UUID granted(SlotType type, String ownerRef) {
+    UUID id = UUID.randomUUID();
+    TargetRows.lease(id, type, "qits-ci", ownerRef, LeaseState.GRANTED, target);
+    return id;
+  }
+
+  private void failedToStart(UUID lease) {
+    List<Lease> changed =
+        leases.applyInventory(
+            target, List.of(new Leases.Held(lease, "FAILED", null, null, "pull failed")));
+    assertEquals(1, changed.size());
+    assertEquals(LeaseState.FAILED, TargetRows.reload(lease).state);
+  }
+
+  @Test
+  void aGrantedCiLeaseItsRunnerFailedToStartCounts() {
+    Instant before = Instant.now();
+    failedToStart(granted(SlotType.CI, "run-1"));
+    Target row = TargetRows.reloadTarget(target);
+    assertEquals(1, row.dialbackFailures);
+    assertNotNull(row.dialbackFailedAt);
+    assertFalse(row.dialbackFailedAt.isBefore(before));
+    assertFalse(row.quarantined());
+  }
+
+  @Test
+  void threeStartFailuresInARowQuarantineTheTarget() {
+    failedToStart(granted(SlotType.CI, "run-1"));
+    failedToStart(granted(SlotType.CI, "run-2"));
+    UUID last = granted(SlotType.CI, "run-3");
+    failedToStart(last);
+    Target row = TargetRows.reloadTarget(target);
+    assertEquals(3, row.dialbackFailures);
+    assertTrue(row.quarantined());
+    assertEquals(
+        "start: 3 CI leases in a row failed to start on this target; last lease "
+            + last
+            + " (run-3): pull failed",
+        row.quarantineReason);
+  }
+
+  @Test
+  void aStartFailureOfAnotherSlotTypeLeavesTheCountAlone() {
+    UUID workspace = UUID.randomUUID();
+    TargetRows.lease(workspace, SlotType.WORKSPACE, "qits-workspaces", "ws-1", LeaseState.GRANTED, target);
+    failedToStart(workspace);
+    assertEquals(0, TargetRows.reloadTarget(target).dialbackFailures);
+  }
+
+  @Test
+  void aRunningCiLeaseReportedFailedLeavesTheCountAlone() {
+    failedToStart(running("run-1"));
+    assertEquals(0, TargetRows.reloadTarget(target).dialbackFailures);
+  }
+
+  @Test
+  void aLeaseThatDialledBackResetsAStartFailure() {
+    failedToStart(granted(SlotType.CI, "run-1"));
+    assertEquals(1, TargetRows.reloadTarget(target).dialbackFailures);
+    end(running("run-2"), null);
+    assertEquals(0, TargetRows.reloadTarget(target).dialbackFailures);
   }
 
   /** Sets the streak directly, for the socket test's health checks. */

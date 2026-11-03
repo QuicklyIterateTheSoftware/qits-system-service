@@ -246,6 +246,13 @@ public class Leases {
    * ({@link Targets#quarantineFor}, which only renews the reason of a standing one); the {@code
    * dialback} health check then holds it there for the cool-off. Every other end leaves the count
    * alone: a lease that never ran says nothing about the link.
+   *
+   * <p>The streak has a second cause (qits-525): a GRANTED CI lease its runner reports FAILED — it
+   * could not start it at all, an image it could not pull, a container docker refused — counts one
+   * more failure too, from {@link #applyInventory}. A target whose runner cannot start CI leases is
+   * as broken for CI as one whose ci daemons never dial back, and was otherwise granted run after
+   * run to fail every one. Both causes share one count, so they add up, and an end here of a RUNNING
+   * lease that did dial back resets it for both.
    */
   public OwnerEnd end(UUID id, String ownerApp, String reason) {
     owned(id, ownerApp);
@@ -260,13 +267,7 @@ public class Leases {
     }
     boolean neverDialled = NEVER_DIALLED_BACK.equals(why);
     Integer failures = targets.recordDialback(lease.targetId, neverDialled, Instant.now());
-    int threshold = config.dialback().threshold();
-    if (!neverDialled || failures == null || failures < threshold) {
-      if (neverDialled && failures != null) {
-        LOG.infof(
-            "CI lease %s (%s) on target %s never dialled back; %d in a row",
-            lease.id, lease.ownerRef, lease.targetId, failures);
-      }
+    if (!neverDialled || failures == null) {
       return new OwnerEnd(lease, null);
     }
     String detail =
@@ -277,11 +278,28 @@ public class Leases {
             + " ("
             + lease.ownerRef
             + ")";
+    return new OwnerEnd(lease, streakCounted(lease, failures, "never dialled back", detail));
+  }
+
+  /**
+   * The tail both causes of the dial-back streak share, once {@link Targets#recordDialback} counted
+   * one more failure: below {@code qits.system.targets.dialback.threshold} an info line naming the
+   * lease and the count ({@code what} says what the lease did), at it the target is quarantined with
+   * {@code detail} ({@link Targets#quarantineFor}, which only renews the reason of a standing
+   * quarantine) and a warn line says so. Answers that quarantine, or null below the threshold.
+   */
+  private Targets.Quarantine streakCounted(Lease lease, int failures, String what, String detail) {
+    if (failures < config.dialback().threshold()) {
+      LOG.infof(
+          "CI lease %s (%s) on target %s %s; %d in a row",
+          lease.id, lease.ownerRef, lease.targetId, what, failures);
+      return null;
+    }
     Targets.Quarantine quarantine = targets.quarantineFor(lease.targetId, detail);
     LOG.warnf(
         "Target %s is quarantined%s: %s",
         lease.targetId, quarantine.began() ? "" : " (already, reason renewed)", detail);
-    return new OwnerEnd(lease, quarantine);
+    return quarantine;
   }
 
   /** Who ends a lease as an operator, for its detail and its audit row. */
@@ -590,6 +608,14 @@ public class Leases {
    * their own they are not a change and publish nothing, except an {@code oomKills} that rose — a
    * process of the lease was just killed — which is announced like a state change, on a lease whose
    * state held too.
+   *
+   * <p>A CI lease that goes from GRANTED to FAILED — its runner could not start it — counts one
+   * more failure in its target's dial-back streak (qits-525), which {@link #end(UUID, String,
+   * String)} otherwise counts for a RUNNING lease that never dialled back (qits-1809); at the
+   * threshold the target is quarantined the same way, with a {@code start: } reason naming the
+   * last lease and its runner's detail. Nothing else here touches the count: a RUNNING lease that
+   * failed or exited ran, so its target can start leases, and a GRANTED one that EXITED is no
+   * start failure. The state before is kept per lease inside the transaction, no column.
    */
   public List<Lease> applyInventory(UUID targetId, List<Held> held) {
     Map<UUID, Held> reported = new LinkedHashMap<>();
@@ -598,6 +624,7 @@ public class Leases {
         reported.put(report.leaseId(), report);
       }
     }
+    Map<UUID, LeaseState> before = new HashMap<>();
     List<Lease> changed =
         QuarkusTransaction.requiringNew()
             .call(
@@ -617,6 +644,7 @@ public class Leases {
                   for (Lease lease : mine) {
                     Held report = reported.get(lease.id);
                     boolean killed = recordMemory(lease, report);
+                    before.put(lease.id, lease.state);
                     if (transition(lease, report, now) | killed) {
                       moved.add(lease);
                     }
@@ -637,10 +665,39 @@ public class Leases {
               : " (" + lease.oomKills + " OOM kill(s), " + lease.oomScope() + ")");
       events.leaseChanged(lease);
     }
+    for (Lease lease : changed) {
+      if (lease.slotType == SlotType.CI
+          && lease.targetId != null
+          && before.get(lease.id) == LeaseState.GRANTED
+          && lease.state == LeaseState.FAILED) {
+        startFailed(lease);
+      }
+    }
     if (changed.stream().anyMatch(l -> !LeaseState.OCCUPYING.contains(l.state))) {
       allocation.requestPass();
     }
     return changed;
+  }
+
+  /**
+   * A GRANTED CI lease its runner reported FAILED: one more failure in its target's dial-back
+   * streak (qits-525), and the quarantine at the threshold.
+   */
+  private void startFailed(Lease lease) {
+    Integer failures = targets.recordDialback(lease.targetId, true, Instant.now());
+    if (failures == null) {
+      return;
+    }
+    String detail =
+        "start: "
+            + failures
+            + " CI leases in a row failed to start on this target; last lease "
+            + lease.id
+            + " ("
+            + lease.ownerRef
+            + "): "
+            + lease.detail;
+    streakCounted(lease, failures, "failed to start", detail);
   }
 
   /**
