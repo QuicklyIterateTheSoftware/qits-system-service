@@ -61,6 +61,13 @@ edge grants no anonymous reads, so the glances pull needs one.
 children get `DOCKER_CONFIG=/tmp/qits-docker` only when that file exists, so the mounted
 `/work/config` above keeps working for an older spec or a rollback until it is retired.
 
+The same `idp:client` resource also backs a second consumer: the named OIDC client `qits`
+(`quarkus.oidc-client.qits` in `application.properties`, qits-428), which mints this service's own
+`qits:system` bearer by client credentials for whatever here reads it by name through
+`OidcClients` — qits-eventstream's calls to qits-events first, its telemetry later — off under
+`%dev` and `%test` and pacted against qits-idp (`IdpConsumerPactTest`'s `MINT` row, run through the
+real client by `IdpTokenMintPactTest`).
+
 With no socket the service still starts, serves its client, and answers 503 on every read. That is
 the honest behaviour: an unreachable daemon is a runtime condition to report, not a container that
 should refuse to come up.

@@ -91,6 +91,22 @@ class IdpConsumerPactTest {
       GoldenInteraction.of(DELETE_TARGET, "no commissioned token with the given id", "deleteToken")
           .header("Authorization", BASIC);
 
+  // --- this service's own named client `qits` (qits-428) ------------------------------------------
+  //
+  // The client-credentials mint quarkus-oidc-client sends for the `qits` client configured in
+  // application.properties: Basic auth and grant_type=client_credentials&audience=qits-platform,
+  // which qits-idp records under "a service client calling its peers" — the same state and row
+  // qits-ci-service's IdpTokenMintPactTest proved first (qits-1149). IdpTokenMintPactTest runs it
+  // through the real client, because the client only exists inside the application.
+
+  static final GoldenInteraction MINT =
+      GoldenInteraction.of(
+              Trigger.of("call", "call", "OidcClients.getClient(\"qits\") (every call a future caller routes through it)"),
+              "a service client calling its peers",
+              "issueToken")
+          .header("Authorization", BASIC)
+          .consumes("access_token", "expires_in");
+
   static final ConsumerPact PACT =
       ConsumerPact.of(
           CONSUMER,
@@ -102,7 +118,8 @@ class IdpConsumerPactTest {
           DECOMMISSION_CLIENT,
           DECOMMISSION_GONE_CLIENT,
           DELETE_TOKEN,
-          DELETE_GONE_TOKEN);
+          DELETE_GONE_TOKEN,
+          MINT);
 
   @Test
   void quarkusOidcReadsTheDiscoveryDocument() {
@@ -185,7 +202,8 @@ class IdpConsumerPactTest {
             DECOMMISSION_CLIENT,
             DECOMMISSION_GONE_CLIENT,
             DELETE_TOKEN,
-            DELETE_GONE_TOKEN),
+            DELETE_GONE_TOKEN,
+            MINT),
         PACT.recorded());
     PACT.assertEveryInteractionCarriesBothReferences();
   }
