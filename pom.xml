@@ -64,17 +64,17 @@
              qits-db-core, qits-eventstream and the runner jars are the targets module's, below. The url is a
              property so the image build can point it at the address the builder container can
              actually reach — see docker/Dockerfile and .qits-maven-settings.xml. -->
-        <qits.auth-core.version>2026.1105.105731</qits.auth-core.version>
-        <qits.arch-rules.version>2026.1030.30851</qits.arch-rules.version>
+        <qits.auth-core.version>2026.1106.507</qits.auth-core.version>
+        <qits.arch-rules.version>2026.1106.507</qits.arch-rules.version>
         <!-- CallerServerFilter/CallerClientFilter: jandex-indexed filters that record inbound
              X-Qits-Caller as the qits.caller span attribute and stamp it on outgoing REST-client
              calls. Also published by qits-integrations-quarkus. -->
-        <qits.http-core.version>2026.1103.132907</qits.http-core.version>
+        <qits.http-core.version>2026.1106.507</qits.http-core.version>
         <!-- qits-telemetry-core (epic qits-428): the three OTLP/HTTP exporters as CDI beans whose
              header supplier carries the `qits` oidc client's current bearer, so spans, logs and
              metrics reach qits-observability at its edge host. Published by
              qits-integrations-quarkus, like qits-http-core above. -->
-        <qits.telemetry-core.version>2026.1103.201640</qits.telemetry-core.version>
+        <qits.telemetry-core.version>2026.1106.507</qits.telemetry-core.version>
         <!-- The user-story framework (test scope): TokenValidationBootstrapIT is a userflow, so a
              `mvn verify -DskipITs=false "-Dit.test=TokenValidationBootstrapIT"` also regenerates
              service/target/userstories/ — the story's documentation, network diagram included.
@@ -100,14 +100,14 @@
              block — a real JWKS fetch over HTTP, a real signature, a real audience check — runs
              nowhere else, and only a server that serves a real JWKS for a real keypair exercises
              it. -->
-        <qits.service-mock.version>2026.1002.70617</qits.service-mock.version>
+        <qits.service-mock.version>2026.1106.507</qits.service-mock.version>
         <!-- The targets module (qits-1481): its store, its outbox and the runner wire.
              qits-runner-protocol is the lifecycle frames and RunnerCodec; qits-runner-toolkit is
              linked for its pure-java install package only (RunnerIdentity, InstallScript), both
              with a *:* exclusion so neither Vert.x nor a containers driver reaches this service.
              One version for both: they are released together from qits-runner-javalib. -->
         <qits.eventstream.version>2026.1103.231226</qits.eventstream.version>
-        <qits.db-core.version>2026.1002.70617</qits.db-core.version>
+        <qits.db-core.version>2026.1106.507</qits.db-core.version>
         <qits.runner.version>2026.1105.194721</qits.runner.version>
         <!-- The qits-system-runner's own frames (qits-1481): SystemRunnerProtocol, SystemRunnerCodec
              and SystemRunnerBinary, whose VERSION is the runner image every target is pinned to.
@@ -143,7 +143,7 @@
         <!-- The consumer half of the contracts (ticket qits-1149), test scope, service/ only: the
              shared golden-master reader from qits-integrations-quarkus, and the recorded answers of
              the one provider this service calls, qits-idp (OIDC discovery and JWKS). Exact pins. -->
-        <qits.pact-consumer.version>2026.1019.82625</qits.pact-consumer.version>
+        <qits.pact-consumer.version>2026.1106.507</qits.pact-consumer.version>
         <qits.idp-golden-masters.version>2026.1027.165632</qits.idp-golden-masters.version>
         <!-- The provider half: each consumer's pact, published as a jar holding
              `pacts/<consumer>_qits-system-service.json` and verified by
