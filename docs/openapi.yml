@@ -171,12 +171,12 @@ components:
           description: Higher first; default 0
         spec:
           $ref: "#/components/schemas/JsonNode"
-          type: array
           description: "LeaseSpec{image, env, user, limits}"
+          type: array
         pinTargetId:
           $ref: "#/components/schemas/UUID"
-          type: string
           description: Consider this target only
+          type: string
         adopt:
           type: object
           additionalProperties:
@@ -195,9 +195,9 @@ components:
           description: "Free text, at most 1024 characters"
         reservations:
           $ref: "#/components/schemas/SlotCounts"
-          type: object
           description: "Slots reserved per type; absent is 0. Not a limit: a type\
             \ may use more while shared slots are free"
+          type: object
         slots:
           type: integer
           format: int32
@@ -436,9 +436,9 @@ components:
           type: string
         spec:
           $ref: "#/components/schemas/JsonNode"
-          type: object
           description: "LeaseSpec{image, env, user, limits}; every env value reads\
             \ \"<redacted>\", the keys are kept. specHash is the stored spec's, unredacted"
+          type: object
         specHash:
           type: string
         adopt:
@@ -464,12 +464,12 @@ components:
             Null until a runner reported one
         oomScope:
           type: string
-          enum:
-          - LEASE
-          - NODE
           description: LEASE (the lease hit its own memory limit) or NODE (the node
             or kernel ran out and the killer picked a process in this lease); null
             when oomKills is null or 0
+          enum:
+          - LEASE
+          - NODE
         memoryPeakBytes:
           type: integer
           format: int64
@@ -609,14 +609,10 @@ components:
           description: Blank clears it; absent leaves it
         reservations:
           $ref: "#/components/schemas/SlotCounts"
-          type: object
           description: Slots reserved per type; absent members leave theirs
+          type: object
         maximums:
           type: object
-          description: "The most leases per type the target runs at once, 0..1024\
-            \ and at least that type's reservation; absent members leave theirs, an\
-            \ explicit null clears one (no ceiling). 0 is a ceiling: that type never\
-            \ runs here"
           properties:
             ci:
               type: integer
@@ -627,13 +623,17 @@ components:
             desk:
               type: integer
               format: int32
+          description: "The most leases per type the target runs at once, 0..1024\
+            \ and at least that type's reservation; absent members leave theirs, an\
+            \ explicit null clears one (no ceiling). 0 is a ceiling: that type never\
+            \ runs here"
     RegisterTargetRequest:
       type: object
       properties:
         capabilities:
           $ref: "#/components/schemas/JsonNode"
-          type: object
           description: "What the runner says about itself: a JSON object"
+          type: object
     ReplaceLeaseSpecRequest:
       type: object
       required:
@@ -795,19 +795,19 @@ components:
           description: What the runner said in its last hello
         reservations:
           $ref: "#/components/schemas/SlotCounts"
-          type: object
           description: "Slots reserved per type. Not a limit: a type may use more\
             \ while shared (unreserved) slots are free"
+          type: object
         maximums:
           $ref: "#/components/schemas/SlotCounts"
-          type: object
           description: "The most leases per type the target runs at once; null is\
             \ no ceiling. The limit a reservation is not: a type at its maximum waits\
             \ however many shared slots are free"
+          type: object
         used:
           $ref: "#/components/schemas/SlotCounts"
-          type: object
           description: "GRANTED, RUNNING and ENDING leases per type"
+          type: object
         login:
           $ref: "#/components/schemas/TargetLogin"
         credentialVolume:
@@ -852,9 +852,9 @@ components:
           $ref: "#/components/schemas/Instant"
         memory:
           $ref: "#/components/schemas/TargetMemory"
-          type: object
           description: "The node's memory and OOM kills, as its runner last reported\
             \ them"
+          type: object
     TargetAuditRow:
       type: object
       properties:
@@ -913,8 +913,8 @@ components:
           description: The node's memory limit (its root memory.max); null when none
         reportedAt:
           $ref: "#/components/schemas/Instant"
-          type: string
           description: When the runner last reported these
+          type: string
     TargetRegistered:
       type: object
       properties:
