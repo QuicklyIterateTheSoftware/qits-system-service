@@ -20,7 +20,8 @@ import java.util.Set;
 @AnalyzeClasses(packages = "eu.wohlben.qits.system", importOptions = ImportOption.DoNotIncludeTests.class)
 class EntityExposureTest {
 
-  static final Set<String> KNOWN_GAPS = Set.of();
+  /** WarmImage is served only via the runner WebSocket estate frame (TargetRunnerSocket). */
+  static final Set<String> KNOWN_GAPS = Set.of("WarmImage qits-1955");
 
   @ArchTest
   static final ArchRule EXPOSED = EntityExposureRules.everyDomainEntityIsExposed(KNOWN_GAPS);

@@ -41,18 +41,6 @@
           "site" : "LeaseController.create(CreateLeaseRequest)"
         },
         {
-          "type" : "eu.wohlben.qits.system.targets.control.TargetAllocation$EstateEntry",
-          "kind" : "assembler",
-          "via" : null,
-          "site" : "TargetAllocation.estateOf(UUID)"
-        },
-        {
-          "type" : "eu.wohlben.qits.system.targets.entity.SlotType",
-          "kind" : "via",
-          "via" : "eu.wohlben.qits.system.targets.control.TargetAllocation$EstateEntry",
-          "site" : "EstateEntry.slotType()"
-        },
-        {
           "type" : "eu.wohlben.qits.system.targets.runner.TargetDocker$Outcome",
           "kind" : "via",
           "via" : "eu.wohlben.qits.system.targets.api.DockerDoor$Call",
@@ -75,24 +63,10 @@
           "kind" : "body"
         },
         {
-          "operationId" : "createLease",
-          "method" : "POST",
-          "path" : "/leases",
-          "dto" : "eu.wohlben.qits.system.targets.entity.SlotType",
-          "kind" : "schema"
-        },
-        {
           "operationId" : "endLease",
           "method" : "DELETE",
           "path" : "/leases/{id}",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "endLease",
-          "method" : "DELETE",
-          "path" : "/leases/{id}",
-          "dto" : "eu.wohlben.qits.system.targets.entity.SlotType",
           "kind" : "returns"
         },
         {
@@ -107,13 +81,6 @@
           "method" : "GET",
           "path" : "/leases/{id}",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "getLease",
-          "method" : "GET",
-          "path" : "/leases/{id}",
-          "dto" : "eu.wohlben.qits.system.targets.entity.SlotType",
           "kind" : "returns"
         },
         {
@@ -138,13 +105,6 @@
           "kind" : "returns"
         },
         {
-          "operationId" : "listLeases",
-          "method" : "GET",
-          "path" : "/leases",
-          "dto" : "eu.wohlben.qits.system.targets.entity.SlotType",
-          "kind" : "returns"
-        },
-        {
           "operationId" : "removeTargetContainer",
           "method" : "DELETE",
           "path" : "/targets/{id}/docker/containers/{name}",
@@ -156,13 +116,6 @@
           "method" : "PUT",
           "path" : "/leases/{id}/spec",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "replaceLeaseSpec",
-          "method" : "PUT",
-          "path" : "/leases/{id}/spec",
-          "dto" : "eu.wohlben.qits.system.targets.entity.SlotType",
           "kind" : "returns"
         },
         {
@@ -280,18 +233,6 @@
           "site" : "LeaseController.create(CreateLeaseRequest)"
         },
         {
-          "type" : "eu.wohlben.qits.system.targets.control.TargetAllocation$EstateEntry",
-          "kind" : "assembler",
-          "via" : null,
-          "site" : "TargetAllocation.estateOf(UUID)"
-        },
-        {
-          "type" : "eu.wohlben.qits.system.targets.entity.SlotType",
-          "kind" : "via",
-          "via" : "eu.wohlben.qits.system.targets.control.TargetAllocation$EstateEntry",
-          "site" : "EstateEntry.slotType()"
-        },
-        {
           "type" : "eu.wohlben.qits.system.targets.runner.TargetDocker$Outcome",
           "kind" : "mapper",
           "via" : null,
@@ -340,13 +281,6 @@
           "kind" : "body"
         },
         {
-          "operationId" : "createLease",
-          "method" : "POST",
-          "path" : "/leases",
-          "dto" : "eu.wohlben.qits.system.targets.entity.SlotType",
-          "kind" : "schema"
-        },
-        {
           "operationId" : "createTarget",
           "method" : "POST",
           "path" : "/targets",
@@ -389,13 +323,6 @@
           "kind" : "returns"
         },
         {
-          "operationId" : "endLease",
-          "method" : "DELETE",
-          "path" : "/leases/{id}",
-          "dto" : "eu.wohlben.qits.system.targets.entity.SlotType",
-          "kind" : "returns"
-        },
-        {
           "operationId" : "execInTargetContainer",
           "method" : "POST",
           "path" : "/targets/{id}/docker/containers/{name}/exec",
@@ -407,13 +334,6 @@
           "method" : "GET",
           "path" : "/leases/{id}",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "getLease",
-          "method" : "GET",
-          "path" : "/leases/{id}",
-          "dto" : "eu.wohlben.qits.system.targets.entity.SlotType",
           "kind" : "returns"
         },
         {
@@ -501,13 +421,6 @@
           "kind" : "returns"
         },
         {
-          "operationId" : "listLeases",
-          "method" : "GET",
-          "path" : "/leases",
-          "dto" : "eu.wohlben.qits.system.targets.entity.SlotType",
-          "kind" : "returns"
-        },
-        {
           "operationId" : "listTargets",
           "method" : "GET",
           "path" : "/targets",
@@ -582,13 +495,6 @@
           "method" : "PUT",
           "path" : "/leases/{id}/spec",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "replaceLeaseSpec",
-          "method" : "PUT",
-          "path" : "/leases/{id}/spec",
-          "dto" : "eu.wohlben.qits.system.targets.entity.SlotType",
           "kind" : "returns"
         },
         {
@@ -715,154 +621,9 @@
       "marking" : "domain",
       "reason" : null,
       "projectionOf" : null,
-      "knownGap" : null,
-      "dtos" : [
-        {
-          "type" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
-          "kind" : "via",
-          "via" : "eu.wohlben.qits.system.targets.entity.SlotType",
-          "site" : "LeaseController.list(String, String, String)"
-        },
-        {
-          "type" : "eu.wohlben.qits.system.targets.api.TargetViews$SlotCounts",
-          "kind" : "via",
-          "via" : "eu.wohlben.qits.system.targets.entity.SlotType",
-          "site" : "SlotCounts.of(Map)"
-        },
-        {
-          "type" : "eu.wohlben.qits.system.targets.control.Leases$NewLease",
-          "kind" : "via",
-          "via" : "eu.wohlben.qits.system.targets.entity.SlotType",
-          "site" : "LeaseController.create(CreateLeaseRequest)"
-        },
-        {
-          "type" : "eu.wohlben.qits.system.targets.entity.SlotType",
-          "kind" : "assembler",
-          "via" : null,
-          "site" : "WarmImages.released(String, String)"
-        }
-      ],
-      "operations" : [
-        {
-          "operationId" : "createLease",
-          "method" : "POST",
-          "path" : "/leases",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
-          "kind" : "schema"
-        },
-        {
-          "operationId" : "createLease",
-          "method" : "POST",
-          "path" : "/leases",
-          "dto" : "eu.wohlben.qits.system.targets.control.Leases$NewLease",
-          "kind" : "body"
-        },
-        {
-          "operationId" : "createLease",
-          "method" : "POST",
-          "path" : "/leases",
-          "dto" : "eu.wohlben.qits.system.targets.entity.SlotType",
-          "kind" : "schema"
-        },
-        {
-          "operationId" : "createTarget",
-          "method" : "POST",
-          "path" : "/targets",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$SlotCounts",
-          "kind" : "schema"
-        },
-        {
-          "operationId" : "endLease",
-          "method" : "DELETE",
-          "path" : "/leases/{id}",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "endLease",
-          "method" : "DELETE",
-          "path" : "/leases/{id}",
-          "dto" : "eu.wohlben.qits.system.targets.entity.SlotType",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "getLease",
-          "method" : "GET",
-          "path" : "/leases/{id}",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "getLease",
-          "method" : "GET",
-          "path" : "/leases/{id}",
-          "dto" : "eu.wohlben.qits.system.targets.entity.SlotType",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "getTarget",
-          "method" : "GET",
-          "path" : "/targets/{id}",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$SlotCounts",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "greenlightTarget",
-          "method" : "POST",
-          "path" : "/targets/{id}/greenlight",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$SlotCounts",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "listLeases",
-          "method" : "GET",
-          "path" : "/leases",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "listLeases",
-          "method" : "GET",
-          "path" : "/leases",
-          "dto" : "eu.wohlben.qits.system.targets.entity.SlotType",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "listTargets",
-          "method" : "GET",
-          "path" : "/targets",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$SlotCounts",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "patchTarget",
-          "method" : "PATCH",
-          "path" : "/targets/{id}",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$SlotCounts",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "replaceLeaseSpec",
-          "method" : "PUT",
-          "path" : "/leases/{id}/spec",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "replaceLeaseSpec",
-          "method" : "PUT",
-          "path" : "/leases/{id}/spec",
-          "dto" : "eu.wohlben.qits.system.targets.entity.SlotType",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "rotateTargetRegistrationToken",
-          "method" : "POST",
-          "path" : "/targets/{id}/registration-token",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$SlotCounts",
-          "kind" : "returns"
-        }
-      ]
+      "knownGap" : "qits-1955",
+      "dtos" : [ ],
+      "operations" : [ ]
     },
     {
       "entity" : "eu.wohlben.qits.system.targets.entity.WorkVolume",
@@ -877,62 +638,15 @@
           "kind" : "assembler",
           "via" : null,
           "site" : "WorkVolumeController.purge(String)"
-        },
-        {
-          "type" : "eu.wohlben.qits.system.targets.control.SlotAllocator$Request",
-          "kind" : "assembler",
-          "via" : null,
-          "site" : "TargetAllocation.decideAndWrite()"
-        },
-        {
-          "type" : "eu.wohlben.qits.system.targets.entity.SlotType",
-          "kind" : "via",
-          "via" : "eu.wohlben.qits.system.targets.control.SlotAllocator$Request",
-          "site" : "Request.type()"
         }
       ],
       "operations" : [
-        {
-          "operationId" : "createLease",
-          "method" : "POST",
-          "path" : "/leases",
-          "dto" : "eu.wohlben.qits.system.targets.entity.SlotType",
-          "kind" : "schema"
-        },
-        {
-          "operationId" : "endLease",
-          "method" : "DELETE",
-          "path" : "/leases/{id}",
-          "dto" : "eu.wohlben.qits.system.targets.entity.SlotType",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "getLease",
-          "method" : "GET",
-          "path" : "/leases/{id}",
-          "dto" : "eu.wohlben.qits.system.targets.entity.SlotType",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "listLeases",
-          "method" : "GET",
-          "path" : "/leases",
-          "dto" : "eu.wohlben.qits.system.targets.entity.SlotType",
-          "kind" : "returns"
-        },
         {
           "operationId" : "purgeWorkVolume",
           "method" : "DELETE",
           "path" : "/work-volumes/{workKey}",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$WorkVolumeDto",
           "kind" : "schema"
-        },
-        {
-          "operationId" : "replaceLeaseSpec",
-          "method" : "PUT",
-          "path" : "/leases/{id}/spec",
-          "dto" : "eu.wohlben.qits.system.targets.entity.SlotType",
-          "kind" : "returns"
         }
       ]
     }
