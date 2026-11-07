@@ -56,13 +56,6 @@
           "kind" : "schema"
         },
         {
-          "operationId" : "createLease",
-          "method" : "POST",
-          "path" : "/leases",
-          "dto" : "eu.wohlben.qits.system.targets.control.Leases$NewLease",
-          "kind" : "body"
-        },
-        {
           "operationId" : "endLease",
           "method" : "DELETE",
           "path" : "/leases/{id}",
@@ -88,13 +81,6 @@
           "method" : "GET",
           "path" : "/leases/{id}/logs",
           "dto" : "eu.wohlben.qits.system.targets.api.DockerDoor$Call",
-          "kind" : "body"
-        },
-        {
-          "operationId" : "leaseLogs",
-          "method" : "GET",
-          "path" : "/leases/{id}/logs",
-          "dto" : "eu.wohlben.qits.system.targets.runner.TargetDocker$Outcome",
           "kind" : "body"
         },
         {
@@ -260,13 +246,6 @@
           "kind" : "schema"
         },
         {
-          "operationId" : "cancelTargetSignIn",
-          "method" : "DELETE",
-          "path" : "/targets/{id}/sign-ins/{signInId}",
-          "dto" : "eu.wohlben.qits.system.targets.runner.TargetSignIns$View",
-          "kind" : "body"
-        },
-        {
           "operationId" : "createLease",
           "method" : "POST",
           "path" : "/leases",
@@ -274,45 +253,10 @@
           "kind" : "schema"
         },
         {
-          "operationId" : "createLease",
-          "method" : "POST",
-          "path" : "/leases",
-          "dto" : "eu.wohlben.qits.system.targets.control.Leases$NewLease",
-          "kind" : "body"
-        },
-        {
           "operationId" : "createTarget",
           "method" : "POST",
           "path" : "/targets",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$Login",
-          "kind" : "schema"
-        },
-        {
-          "operationId" : "createTarget",
-          "method" : "POST",
-          "path" : "/targets",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$Memory",
-          "kind" : "schema"
-        },
-        {
-          "operationId" : "createTarget",
-          "method" : "POST",
-          "path" : "/targets",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$SlotCounts",
-          "kind" : "schema"
-        },
-        {
-          "operationId" : "createTarget",
-          "method" : "POST",
-          "path" : "/targets",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$TargetDto",
-          "kind" : "schema"
-        },
-        {
-          "operationId" : "createTarget",
-          "method" : "POST",
-          "path" : "/targets",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$TargetRegistrationDto",
           "kind" : "schema"
         },
         {
@@ -344,27 +288,6 @@
           "kind" : "returns"
         },
         {
-          "operationId" : "getTarget",
-          "method" : "GET",
-          "path" : "/targets/{id}",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$Memory",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "getTarget",
-          "method" : "GET",
-          "path" : "/targets/{id}",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$SlotCounts",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "getTarget",
-          "method" : "GET",
-          "path" : "/targets/{id}",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$TargetDto",
-          "kind" : "returns"
-        },
-        {
           "operationId" : "getTargetSignIn",
           "method" : "GET",
           "path" : "/targets/{id}/sign-ins/{signInId}",
@@ -379,38 +302,10 @@
           "kind" : "returns"
         },
         {
-          "operationId" : "greenlightTarget",
-          "method" : "POST",
-          "path" : "/targets/{id}/greenlight",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$Memory",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "greenlightTarget",
-          "method" : "POST",
-          "path" : "/targets/{id}/greenlight",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$SlotCounts",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "greenlightTarget",
-          "method" : "POST",
-          "path" : "/targets/{id}/greenlight",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$TargetDto",
-          "kind" : "returns"
-        },
-        {
           "operationId" : "leaseLogs",
           "method" : "GET",
           "path" : "/leases/{id}/logs",
           "dto" : "eu.wohlben.qits.system.targets.api.DockerDoor$Call",
-          "kind" : "body"
-        },
-        {
-          "operationId" : "leaseLogs",
-          "method" : "GET",
-          "path" : "/leases/{id}/logs",
-          "dto" : "eu.wohlben.qits.system.targets.runner.TargetDocker$Outcome",
           "kind" : "body"
         },
         {
@@ -428,52 +323,10 @@
           "kind" : "returns"
         },
         {
-          "operationId" : "listTargets",
-          "method" : "GET",
-          "path" : "/targets",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$Memory",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "listTargets",
-          "method" : "GET",
-          "path" : "/targets",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$SlotCounts",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "listTargets",
-          "method" : "GET",
-          "path" : "/targets",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$TargetDto",
-          "kind" : "returns"
-        },
-        {
           "operationId" : "patchTarget",
           "method" : "PATCH",
           "path" : "/targets/{id}",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$Login",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "patchTarget",
-          "method" : "PATCH",
-          "path" : "/targets/{id}",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$Memory",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "patchTarget",
-          "method" : "PATCH",
-          "path" : "/targets/{id}",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$SlotCounts",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "patchTarget",
-          "method" : "PATCH",
-          "path" : "/targets/{id}",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$TargetDto",
           "kind" : "returns"
         },
         {
@@ -512,46 +365,11 @@
           "kind" : "returns"
         },
         {
-          "operationId" : "rotateTargetRegistrationToken",
-          "method" : "POST",
-          "path" : "/targets/{id}/registration-token",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$Memory",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "rotateTargetRegistrationToken",
-          "method" : "POST",
-          "path" : "/targets/{id}/registration-token",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$SlotCounts",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "rotateTargetRegistrationToken",
-          "method" : "POST",
-          "path" : "/targets/{id}/registration-token",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$TargetDto",
-          "kind" : "returns"
-        },
-        {
-          "operationId" : "rotateTargetRegistrationToken",
-          "method" : "POST",
-          "path" : "/targets/{id}/registration-token",
-          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$TargetRegistrationDto",
-          "kind" : "returns"
-        },
-        {
           "operationId" : "startTargetSignIn",
           "method" : "POST",
           "path" : "/targets/{id}/sign-ins",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$SignInView",
           "kind" : "schema"
-        },
-        {
-          "operationId" : "startTargetSignIn",
-          "method" : "POST",
-          "path" : "/targets/{id}/sign-ins",
-          "dto" : "eu.wohlben.qits.system.targets.runner.TargetSignIns$View",
-          "kind" : "body"
         },
         {
           "operationId" : "stopTargetContainer",
@@ -566,13 +384,6 @@
           "path" : "/targets/{id}/sign-ins/{signInId}/code",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$SignInView",
           "kind" : "schema"
-        },
-        {
-          "operationId" : "submitTargetSignInCode",
-          "method" : "POST",
-          "path" : "/targets/{id}/sign-ins/{signInId}/code",
-          "dto" : "eu.wohlben.qits.system.targets.runner.TargetSignIns$View",
-          "kind" : "body"
         },
         {
           "operationId" : "targetAudit",
