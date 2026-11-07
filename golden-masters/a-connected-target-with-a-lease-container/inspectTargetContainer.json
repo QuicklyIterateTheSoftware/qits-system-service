@@ -1,0 +1,39 @@
+{
+  "Id": "3f9c1a7e5b2d4c6e8a0f1b3d5c7e9a1b2c4d6e8f0a1b3c5d7e9f1a2b4c6d8e0f",
+  "Created": "2026-01-01T00:00:00Z",
+  "Name": "/qits-system-runner-lease-00000000-0000-4000-8000-000000000002-00000000",
+  "State": {
+    "Status": "running",
+    "Running": true,
+    "OOMKilled": false,
+    "ExitCode": 0,
+    "StartedAt": "2026-01-01T00:00:00Z"
+  },
+  "Config": {
+    "Image": "registry.qits.wohlben.eu/qits/workspace:2026.1",
+    "User": "1000",
+    "Env": [
+      "QITS_TOKEN=***",
+      "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    ],
+    "Labels": {
+      "qits.system.runner": "00000000-0000-4000-8000-000000000001",
+      "qits.system.runner.lease": "00000000-0000-4000-8000-000000000002"
+    }
+  },
+  "HostConfig": {
+    "Memory": 4294967296
+  },
+  "Mounts": [
+    {
+      "Type": "volume",
+      "Name": "qits-system-runner-work-ws-17-00000000",
+      "Source": "/var/lib/docker/volumes/qits-system-runner-work-ws-17-00000000/_data",
+      "Destination": "/work",
+      "Driver": "local",
+      "Mode": "z",
+      "RW": true,
+      "Propagation": ""
+    }
+  ]
+}

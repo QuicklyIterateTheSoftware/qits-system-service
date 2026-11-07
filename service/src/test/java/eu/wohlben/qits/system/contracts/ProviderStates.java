@@ -1,6 +1,7 @@
 package eu.wohlben.qits.system.contracts;
 
 import eu.wohlben.qits.runner.protocol.Ack;
+import eu.wohlben.qits.system.reads.NodeReads;
 import eu.wohlben.qits.system.targets.ContractBearers;
 import eu.wohlben.qits.system.targets.FakeTargetRunner;
 import eu.wohlben.qits.system.targets.IdpStub;
@@ -10,8 +11,17 @@ import eu.wohlben.qits.system.targets.entity.LeaseState;
 import eu.wohlben.qits.system.targets.entity.LoginValue;
 import eu.wohlben.qits.system.targets.entity.SlotType;
 import eu.wohlben.qits.system.targets.entity.Target;
+import eu.wohlben.qits.system.targets.entity.TargetAudit;
 import eu.wohlben.qits.system.targets.entity.WorkVolume;
 import eu.wohlben.qits.system.targets.runner.TargetSignIns;
+import eu.wohlben.qits.system.terminal.ExecShell;
+import eu.wohlben.qits.system.terminal.TerminalLaunch;
+import eu.wohlben.qits.system.terminal.TerminalOutputSink;
+import eu.wohlben.qits.system.terminal.TerminalSession;
+import eu.wohlben.qits.system.terminal.TerminalSessions;
+import eu.wohlben.qits.systemrunner.protocol.Docker;
+import eu.wohlben.qits.systemrunner.protocol.DockerResult;
+import eu.wohlben.qits.systemrunner.protocol.DockerStatus;
 import eu.wohlben.qits.systemrunner.protocol.Estate;
 import eu.wohlben.qits.systemrunner.protocol.SignIn;
 import eu.wohlben.qits.systemrunner.protocol.SignInState;
@@ -19,6 +29,7 @@ import eu.wohlben.qits.systemrunner.protocol.SystemRunnerBinary;
 import io.quarkus.arc.Arc;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import java.net.URI;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -126,6 +137,38 @@ public class ProviderStates {
   public static final String A_CLAUDE_SIGN_IN_AWAITING_ITS_CODE =
       "a connected target with a claude sign-in awaiting its code";
 
+  /**
+   * Target {@code lab} connected as {@link #A_CONNECTED_TARGET} is, with qits-workspaces' RUNNING
+   * lease {@link #LEASE_ID} on it, the lease's container {@link #LEASE_CONTAINER} and its work volume
+   * {@link #LEASE_VOLUME}, and two earlier docker calls in the target's audit (qits-1936). The runner
+   * answers every {@code docker} frame as qits-system-runner's {@code DockerOperations} would for
+   * that container and volume ({@link #dockerAnswer}): params {@code targetId}, {@code leaseId},
+   * {@code containerName}, {@code volumeName}.
+   */
+  public static final String A_CONNECTED_TARGET_WITH_A_LEASE_CONTAINER =
+      "a connected target with a lease container";
+
+  /** No terminal is open on this node: where an open starts (qits-1936). */
+  public static final String NO_TERMINAL = "no terminal";
+
+  /**
+   * One EXEC terminal into {@link #CONTAINER_ID}'s container, opened by {@code an-operator} and
+   * attached to by one client, so it outlives the linger window: param {@code terminalId}
+   * (qits-1936).
+   */
+  public static final String AN_OPEN_EXEC_TERMINAL = "an open exec terminal";
+
+  /** {@code qits-system-runner-lease-<leaseId>-<id8>}, as the runner's {@code TargetNames} spells it. */
+  static final String LEASE_CONTAINER =
+      "qits-system-runner-lease-" + Freezer.frozenId(2) + "-00000000";
+
+  /** {@code qits-system-runner-work-<workKey>-<id8>}. */
+  static final String LEASE_VOLUME = "qits-system-runner-work-ws-17-00000000";
+
+  /** The lease container's docker id, a fixed 64-hex string. */
+  static final String LEASE_CONTAINER_DOCKER_ID =
+      "3f9c1a7e5b2d4c6e8a0f1b3d5c7e9a1b2c4d6e8f0a1b3c5d7e9f1a2b4c6d8e0f";
+
   static final String CLAUDE_SIGN_IN_URL =
       "https://claude.com/cai/oauth/authorize?code=true&client_id=contract&state=contract";
 
@@ -204,6 +247,9 @@ public class ProviderStates {
   /** The runner a sign-in state holds connected, until the next state or {@link #close}. */
   private FakeTargetRunner runner;
 
+  /** Whether a terminal state ran since the last {@link #close}: then close ends every terminal. */
+  private boolean terminals;
+
   public ProviderStates(ContractBearers bearers) {
     this(bearers, null);
   }
@@ -228,13 +274,24 @@ public class ProviderStates {
     states.put(A_CONNECTED_TARGET, this::aConnectedTarget);
     states.put(A_CLAUDE_SIGN_IN_AWAITING_ITS_CODE, this::aClaudeSignInAwaitingItsCode);
     states.put(A_CONNECTED_TARGET_WITH_LEASES, this::aConnectedTargetWithLeases);
+    states.put(A_CONNECTED_TARGET_WITH_A_LEASE_CONTAINER, this::aConnectedTargetWithALeaseContainer);
+    states.put(NO_TERMINAL, this::noTerminal);
+    states.put(AN_OPEN_EXEC_TERMINAL, this::anOpenExecTerminal);
   }
 
-  /** Hangs up the runner a sign-in state dialled, if one did. */
+  /**
+   * Hangs up the runner a sign-in state dialled, if one did, and ends every terminal once a terminal
+   * state ran — the one it opened and any a recorded open started — so none outlives the state.
+   */
   public void close() {
     if (runner != null) {
+      runner.answering(null);
       runner.close();
       runner = null;
+    }
+    if (terminals) {
+      endEveryTerminal();
+      terminals = false;
     }
   }
 
@@ -583,6 +640,185 @@ public class ProviderStates {
       throw new IllegalStateException(interrupted);
     }
     return new Setup(Map.of("targetId", TARGET_ID, "signInId", id));
+  }
+
+  /**
+   * {@link #aConnectedTarget}'s connection, with the lease, its volume row and two audit rows
+   * standing up behind it and the runner answering for its container and volume. The audit rows
+   * carry fixed ids and instants; the calls the recorded doors make write rows of their own, but a
+   * state runs afresh for each door, so the audit door reads only these two.
+   */
+  private Setup aConnectedTargetWithALeaseContainer() {
+    aConnectedTarget();
+    runner.answering(ProviderStates::dockerAnswer);
+    UUID target = UUID.fromString(TARGET_ID);
+    UUID lease = UUID.fromString(LEASE_ID);
+    runningLease(
+        lease,
+        WORKSPACES.type(),
+        WORKSPACES.app(),
+        WORKSPACES.ownerRef(),
+        WORKSPACES.workKey(),
+        WORKSPACES.image(),
+        "1000");
+    QuarkusTransaction.requiringNew()
+        .run(
+            () -> {
+              auditRow(
+                  Freezer.frozenId(3), TargetRows.T0.plusSeconds(60), target, lease,
+                  "DOCKER_LOGS", LEASE_CONTAINER, "{\"tail\":200}", "OK", null);
+              auditRow(
+                  Freezer.frozenId(4), TargetRows.T0, target, null,
+                  "DOCKER_LIST_CONTAINERS", null, null, "OK", null);
+            });
+    Map<String, String> params = new TreeMap<>();
+    params.put("targetId", TARGET_ID);
+    params.put("leaseId", LEASE_ID);
+    params.put("containerName", LEASE_CONTAINER);
+    params.put("volumeName", LEASE_VOLUME);
+    return new Setup(Collections.unmodifiableMap(params));
+  }
+
+  private static void auditRow(
+      String id, Instant at, UUID target, UUID lease, String operation, String resource,
+      String args, String outcome, String detail) {
+    TargetAudit row = new TargetAudit();
+    row.id = UUID.fromString(id);
+    row.at = at;
+    row.actor = "an-operator";
+    row.roles = "qits:admin";
+    row.targetId = target;
+    row.leaseId = lease;
+    row.operation = operation;
+    row.resource = resource;
+    row.args = args;
+    row.outcome = outcome;
+    row.detail = detail;
+    row.persist();
+  }
+
+  /**
+   * What qits-system-runner's {@code DockerOperations} answers for {@link #LEASE_CONTAINER} and
+   * {@link #LEASE_VOLUME} on target {@link #TARGET_ID}: docker's own shapes ({@code ps}/{@code volume
+   * ls --format '{{json .}}'} rows as one array, an inspect's one object), its {@code stop}/{@code rm}
+   * printing the name, and {@code NOT_FOUND} for any other name.
+   */
+  static DockerResult dockerAnswer(Docker request) {
+    String volumeRoot = "/var/lib/docker/volumes/" + LEASE_VOLUME + "/_data";
+    String name = request.name();
+    boolean container = LEASE_CONTAINER.equals(name);
+    return switch (request.op()) {
+      case LIST_CONTAINERS ->
+          ok(
+              request,
+              "[{\"Command\":\"\\\"sleep infinity\\\"\",\"CreatedAt\":\"2026-01-01 00:00:00 +0000 UTC\","
+                  + "\"ID\":\"" + LEASE_CONTAINER_DOCKER_ID + "\",\"Image\":\"" + WORKSPACE_IMAGE + "\","
+                  + "\"Labels\":\"qits.system.runner=" + TARGET_ID + ",qits.system.runner.lease=" + LEASE_ID
+                  + "\",\"LocalVolumes\":\"1\",\"Mounts\":\"" + LEASE_VOLUME + "\",\"Names\":\""
+                  + LEASE_CONTAINER + "\",\"Networks\":\"bridge\",\"Ports\":\"\",\"RunningFor\":"
+                  + "\"2 hours ago\",\"Size\":\"0B\",\"State\":\"running\",\"Status\":\"Up 2 hours\"}]");
+      case INSPECT_CONTAINER ->
+          container
+              ? ok(
+                  request,
+                  "{\"Id\":\"" + LEASE_CONTAINER_DOCKER_ID + "\",\"Created\":\"2026-01-01T00:00:00Z\","
+                      + "\"Name\":\"/" + LEASE_CONTAINER + "\",\"State\":{\"Status\":\"running\","
+                      + "\"Running\":true,\"OOMKilled\":false,\"ExitCode\":0,"
+                      + "\"StartedAt\":\"2026-01-01T00:00:00Z\"},\"Config\":{\"Image\":\""
+                      + WORKSPACE_IMAGE + "\",\"User\":\"1000\",\"Env\":[\"QITS_TOKEN=qits_tok_lease\","
+                      + "\"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\"],"
+                      + "\"Labels\":{\"qits.system.runner\":\"" + TARGET_ID + "\","
+                      + "\"qits.system.runner.lease\":\"" + LEASE_ID + "\"}},\"HostConfig\":"
+                      + "{\"Memory\":4294967296},\"Mounts\":[{\"Type\":\"volume\",\"Name\":\""
+                      + LEASE_VOLUME + "\",\"Source\":\"" + volumeRoot + "\",\"Destination\":"
+                      + "\"/work\",\"Driver\":\"local\",\"Mode\":\"z\",\"RW\":true,"
+                      + "\"Propagation\":\"\"}]}")
+              : notFound(request, "container", name);
+      case LOGS ->
+          container
+              ? ok(request, "starting the workspace\nready on /work\n")
+              : notFound(request, "container", name);
+      case EXEC ->
+          container
+              ? new DockerResult(request.requestId(), DockerStatus.OK, "README.md\nsrc\n", false, 0, "")
+              : notFound(request, "container", name);
+      case STOP, REMOVE ->
+          container ? ok(request, LEASE_CONTAINER) : notFound(request, "container", name);
+      case LIST_VOLUMES ->
+          ok(
+              request,
+              "[{\"Availability\":\"N/A\",\"Driver\":\"local\",\"Group\":\"N/A\","
+                  + "\"Labels\":\"qits.system.runner=" + TARGET_ID + "\",\"Links\":\"N/A\","
+                  + "\"Mountpoint\":\"" + volumeRoot + "\",\"Name\":\"" + LEASE_VOLUME + "\","
+                  + "\"Scope\":\"local\",\"Size\":\"N/A\",\"Status\":\"N/A\",\"ownedBy\":\"label\"}]");
+      case INSPECT_VOLUME ->
+          LEASE_VOLUME.equals(name)
+              ? ok(
+                  request,
+                  "{\"CreatedAt\":\"2026-01-01T00:00:00Z\",\"Driver\":\"local\",\"Labels\":"
+                      + "{\"qits.system.runner\":\"" + TARGET_ID + "\"},\"Mountpoint\":\""
+                      + volumeRoot + "\",\"Name\":\"" + LEASE_VOLUME + "\",\"Options\":null,"
+                      + "\"Scope\":\"local\"}")
+              : notFound(request, "volume", name);
+    };
+  }
+
+  private static DockerResult ok(Docker request, String body) {
+    return new DockerResult(request.requestId(), DockerStatus.OK, body, false, null, null);
+  }
+
+  private static DockerResult notFound(Docker request, String what, String name) {
+    return DockerResult.of(
+        request.requestId(), DockerStatus.NOT_FOUND, "no " + what + " " + name + " of this target");
+  }
+
+  // --- the terminal states (qits-1936) ----------------------------------------------------------
+
+  private Setup noTerminal() {
+    terminals = true;
+    endEveryTerminal();
+    return new Setup(Map.of());
+  }
+
+  /**
+   * Opened the way the open door opens one — the container resolved against the fake docker, the
+   * operator as its creator — and attached to by a client that drops what it is sent, which cancels
+   * the linger window. Its id is random; a recording freezes it (and its {@code createdAt}) by shape.
+   */
+  private Setup anOpenExecTerminal() {
+    terminals = true;
+    endEveryTerminal();
+    NodeReads.ContainerTarget container =
+        Arc.container().instance(NodeReads.class).get().requireRunningContainer(CONTAINER_ID);
+    TerminalSession session =
+        terminalSessions()
+            .create(
+                new TerminalLaunch.Exec(container.id(), container.name(), ExecShell.parse("sh")),
+                "an-operator")
+            .session();
+    terminalSessions().attach(session.id(), NO_CLIENT, code -> {});
+    return new Setup(Map.of("terminalId", session.id().toString()));
+  }
+
+  /** A client that keeps nothing and never goes away. */
+  private static final TerminalOutputSink NO_CLIENT =
+      new TerminalOutputSink() {
+        @Override
+        public void write(String data) {}
+
+        @Override
+        public boolean isOpen() {
+          return true;
+        }
+      };
+
+  private static void endEveryTerminal() {
+    TerminalSessions sessions = terminalSessions();
+    sessions.list().forEach(session -> sessions.terminate(session.id()));
+  }
+
+  private static TerminalSessions terminalSessions() {
+    return Arc.container().instance(TerminalSessions.class).get();
   }
 
   private static TargetSignIns signIns() {

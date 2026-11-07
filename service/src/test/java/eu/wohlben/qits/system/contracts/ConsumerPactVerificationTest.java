@@ -201,4 +201,19 @@ class ConsumerPactVerificationTest {
   Map<String, String> aClaudeSignInAwaitingItsCode() {
     return states.params(ProviderStates.A_CLAUDE_SIGN_IN_AWAITING_ITS_CODE);
   }
+
+  @State(ProviderStates.A_CONNECTED_TARGET_WITH_A_LEASE_CONTAINER)
+  Map<String, String> aConnectedTargetWithALeaseContainer() {
+    return states.params(ProviderStates.A_CONNECTED_TARGET_WITH_A_LEASE_CONTAINER);
+  }
+
+  @State(ProviderStates.NO_TERMINAL)
+  Map<String, String> noTerminal() {
+    return states.params(ProviderStates.NO_TERMINAL);
+  }
+
+  @State(ProviderStates.AN_OPEN_EXEC_TERMINAL)
+  Map<String, String> anOpenExecTerminal() {
+    return states.params(ProviderStates.AN_OPEN_EXEC_TERMINAL);
+  }
 }

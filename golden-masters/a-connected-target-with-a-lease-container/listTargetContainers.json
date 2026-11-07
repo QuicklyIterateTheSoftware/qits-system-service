@@ -1,0 +1,18 @@
+[
+  {
+    "Command": "\"sleep infinity\"",
+    "CreatedAt": "2026-01-01 00:00:00 +0000 UTC",
+    "ID": "3f9c1a7e5b2d4c6e8a0f1b3d5c7e9a1b2c4d6e8f0a1b3c5d7e9f1a2b4c6d8e0f",
+    "Image": "registry.qits.wohlben.eu/qits/workspace:2026.1",
+    "Labels": "qits.system.runner=00000000-0000-4000-8000-000000000001,qits.system.runner.lease=00000000-0000-4000-8000-000000000002",
+    "LocalVolumes": "1",
+    "Mounts": "qits-system-runner-work-ws-17-00000000",
+    "Names": "qits-system-runner-lease-00000000-0000-4000-8000-000000000002-00000000",
+    "Networks": "bridge",
+    "Ports": "",
+    "RunningFor": "2 hours ago",
+    "Size": "0B",
+    "State": "running",
+    "Status": "Up 2 hours"
+  }
+]

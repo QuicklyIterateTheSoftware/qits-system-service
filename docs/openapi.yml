@@ -1299,6 +1299,8 @@ paths:
         - qits:system
   /system/api/nodes/{id}/containers:
     get:
+      summary: Containers
+      operationId: listNodeContainers
       parameters:
       - name: id
         in: path
@@ -1323,7 +1325,6 @@ paths:
           description: Not Authorized
         "403":
           description: Not Allowed
-      summary: Containers
       tags:
       - Node Controller
       security:
@@ -1335,6 +1336,8 @@ paths:
         - qits:agent
   /system/api/nodes/{id}/containers/{cid}:
     get:
+      summary: Container
+      operationId: getNodeContainer
       parameters:
       - name: cid
         in: path
@@ -1357,7 +1360,6 @@ paths:
           description: Not Authorized
         "403":
           description: Not Allowed
-      summary: Container
       tags:
       - Node Controller
       security:
@@ -1369,6 +1371,8 @@ paths:
         - qits:agent
   /system/api/nodes/{id}/containers/{cid}/logs:
     get:
+      summary: Logs
+      operationId: getContainerLogs
       parameters:
       - name: cid
         in: path
@@ -1397,7 +1401,6 @@ paths:
           description: Not Authorized
         "403":
           description: Not Allowed
-      summary: Logs
       tags:
       - Node Controller
       security:
@@ -1409,6 +1412,8 @@ paths:
         - qits:agent
   /system/api/nodes/{id}/images:
     get:
+      summary: Images
+      operationId: listNodeImages
       parameters:
       - name: id
         in: path
@@ -1428,7 +1433,6 @@ paths:
           description: Not Authorized
         "403":
           description: Not Allowed
-      summary: Images
       tags:
       - Node Controller
       security:
@@ -1440,6 +1444,8 @@ paths:
         - qits:agent
   /system/api/nodes/{id}/networks:
     get:
+      summary: Networks
+      operationId: listNodeNetworks
       parameters:
       - name: id
         in: path
@@ -1459,7 +1465,6 @@ paths:
           description: Not Authorized
         "403":
           description: Not Allowed
-      summary: Networks
       tags:
       - Node Controller
       security:
@@ -1471,6 +1476,8 @@ paths:
         - qits:agent
   /system/api/nodes/{id}/volumes:
     get:
+      summary: Volumes
+      operationId: listNodeVolumes
       parameters:
       - name: id
         in: path
@@ -1490,7 +1497,6 @@ paths:
           description: Not Authorized
         "403":
           description: Not Allowed
-      summary: Volumes
       tags:
       - Node Controller
       security:
@@ -1502,6 +1508,8 @@ paths:
         - qits:agent
   /system/api/overview:
     get:
+      summary: Overview
+      operationId: getOverview
       responses:
         "200":
           description: OK
@@ -1513,7 +1521,6 @@ paths:
           description: Not Authorized
         "403":
           description: Not Allowed
-      summary: Overview
       tags:
       - Overview Controller
       security:
@@ -1525,6 +1532,8 @@ paths:
         - qits:agent
   /system/api/swarm/configs:
     get:
+      summary: Configs
+      operationId: listSwarmConfigs
       responses:
         "200":
           description: OK
@@ -1538,7 +1547,6 @@ paths:
           description: Not Authorized
         "403":
           description: Not Allowed
-      summary: Configs
       tags:
       - Swarm Controller
       security:
@@ -1550,6 +1558,8 @@ paths:
         - qits:agent
   /system/api/swarm/configs/{id}:
     get:
+      summary: Config
+      operationId: getSwarmConfig
       parameters:
       - name: id
         in: path
@@ -1567,7 +1577,6 @@ paths:
           description: Not Authorized
         "403":
           description: Not Allowed
-      summary: Config
       tags:
       - Swarm Controller
       security:
@@ -1579,6 +1588,8 @@ paths:
         - qits:agent
   /system/api/swarm/nodes:
     get:
+      summary: Nodes
+      operationId: listSwarmNodes
       responses:
         "200":
           description: OK
@@ -1592,7 +1603,6 @@ paths:
           description: Not Authorized
         "403":
           description: Not Allowed
-      summary: Nodes
       tags:
       - Swarm Controller
       security:
@@ -1604,6 +1614,8 @@ paths:
         - qits:agent
   /system/api/swarm/nodes/{id}:
     get:
+      summary: Node
+      operationId: getSwarmNode
       parameters:
       - name: id
         in: path
@@ -1621,7 +1633,6 @@ paths:
           description: Not Authorized
         "403":
           description: Not Allowed
-      summary: Node
       tags:
       - Swarm Controller
       security:
@@ -1633,6 +1644,8 @@ paths:
         - qits:agent
   /system/api/swarm/secrets:
     get:
+      summary: Secrets
+      operationId: listSwarmSecrets
       responses:
         "200":
           description: OK
@@ -1646,7 +1659,6 @@ paths:
           description: Not Authorized
         "403":
           description: Not Allowed
-      summary: Secrets
       tags:
       - Swarm Controller
       security:
@@ -1658,6 +1670,8 @@ paths:
         - qits:agent
   /system/api/swarm/services:
     get:
+      summary: Services
+      operationId: listSwarmServices
       responses:
         "200":
           description: OK
@@ -1671,7 +1685,6 @@ paths:
           description: Not Authorized
         "403":
           description: Not Allowed
-      summary: Services
       tags:
       - Swarm Controller
       security:
@@ -1683,6 +1696,8 @@ paths:
         - qits:agent
   /system/api/swarm/services/{id}:
     get:
+      summary: Service
+      operationId: getSwarmService
       parameters:
       - name: id
         in: path
@@ -1700,7 +1715,6 @@ paths:
           description: Not Authorized
         "403":
           description: Not Allowed
-      summary: Service
       tags:
       - Swarm Controller
       security:
@@ -2603,6 +2617,8 @@ paths:
         - qits:desk-admin
   /system/api/terminals:
     post:
+      summary: Open
+      operationId: openTerminal
       requestBody:
         content:
           application/json:
@@ -2610,18 +2626,29 @@ paths:
               $ref: "#/components/schemas/TerminalRequest"
         required: true
       responses:
-        "200":
-          description: OK
+        "201":
+          description: A new terminal
           content:
             application/json:
-              schema: {}
+              schema:
+                $ref: "#/components/schemas/TerminalView"
+        "200":
+          description: "The live glances terminal, found rather than started again"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TerminalView"
+        "400":
+          description: Not one of the two request shapes
+        "404":
+          description: "EXEC: no such container"
+        "409":
+          description: "EXEC: the container is not running; or the terminal limit\
+            \ is reached"
         "401":
           description: Not Authorized
         "403":
           description: Not Allowed
-        "400":
-          description: Bad Request
-      summary: Open
       tags:
       - Terminal Controller
       security:
@@ -2631,6 +2658,8 @@ paths:
         - qits:desk-admin
         - qits:system
     get:
+      summary: List
+      operationId: listTerminals
       responses:
         "200":
           description: OK
@@ -2644,7 +2673,6 @@ paths:
           description: Not Authorized
         "403":
           description: Not Allowed
-      summary: List
       tags:
       - Terminal Controller
       security:
@@ -2656,6 +2684,8 @@ paths:
         - qits:agent
   /system/api/terminals/{id}:
     get:
+      summary: Get
+      operationId: getTerminal
       parameters:
       - name: id
         in: path
@@ -2669,11 +2699,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TerminalView"
+        "404":
+          description: No such terminal
         "401":
           description: Not Authorized
         "403":
           description: Not Allowed
-      summary: Get
       tags:
       - Terminal Controller
       security:
@@ -2684,6 +2715,8 @@ paths:
         - qits:system
         - qits:agent
     delete:
+      summary: Close
+      operationId: closeTerminal
       parameters:
       - name: id
         in: path
@@ -2691,16 +2724,14 @@ paths:
         schema:
           type: string
       responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema: {}
+        "204":
+          description: Ended
+        "404":
+          description: No such terminal
         "401":
           description: Not Authorized
         "403":
           description: Not Allowed
-      summary: Close
       tags:
       - Terminal Controller
       security:

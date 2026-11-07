@@ -1,0 +1,13 @@
+{
+  "id": "00000000-0000-4000-8000-000000000003",
+  "kind": "EXEC",
+  "container": {
+    "id": "b248472f7a8e00bba8cd036232373baed8856d90eb77b06c53f3eb0b321fdb17",
+    "name": "dev-qits-ci.1.k4g0nn1ld7o272jl7fciatg6m"
+  },
+  "shell": "sh",
+  "createdAt": "2026-01-01T00:00:00Z",
+  "createdBy": "an-operator",
+  "attachedClients": 0,
+  "socketPath": "/system/api/terminals/00000000-0000-4000-8000-000000000003"
+}

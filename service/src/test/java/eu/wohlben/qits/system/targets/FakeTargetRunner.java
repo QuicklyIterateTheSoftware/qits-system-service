@@ -30,12 +30,14 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
@@ -63,6 +65,14 @@ public final class FakeTargetRunner implements AutoCloseable {
   private final CountDownLatch closed = new CountDownLatch(1);
   private final AtomicInteger closeCode = new AtomicInteger(-1);
   private final AtomicReference<String> closeReason = new AtomicReference<>("");
+
+  /**
+   * What answers a {@code docker} frame the moment it arrives, as the runner would, or null: then
+   * the frame is kept for a test to {@link #await} and answer with {@link #dockerResult}. A caller
+   * that cannot wait for the frame itself — a synchronous recording — installs one ({@link
+   * #answering}).
+   */
+  private final AtomicReference<Function<Docker, DockerResult>> answering = new AtomicReference<>();
 
   private FakeTargetRunner(URI uri, String authorization) {
     WebSocket.Builder builder = HttpClient.newHttpClient().newWebSocketBuilder();
@@ -150,6 +160,15 @@ public final class FakeTargetRunner implements AutoCloseable {
       String requestId, List<eu.wohlben.qits.runner.protocol.health.CheckResult> checks) {
     boolean ok = checks.stream().allMatch(eu.wohlben.qits.runner.protocol.health.CheckResult::ok);
     send(HealthChecked.of(new HealthReport(ok, ok ? "" : "a check failed", requestId, checks)));
+  }
+
+  /**
+   * Answers every {@code docker} frame from now on with {@code answer}'s result, off the socket's
+   * thread; null goes back to keeping them for {@link #await}. An answer of null leaves that frame
+   * unanswered (the service times it out) and unkept.
+   */
+  public void answering(Function<Docker, DockerResult> answer) {
+    answering.set(answer);
   }
 
   /** Answers a {@code docker} request as the runner would. */
@@ -243,6 +262,13 @@ public final class FakeTargetRunner implements AutoCloseable {
     }
   }
 
+  private void autoAnswer(Function<Docker, DockerResult> answer, Docker request) {
+    DockerResult result = answer.apply(request);
+    if (result != null) {
+      send(result);
+    }
+  }
+
   private final class Collector implements WebSocket.Listener {
     private final StringBuilder partial = new StringBuilder();
 
@@ -257,7 +283,13 @@ public final class FakeTargetRunner implements AutoCloseable {
             Object images = frame.get("warmImages");
             warmImages.add(images == null ? ABSENT : images);
           }
-          inbox.add(CODEC.decode(frame));
+          RunnerMessage message = CODEC.decode(frame);
+          Function<Docker, DockerResult> answer = answering.get();
+          if (answer != null && message instanceof Docker request) {
+            CompletableFuture.runAsync(() -> autoAnswer(answer, request));
+          } else {
+            inbox.add(message);
+          }
         } catch (Exception e) {
           throw new IllegalStateException("an undecodable frame: " + partial, e);
         }

@@ -49,8 +49,9 @@ import org.junit.jupiter.api.Test;
  * qits-runner-toolkit's register rows read. An answer with no body (a 204) is recorded as JSON
  * {@code null}, a text answer ({@code install.sh}) as one JSON string.
  *
- * <p><b>Terminals are not recorded.</b> A terminal's id is random and its list depends on what the
- * other test classes in this JVM opened.
+ * <p><b>Terminals are recorded</b> (qits-1936) from states that first end every live session, so
+ * a list holds only the state's own; a terminal's random id and its {@code createdAt} are frozen by
+ * shape like a target's.
  *
  * <p>It <b>compares by default</b> and fails with a unified diff per differing file — including a
  * committed {@code .json} no interaction produces any more. {@code -Dgolden.update=true} (or {@code
@@ -91,11 +92,12 @@ class GoldenMasterRecordingTest {
   private static final String RUNNER = API + "/targets/{runnerId}";
   private static final String LEASE = API + "/leases/{leaseId}";
   private static final String SIGN_IN = TARGET + "/sign-ins/{signInId}";
+  private static final String DOCKER = TARGET + "/docker";
+  private static final String TERMINAL = API + "/terminals/{terminalId}";
 
   /**
-   * The swarm reads publish no operationIds of their own (no {@code @Operation} annotations), so
-   * their names are this table's; the targets doors name theirs in their {@code @Operation}.
-   * Renaming one is a contract change all the same.
+   * Every row's operationId is its door's {@code @Operation} — the swarm, node and overview reads
+   * took the names this table had given them (qits-1936). Renaming one is a contract change.
    */
 
   private static List<Interaction> interactions() {
@@ -359,12 +361,67 @@ class GoldenMasterRecordingTest {
               API + "/work-volumes/{workKey}",
               202,
               null,
-              BEARER));
+              BEARER),
+          // --- the docker doors and a lease's log (qits-1936), as the operator ---
+          lease("leaseLogs", "GET", LEASE + "/logs", null),
+          lease("targetAudit", "GET", DOCKER + "/audit", null),
+          lease("listTargetContainers", "GET", DOCKER + "/containers", null),
+          lease("inspectTargetContainer", "GET", DOCKER + "/containers/{containerName}", null),
+          lease("targetContainerLogs", "GET", DOCKER + "/containers/{containerName}/logs", null),
+          lease(
+              "execInTargetContainer",
+              "POST",
+              DOCKER + "/containers/{containerName}/exec",
+              "{\"argv\":[\"ls\"]}"),
+          lease("stopTargetContainer", "POST", DOCKER + "/containers/{containerName}/stop", null),
+          lease("removeTargetContainer", "DELETE", DOCKER + "/containers/{containerName}", null),
+          lease("listTargetVolumes", "GET", DOCKER + "/volumes", null),
+          lease("inspectTargetVolume", "GET", DOCKER + "/volumes/{volumeName}", null),
+          // --- the terminals (qits-1936) ---
+          call(
+              ProviderStates.NO_TERMINAL,
+              "openTerminal",
+              "POST",
+              API + "/terminals",
+              201,
+              "{\"kind\":\"EXEC\",\"container\":\""
+                  + ProviderStates.CONTAINER_ID
+                  + "\",\"shell\":\"sh\"}",
+              Map.of()),
+          call(
+              ProviderStates.AN_OPEN_EXEC_TERMINAL,
+              "listTerminals",
+              "GET",
+              API + "/terminals",
+              200,
+              null,
+              Map.of()),
+          call(ProviderStates.AN_OPEN_EXEC_TERMINAL, "getTerminal", "GET", TERMINAL, 200, null, Map.of()),
+          call(
+              ProviderStates.AN_OPEN_EXEC_TERMINAL,
+              "closeTerminal",
+              "DELETE",
+              TERMINAL,
+              204,
+              null,
+              Map.of()));
 
   static final List<Interaction> INTERACTIONS = interactions();
 
   private static Interaction get(String operationId, String path) {
     return new Interaction(STATE, operationId, "GET", path, 200, null, Map.of());
+  }
+
+  /** A 200 in {@link ProviderStates#A_CONNECTED_TARGET_WITH_A_LEASE_CONTAINER}, as the operator. */
+  private static Interaction lease(String operationId, String method, String path, String body) {
+    return call(
+        ProviderStates.A_CONNECTED_TARGET_WITH_A_LEASE_CONTAINER,
+        operationId,
+        method,
+        path,
+        200,
+        body,
+        Map.of());
   }
 
   private static Interaction call(

@@ -106,6 +106,185 @@
       ]
     },
     {
+      "name": "a connected target with a lease container",
+      "slug": "a-connected-target-with-a-lease-container",
+      "params": {
+        "containerName": "qits-system-runner-lease-00000000-0000-4000-8000-000000000002-00000000",
+        "leaseId": "00000000-0000-4000-8000-000000000002",
+        "targetId": "00000000-0000-4000-8000-000000000001",
+        "volumeName": "qits-system-runner-work-ws-17-00000000"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "execInTargetContainer",
+          "method": "POST",
+          "path": "/system/api/targets/{targetId}/docker/containers/{containerName}/exec",
+          "body": {
+            "argv": [
+              "ls"
+            ]
+          },
+          "status": 200,
+          "file": "a-connected-target-with-a-lease-container/execInTargetContainer.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "inspectTargetContainer",
+          "method": "GET",
+          "path": "/system/api/targets/{targetId}/docker/containers/{containerName}",
+          "status": 200,
+          "file": "a-connected-target-with-a-lease-container/inspectTargetContainer.json",
+          "frozen": {
+            "ids": [
+              "$.Config.Labels['qits.system.runner']",
+              "$.Config.Labels['qits.system.runner.lease']"
+            ],
+            "instants": [
+              "$.Created",
+              "$.State.StartedAt"
+            ],
+            "strings": [
+              "$.Name"
+            ],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "inspectTargetVolume",
+          "method": "GET",
+          "path": "/system/api/targets/{targetId}/docker/volumes/{volumeName}",
+          "status": 200,
+          "file": "a-connected-target-with-a-lease-container/inspectTargetVolume.json",
+          "frozen": {
+            "ids": [
+              "$.Labels['qits.system.runner']"
+            ],
+            "instants": [
+              "$.CreatedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "leaseLogs",
+          "method": "GET",
+          "path": "/system/api/leases/{leaseId}/logs",
+          "status": 200,
+          "file": "a-connected-target-with-a-lease-container/leaseLogs.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listTargetContainers",
+          "method": "GET",
+          "path": "/system/api/targets/{targetId}/docker/containers",
+          "status": 200,
+          "file": "a-connected-target-with-a-lease-container/listTargetContainers.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [
+              "$[*].Labels",
+              "$[*].Names"
+            ],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listTargetVolumes",
+          "method": "GET",
+          "path": "/system/api/targets/{targetId}/docker/volumes",
+          "status": 200,
+          "file": "a-connected-target-with-a-lease-container/listTargetVolumes.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [
+              "$[*].Labels"
+            ],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "removeTargetContainer",
+          "method": "DELETE",
+          "path": "/system/api/targets/{targetId}/docker/containers/{containerName}",
+          "status": 200,
+          "file": "a-connected-target-with-a-lease-container/removeTargetContainer.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [
+              "$.name",
+              "$.output"
+            ],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "stopTargetContainer",
+          "method": "POST",
+          "path": "/system/api/targets/{targetId}/docker/containers/{containerName}/stop",
+          "status": 200,
+          "file": "a-connected-target-with-a-lease-container/stopTargetContainer.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [
+              "$.name",
+              "$.output"
+            ],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "targetAudit",
+          "method": "GET",
+          "path": "/system/api/targets/{targetId}/docker/audit",
+          "status": 200,
+          "file": "a-connected-target-with-a-lease-container/targetAudit.json",
+          "frozen": {
+            "ids": [
+              "$[*].id",
+              "$[*].targetId",
+              "$[*].leaseId"
+            ],
+            "instants": [
+              "$[*].at"
+            ],
+            "strings": [
+              "$[*].resource"
+            ],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "targetContainerLogs",
+          "method": "GET",
+          "path": "/system/api/targets/{targetId}/docker/containers/{containerName}/logs",
+          "status": 200,
+          "file": "a-connected-target-with-a-lease-container/targetContainerLogs.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a connected target with leases",
       "slug": "a-connected-target-with-leases",
       "params": {
@@ -1230,6 +1409,67 @@
       ]
     },
     {
+      "name": "an open exec terminal",
+      "slug": "an-open-exec-terminal",
+      "params": {
+        "terminalId": "00000000-0000-4000-8000-000000000003"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "closeTerminal",
+          "method": "DELETE",
+          "path": "/system/api/terminals/{terminalId}",
+          "status": 204,
+          "file": "an-open-exec-terminal/closeTerminal.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getTerminal",
+          "method": "GET",
+          "path": "/system/api/terminals/{terminalId}",
+          "status": 200,
+          "file": "an-open-exec-terminal/getTerminal.json",
+          "frozen": {
+            "ids": [
+              "$.id"
+            ],
+            "instants": [
+              "$.createdAt"
+            ],
+            "strings": [
+              "$.socketPath"
+            ],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listTerminals",
+          "method": "GET",
+          "path": "/system/api/terminals",
+          "status": 200,
+          "file": "an-open-exec-terminal/listTerminals.json",
+          "frozen": {
+            "ids": [
+              "$[*].id"
+            ],
+            "instants": [
+              "$[*].createdAt"
+            ],
+            "strings": [
+              "$[*].socketPath"
+            ],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "an unregistered runner",
       "slug": "an-unregistered-runner",
       "params": {
@@ -1468,6 +1708,38 @@
             "instants": [],
             "strings": [
               "$"
+            ],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "no terminal",
+      "slug": "no-terminal",
+      "params": {},
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "openTerminal",
+          "method": "POST",
+          "path": "/system/api/terminals",
+          "body": {
+            "kind": "EXEC",
+            "container": "dev-qits-ci.1.k4g0nn1ld7o272jl7fciatg6m",
+            "shell": "sh"
+          },
+          "status": 201,
+          "file": "no-terminal/openTerminal.json",
+          "frozen": {
+            "ids": [
+              "$.id"
+            ],
+            "instants": [
+              "$.createdAt"
+            ],
+            "strings": [
+              "$.socketPath"
             ],
             "listFilteredTo": null
           }

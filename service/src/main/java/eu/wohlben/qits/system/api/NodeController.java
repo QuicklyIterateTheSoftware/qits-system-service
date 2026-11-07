@@ -17,6 +17,7 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import java.util.List;
+import org.eclipse.microprofile.openapi.annotations.Operation;
 
 /**
  * What is on ONE node's docker daemon.
@@ -36,6 +37,7 @@ public class NodeController {
   /** {@code all=true} includes stopped containers — which is what an operator wants after a death. */
   @GET
   @Path("/{id}/containers")
+  @Operation(operationId = "listNodeContainers", summary = "Containers")
   public List<ContainerSummary> containers(
       @PathParam("id") String id, @QueryParam("all") @DefaultValue("false") boolean all) {
     return nodes.containers(id, all);
@@ -43,12 +45,14 @@ public class NodeController {
 
   @GET
   @Path("/{id}/containers/{cid}")
+  @Operation(operationId = "getNodeContainer", summary = "Container")
   public ContainerDetail container(@PathParam("id") String id, @PathParam("cid") String cid) {
     return nodes.container(id, cid);
   }
 
   @GET
   @Path("/{id}/containers/{cid}/logs")
+  @Operation(operationId = "getContainerLogs", summary = "Logs")
   public LogChunk logs(
       @PathParam("id") String id,
       @PathParam("cid") String cid,
@@ -58,18 +62,21 @@ public class NodeController {
 
   @GET
   @Path("/{id}/images")
+  @Operation(operationId = "listNodeImages", summary = "Images")
   public List<ImageSummary> images(@PathParam("id") String id) {
     return nodes.images(id);
   }
 
   @GET
   @Path("/{id}/volumes")
+  @Operation(operationId = "listNodeVolumes", summary = "Volumes")
   public List<VolumeSummary> volumes(@PathParam("id") String id) {
     return nodes.volumes(id);
   }
 
   @GET
   @Path("/{id}/networks")
+  @Operation(operationId = "listNodeNetworks", summary = "Networks")
   public List<NetworkSummary> networks(@PathParam("id") String id) {
     return nodes.networks(id);
   }

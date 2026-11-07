@@ -23,6 +23,10 @@ import jakarta.ws.rs.core.SecurityContext;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 
 /**
  * The terminal LIFECYCLE — create, list, read, end. The bytes go over the WebSocket in {@link
@@ -50,6 +54,7 @@ public class TerminalController {
 
   @GET
   @RolesAllowed({"qits:admin", "qits:admin-agent", "qits:desk-admin", "qits:system", "qits:agent"})
+  @Operation(operationId = "listTerminals", summary = "List")
   public List<TerminalView> list() {
     return sessions.list().stream().map(TerminalView::of).toList();
   }
@@ -57,6 +62,15 @@ public class TerminalController {
   @GET
   @Path("/{id}")
   @RolesAllowed({"qits:admin", "qits:admin-agent", "qits:desk-admin", "qits:system", "qits:agent"})
+  @Operation(operationId = "getTerminal", summary = "Get")
+  @APIResponse(
+      responseCode = "200",
+      description = "OK",
+      content =
+          @Content(
+              mediaType = MediaType.APPLICATION_JSON,
+              schema = @Schema(implementation = TerminalView.class)))
+  @APIResponse(responseCode = "404", description = "No such terminal")
   public TerminalView get(@PathParam("id") String id) {
     return TerminalView.of(require(id));
   }
@@ -71,6 +85,26 @@ public class TerminalController {
    */
   @POST
   @Consumes(MediaType.APPLICATION_JSON)
+  @Operation(operationId = "openTerminal", summary = "Open")
+  @APIResponse(
+      responseCode = "201",
+      description = "A new terminal",
+      content =
+          @Content(
+              mediaType = MediaType.APPLICATION_JSON,
+              schema = @Schema(implementation = TerminalView.class)))
+  @APIResponse(
+      responseCode = "200",
+      description = "The live glances terminal, found rather than started again",
+      content =
+          @Content(
+              mediaType = MediaType.APPLICATION_JSON,
+              schema = @Schema(implementation = TerminalView.class)))
+  @APIResponse(responseCode = "400", description = "Not one of the two request shapes")
+  @APIResponse(responseCode = "404", description = "EXEC: no such container")
+  @APIResponse(
+      responseCode = "409",
+      description = "EXEC: the container is not running; or the terminal limit is reached")
   public Response open(TerminalRequest request, SecurityContext security) {
     TerminalLaunch launch = launchOf(request);
     String principal =
@@ -84,6 +118,9 @@ public class TerminalController {
   /** End a terminal now, rather than waiting for the linger window. Idempotent-ish: 404 if gone. */
   @DELETE
   @Path("/{id}")
+  @Operation(operationId = "closeTerminal", summary = "Close")
+  @APIResponse(responseCode = "204", description = "Ended")
+  @APIResponse(responseCode = "404", description = "No such terminal")
   public Response close(@PathParam("id") String id) {
     UUID sessionId = DockerIdentifiers.parseSessionId(id);
     if (sessionId == null || !sessions.terminate(sessionId)) {

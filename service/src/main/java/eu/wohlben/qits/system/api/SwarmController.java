@@ -16,6 +16,7 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import java.util.List;
+import org.eclipse.microprofile.openapi.annotations.Operation;
 
 /**
  * The cluster-wide reads. These are answered by the swarm MANAGER this service runs on, so they
@@ -33,30 +34,35 @@ public class SwarmController {
 
   @GET
   @Path("/nodes")
+  @Operation(operationId = "listSwarmNodes", summary = "Nodes")
   public List<NodeSummary> nodes() {
     return swarm.nodes();
   }
 
   @GET
   @Path("/nodes/{id}")
+  @Operation(operationId = "getSwarmNode", summary = "Node")
   public NodeDetail node(@PathParam("id") String id) {
     return swarm.node(id);
   }
 
   @GET
   @Path("/services")
+  @Operation(operationId = "listSwarmServices", summary = "Services")
   public List<ServiceSummary> services() {
     return swarm.services();
   }
 
   @GET
   @Path("/services/{id}")
+  @Operation(operationId = "getSwarmService", summary = "Service")
   public ServiceDetail service(@PathParam("id") String id) {
     return swarm.service(id);
   }
 
   @GET
   @Path("/configs")
+  @Operation(operationId = "listSwarmConfigs", summary = "Configs")
   public List<ConfigSummary> configs() {
     return swarm.configs();
   }
@@ -64,12 +70,14 @@ public class SwarmController {
   /** Carries the config's DATA, base64-decoded. See {@link ConfigDetail} for why that is right. */
   @GET
   @Path("/configs/{id}")
+  @Operation(operationId = "getSwarmConfig", summary = "Config")
   public ConfigDetail config(@PathParam("id") String id) {
     return swarm.config(id);
   }
 
   @GET
   @Path("/secrets")
+  @Operation(operationId = "listSwarmSecrets", summary = "Secrets")
   public List<SecretSummary> secrets() {
     return swarm.secrets();
   }

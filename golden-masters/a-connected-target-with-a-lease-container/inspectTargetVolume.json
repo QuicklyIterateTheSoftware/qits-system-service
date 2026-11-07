@@ -1,0 +1,11 @@
+{
+  "CreatedAt": "2026-01-01T00:00:00Z",
+  "Driver": "local",
+  "Labels": {
+    "qits.system.runner": "00000000-0000-4000-8000-000000000001"
+  },
+  "Mountpoint": "/var/lib/docker/volumes/qits-system-runner-work-ws-17-00000000/_data",
+  "Name": "qits-system-runner-work-ws-17-00000000",
+  "Options": null,
+  "Scope": "local"
+}

@@ -8,6 +8,7 @@ import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
+import org.eclipse.microprofile.openapi.annotations.Operation;
 
 /**
  * The landing read: the machine, its disk and its swarm, in one call.
@@ -26,6 +27,7 @@ public class OverviewController {
   @Inject HostReads hosts;
 
   @GET
+  @Operation(operationId = "getOverview", summary = "Overview")
   public Overview overview() {
     return hosts.overview();
   }
