@@ -108,7 +108,7 @@
              One version for both: they are released together from qits-runner-javalib. -->
         <qits.eventstream.version>2026.1106.12426</qits.eventstream.version>
         <qits.db-core.version>2026.1106.507</qits.db-core.version>
-        <qits.runner.version>2026.1106.151306</qits.runner.version>
+        <qits.runner.version>2026.1107.80422</qits.runner.version>
         <!-- The qits-system-runner's own frames (qits-1481): SystemRunnerProtocol, SystemRunnerCodec
              and SystemRunnerBinary, whose VERSION is the runner image every target is pinned to.
              Published by qits-system-runner-daemon. -->
@@ -119,7 +119,7 @@
              rather than reporting UNKNOWN until its first lease. Same pin qits-projects-service
              carries for the refinement image, moved by qits-maintenance on maintenance/dependencies
              like any other internal pin; never by hand. -->
-        <qits.workspace-daemon-protocol.version>2026.1106.155940</qits.workspace-daemon-protocol.version>
+        <qits.workspace-daemon-protocol.version>2026.1107.64407</qits.workspace-daemon-protocol.version>
         <zonky.embedded-postgres.version>2.2.2</zonky.embedded-postgres.version>
         <zonky.postgres-binaries.version>18.6.0</zonky.postgres-binaries.version>
         <qits.maven.repository.url>https://registry.qits.wohlben.eu/artifacts/maven/maven</qits.maven.repository.url>
