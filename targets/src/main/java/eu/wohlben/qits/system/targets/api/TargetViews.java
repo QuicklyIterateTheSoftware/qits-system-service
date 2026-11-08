@@ -7,6 +7,7 @@ import eu.wohlben.qits.system.targets.control.Targets;
 import eu.wohlben.qits.system.targets.entity.Lease;
 import eu.wohlben.qits.system.targets.entity.SlotType;
 import eu.wohlben.qits.system.targets.entity.Target;
+import eu.wohlben.qits.system.targets.entity.WarmImage;
 import eu.wohlben.qits.system.targets.runner.TargetLoginCommand;
 import eu.wohlben.qits.system.targets.runner.TargetRegistry;
 import eu.wohlben.qits.system.targets.runner.TargetSignIns;
@@ -210,6 +211,20 @@ public class TargetViews {
   public record WorkVolumeDto(
       String ownerApp, String workKey, UUID targetId, String volumeName, Instant purgeRequestedAt) {}
 
+  /**
+   * The image one slot type keeps warm (qits-1692): the newest released version of its slot image,
+   * which every target that can run the type pulls ahead of its first lease.
+   */
+  @Schema(name = "WarmImage")
+  public record WarmImageDto(
+      SlotType slotType,
+      @Schema(description = "The released package, as qits-ci names it: qits/workspace")
+          String packageName,
+      @Schema(description = "Its version, YYYY.MMDD.HHMMSS") String version,
+      @Schema(description = "The full reference the estate carries: <configured image>:<version>")
+          String image,
+      @Schema(description = "When the newest release moved it here") Instant updatedAt) {}
+
   // --- mapping ----------------------------------------------------------------------------------
 
   public TargetDto view(Target target, Map<SlotType, Integer> used) {
@@ -298,5 +313,9 @@ public class TargetViews {
         lease.oomScope(),
         lease.memoryPeakBytes,
         lease.oomKilled);
+  }
+
+  public static WarmImageDto view(WarmImage row) {
+    return new WarmImageDto(row.slotType, row.packageName, row.version, row.image, row.updatedAt);
   }
 }

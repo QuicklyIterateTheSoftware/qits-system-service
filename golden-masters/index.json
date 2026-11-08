@@ -933,6 +933,29 @@
       ]
     },
     {
+      "name": "a released slot image",
+      "slug": "a-released-slot-image",
+      "params": {},
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listWarmImages",
+          "method": "GET",
+          "path": "/system/api/targets/warm-images",
+          "status": 200,
+          "file": "a-released-slot-image/listWarmImages.json",
+          "frozen": {
+            "ids": [],
+            "instants": [
+              "$[*].updatedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a rotated runner",
       "slug": "a-rotated-runner",
       "params": {

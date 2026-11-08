@@ -94,6 +94,22 @@ public class WarmImages {
     return QuarkusTransaction.requiringNew().call(WarmImages::currentInTransaction);
   }
 
+  /**
+   * Every {@code warm_image} row, in slot type order; empty when no slot image was released yet.
+   * The rows are detached: every column is a plain value, read before the transaction ends.
+   */
+  public List<WarmImage> rows() {
+    return QuarkusTransaction.requiringNew()
+        .call(
+            () -> {
+              Map<SlotType, WarmImage> byType = new EnumMap<>(SlotType.class);
+              for (WarmImage row : WarmImage.<WarmImage>listAll()) {
+                byType.put(row.slotType, row);
+              }
+              return List.copyOf(byType.values());
+            });
+  }
+
   /** {@link #current()} inside the caller's transaction. */
   public static Map<SlotType, String> currentInTransaction() {
     Map<SlotType, String> images = new EnumMap<>(SlotType.class);

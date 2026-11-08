@@ -12,6 +12,7 @@ import eu.wohlben.qits.system.targets.entity.LoginValue;
 import eu.wohlben.qits.system.targets.entity.SlotType;
 import eu.wohlben.qits.system.targets.entity.Target;
 import eu.wohlben.qits.system.targets.entity.TargetAudit;
+import eu.wohlben.qits.system.targets.entity.WarmImage;
 import eu.wohlben.qits.system.targets.entity.WorkVolume;
 import eu.wohlben.qits.system.targets.runner.TargetSignIns;
 import eu.wohlben.qits.system.terminal.ExecShell;
@@ -148,6 +149,12 @@ public class ProviderStates {
   public static final String A_CONNECTED_TARGET_WITH_A_LEASE_CONTAINER =
       "a connected target with a lease container";
 
+  /**
+   * qits-workspaces' slot image {@code qits/workspace} released at {@link #WARM_VERSION}: the
+   * WORKSPACE type keeps {@link #WORKSPACE_IMAGE} warm, the one {@code warm_image} row (qits-1955).
+   */
+  public static final String A_RELEASED_SLOT_IMAGE = "a released slot image";
+
   /** No terminal is open on this node: where an open starts (qits-1936). */
   public static final String NO_TERMINAL = "no terminal";
 
@@ -182,6 +189,9 @@ public class ProviderStates {
   static final String PROJECTS_BEARER = "Bearer qits_tok_contract-qits-projects";
 
   static final String WORKSPACE_IMAGE = "registry.qits.wohlben.eu/qits/workspace:2026.1";
+
+  /** {@link #WORKSPACE_IMAGE}'s version, as {@link #A_RELEASED_SLOT_IMAGE} holds it warm. */
+  static final String WARM_VERSION = "2026.1";
 
   static final String DESK_IMAGE = "registry.qits.wohlben.eu/qits/project-agent:2026.1";
 
@@ -275,6 +285,7 @@ public class ProviderStates {
     states.put(A_CLAUDE_SIGN_IN_AWAITING_ITS_CODE, this::aClaudeSignInAwaitingItsCode);
     states.put(A_CONNECTED_TARGET_WITH_LEASES, this::aConnectedTargetWithLeases);
     states.put(A_CONNECTED_TARGET_WITH_A_LEASE_CONTAINER, this::aConnectedTargetWithALeaseContainer);
+    states.put(A_RELEASED_SLOT_IMAGE, this::aReleasedSlotImage);
     states.put(NO_TERMINAL, this::noTerminal);
     states.put(AN_OPEN_EXEC_TERMINAL, this::anOpenExecTerminal);
   }
@@ -770,6 +781,24 @@ public class ProviderStates {
   private static DockerResult notFound(Docker request, String what, String name) {
     return DockerResult.of(
         request.requestId(), DockerStatus.NOT_FOUND, "no " + what + " " + name + " of this target");
+  }
+
+  // --- the warm images (qits-1955) -------------------------------------------------------------
+
+  private Setup aReleasedSlotImage() {
+    fresh();
+    QuarkusTransaction.requiringNew()
+        .run(
+            () -> {
+              WarmImage row = new WarmImage();
+              row.slotType = SlotType.WORKSPACE;
+              row.packageName = "qits/workspace";
+              row.version = WARM_VERSION;
+              row.image = WORKSPACE_IMAGE;
+              row.updatedAt = TargetRows.T0;
+              row.persist();
+            });
+    return new Setup(Map.of());
   }
 
   // --- the terminal states (qits-1936) ----------------------------------------------------------

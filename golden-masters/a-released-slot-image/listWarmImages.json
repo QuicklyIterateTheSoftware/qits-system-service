@@ -1,0 +1,9 @@
+[
+  {
+    "slotType": "WORKSPACE",
+    "packageName": "qits/workspace",
+    "version": "2026.1",
+    "image": "registry.qits.wohlben.eu/qits/workspace:2026.1",
+    "updatedAt": "2026-01-01T00:00:00Z"
+  }
+]

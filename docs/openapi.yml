@@ -1056,6 +1056,24 @@ components:
           type: object
           additionalProperties:
             type: string
+    WarmImage:
+      type: object
+      properties:
+        slotType:
+          $ref: "#/components/schemas/SlotType"
+        packageName:
+          type: string
+          description: "The released package, as qits-ci names it: qits/workspace"
+        version:
+          type: string
+          description: "Its version, YYYY.MMDD.HHMMSS"
+        image:
+          type: string
+          description: "The full reference the estate carries: <configured image>:<version>"
+        updatedAt:
+          $ref: "#/components/schemas/Instant"
+          description: When the newest release moved it here
+          type: string
     WorkVolume:
       type: object
       properties:
@@ -1812,6 +1830,33 @@ paths:
       security:
       - SecurityScheme:
         - qits:target-runner-registration
+        - qits:admin
+        - qits:admin-agent
+        - qits:desk-admin
+        - qits:system
+        - qits:agent
+  /system/api/targets/warm-images:
+    get:
+      summary: "The image each slot type keeps warm, by slot type"
+      operationId: listWarmImages
+      responses:
+        "200":
+          description: "One per slot type a slot image was released for, in slot type\
+            \ order; empty when none"
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WarmImage"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      tags:
+      - Target Controller
+      security:
+      - SecurityScheme:
         - qits:admin
         - qits:admin-agent
         - qits:desk-admin

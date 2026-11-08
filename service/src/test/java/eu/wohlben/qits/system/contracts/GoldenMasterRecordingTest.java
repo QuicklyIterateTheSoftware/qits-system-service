@@ -377,6 +377,15 @@ class GoldenMasterRecordingTest {
           lease("removeTargetContainer", "DELETE", DOCKER + "/containers/{containerName}", null),
           lease("listTargetVolumes", "GET", DOCKER + "/volumes", null),
           lease("inspectTargetVolume", "GET", DOCKER + "/volumes/{volumeName}", null),
+          // --- the warm images (qits-1955), as the operator ---
+          call(
+              ProviderStates.A_RELEASED_SLOT_IMAGE,
+              "listWarmImages",
+              "GET",
+              API + "/targets/warm-images",
+              200,
+              null,
+              Map.of()),
           // --- the terminals (qits-1936) ---
           call(
               ProviderStates.NO_TERMINAL,

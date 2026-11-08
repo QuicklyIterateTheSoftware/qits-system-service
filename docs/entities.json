@@ -432,9 +432,24 @@
       "marking" : "domain",
       "reason" : null,
       "projectionOf" : null,
-      "knownGap" : "qits-1955",
-      "dtos" : [ ],
-      "operations" : [ ]
+      "knownGap" : null,
+      "dtos" : [
+        {
+          "type" : "eu.wohlben.qits.system.targets.api.TargetViews$WarmImageDto",
+          "kind" : "mapper",
+          "via" : null,
+          "site" : "TargetViews.view(WarmImage)"
+        }
+      ],
+      "operations" : [
+        {
+          "operationId" : "listWarmImages",
+          "method" : "GET",
+          "path" : "/targets/warm-images",
+          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$WarmImageDto",
+          "kind" : "returns"
+        }
+      ]
     },
     {
       "entity" : "eu.wohlben.qits.system.targets.entity.WorkVolume",
