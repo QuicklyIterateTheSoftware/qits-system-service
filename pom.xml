@@ -119,7 +119,7 @@
              rather than reporting UNKNOWN until its first lease. Same pin qits-projects-service
              carries for the refinement image, moved by qits-maintenance on maintenance/dependencies
              like any other internal pin; never by hand. -->
-        <qits.workspace-daemon-protocol.version>2026.1107.181149</qits.workspace-daemon-protocol.version>
+        <qits.workspace-daemon-protocol.version>2026.1108.110945</qits.workspace-daemon-protocol.version>
         <zonky.embedded-postgres.version>2.2.2</zonky.embedded-postgres.version>
         <zonky.postgres-binaries.version>18.6.0</zonky.postgres-binaries.version>
         <qits.maven.repository.url>https://registry.qits.wohlben.eu/artifacts/maven/maven</qits.maven.repository.url>
@@ -144,7 +144,7 @@
              shared golden-master reader from qits-integrations-quarkus, and the recorded answers of
              the one provider this service calls, qits-idp (OIDC discovery and JWKS). Exact pins. -->
         <qits.pact-consumer.version>2026.1106.507</qits.pact-consumer.version>
-        <qits.idp-golden-masters.version>2026.1107.220215</qits.idp-golden-masters.version>
+        <qits.idp-golden-masters.version>2026.1108.62139</qits.idp-golden-masters.version>
         <!-- The provider half: each consumer's pact, published as a jar holding
              `pacts/<consumer>_qits-system-service.json` and verified by
              contracts/ConsumerPactVerificationTest. qits-landing-app is the first (its target
@@ -154,6 +154,8 @@
              edit). Named like every pact pin on the estate: the artifactId without its `qits-`. -->
         <qits.landing-app-pacts-qits-system-service.version>2026.1028.215301</qits.landing-app-pacts-qits-system-service.version>
         <qits.maintenance-service-pacts-qits-system-service.version>2026.1031.131646</qits.maintenance-service-pacts-qits-system-service.version>
+        <qits.projects-service-pacts-qits-system-service.version>2026.1028.163552</qits.projects-service-pacts-qits-system-service.version>
+        <qits.workspaces-service-pacts-qits-system-service.version>2026.1024.141209</qits.workspaces-service-pacts-qits-system-service.version>
 
         <compiler-plugin.version>3.15.0</compiler-plugin.version>
         <surefire-plugin.version>3.5.4</surefire-plugin.version>
@@ -347,6 +349,20 @@
                 <groupId>${project.groupId}</groupId>
                 <artifactId>qits-maintenance-service-pacts-qits-system-service</artifactId>
                 <version>${qits.maintenance-service-pacts-qits-system-service.version}</version>
+            </dependency>
+            <dependency>
+                <!-- Test scope at every declaration site: a consumer's pact, verified by
+                     ConsumerPactVerificationTest. -->
+                <groupId>${project.groupId}</groupId>
+                <artifactId>qits-projects-service-pacts-qits-system-service</artifactId>
+                <version>${qits.projects-service-pacts-qits-system-service.version}</version>
+            </dependency>
+            <dependency>
+                <!-- Test scope at every declaration site: a consumer's pact, verified by
+                     ConsumerPactVerificationTest. -->
+                <groupId>${project.groupId}</groupId>
+                <artifactId>qits-workspaces-service-pacts-qits-system-service</artifactId>
+                <version>${qits.workspaces-service-pacts-qits-system-service.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
