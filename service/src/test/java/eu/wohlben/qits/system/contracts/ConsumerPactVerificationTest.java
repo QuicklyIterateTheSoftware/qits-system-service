@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.hc.core5.http.ClassicHttpRequest;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,6 +43,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
  * fake docker script behind it. Every {@code @State} method delegates to {@link ProviderStates};
  * {@link #target} fails an unknown state, and an interaction without {@code
  * comments.references.qits-call} or {@code qits-trigger}.
+ *
+ * <p><b>A pinned, deployed or rollback consumer pact that is wrong is named in {@link
+ * #KNOWN_WRONG}, by its jar's version</b> (qits-maintenance-service's and qits-projects-service's
+ * pattern), and its interaction is reported as skipped with the reason — never answered by
+ * bending the provider to it. The entry is for that version alone: the bump that carries the
+ * consumer's fix verifies the interaction for real, and a bump that does not fix it goes red
+ * here.
  */
 @QuarkusTest
 @Provider(ConsumerPactVerificationTest.PROVIDER)
@@ -56,6 +64,54 @@ class ConsumerPactVerificationTest {
     System.setProperty("pact_do_not_track", "true");
   }
 
+  /**
+   * A pinned, deployed or rollback consumer pact interaction this provider cannot honour, and why:
+   * the consumer must fix it. {@code state}, when not null, narrows the entry to the interaction
+   * set up in that provider state — for a description a consumer reuses across several
+   * interactions. {@code version} is matched against the pact's source ({@link Pact#getSource()}),
+   * whose string names the jar or file it was read from — the pinned jar's maven path carries
+   * {@code /<version>/}, same as the deployed-pacts layout's {@code
+   * <consumer-repo>/<pactVersion>/} directory, so the one check covers both.
+   */
+  record KnownWrong(String consumer, String version, String description, String state, String reason) {
+
+    KnownWrong(String consumer, String version, String description, String reason) {
+      this(consumer, version, description, null, reason);
+    }
+
+    boolean names(Pact pact, Interaction interaction) {
+      return consumer.equals(pact.getConsumer().getName())
+          && (description == null || description.equals(interaction.getDescription()))
+          && String.valueOf(pact.getSource()).contains("/" + version + "/")
+          && (state == null
+              || interaction.getProviderStates().stream()
+                  .anyMatch(each -> state.equals(each.getName())));
+    }
+  }
+
+  /**
+   * The pinned, deployed or rollback consumer pact interactions this provider cannot honour. Empty
+   * when every consumer version the gate verifies holds; an entry stays only while its version is
+   * pinned, deployed or a rollback target of its consumer.
+   *
+   * <p>qits-workspaces-service's {@code 2026.1024.141209} (not pinned here, but served by its
+   * rollback version 2026.1108.130121 and so verified through {@code QITS_DEPLOYED_PACTS_DIR})
+   * asks {@code createLease} for ownerRef 17 / {@code ws-17} in provider state "a queued workspace
+   * lease" — the very lease the state seeds — so this provider correctly answers 409
+   * LEASE_EXISTS. The consumer fixed it in pact {@code 2026.1108.163532} (ownerRef 18), which
+   * verifies for real. This entry stays until {@code 2026.1024.141209} is neither pinned, deployed
+   * nor a rollback target of qits-workspaces-service.
+   */
+  static final List<KnownWrong> KNOWN_WRONG =
+      List.of(
+          new KnownWrong(
+              "qits-workspaces-service",
+              "2026.1024.141209",
+              "ensureWorkspaceContainer: createLease",
+              "a queued workspace lease",
+              "asks createLease for ownerRef 17, the lease the state seeds, so qits-system answers"
+                  + " 409 LEASE_EXISTS; fixed in 2026.1108.163532 (qits-1952)"));
+
   @jakarta.inject.Inject eu.wohlben.qits.system.targets.ContractBearers bearers;
 
   private ProviderStates states;
@@ -67,6 +123,20 @@ class ConsumerPactVerificationTest {
   void target(PactVerificationContext context, Pact pact, Interaction interaction) {
     states = new ProviderStates(bearers, URI.create(base.toString()));
     String consumer = pact.getConsumer().getName();
+    // First, so a known-wrong interaction is skipped for its reason rather than failed on
+    // something else below.
+    for (KnownWrong wrong : KNOWN_WRONG) {
+      if (wrong.names(pact, interaction)) {
+        Assumptions.abort(
+            consumer
+                + " "
+                + wrong.version()
+                + " '"
+                + interaction.getDescription()
+                + "': "
+                + wrong.reason());
+      }
+    }
     for (ProviderState state : interaction.getProviderStates()) {
       if (!states.names().contains(state.getName())) {
         fail(
