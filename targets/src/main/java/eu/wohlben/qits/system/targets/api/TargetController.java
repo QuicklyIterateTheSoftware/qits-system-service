@@ -7,6 +7,7 @@ import eu.wohlben.qits.system.targets.control.LeaseSpecs;
 import eu.wohlben.qits.system.targets.control.TargetAllocation;
 import eu.wohlben.qits.system.targets.control.TargetRefusal;
 import eu.wohlben.qits.system.targets.control.Targets;
+import eu.wohlben.qits.system.targets.control.WarmImages;
 import eu.wohlben.qits.system.targets.entity.SlotType;
 import eu.wohlben.qits.system.targets.entity.Target;
 import eu.wohlben.qits.system.targets.idp.TargetRunnerCommissioner;
@@ -63,6 +64,7 @@ import org.jboss.logging.Logger;
       TargetViews.RegisteredTarget.class,
       TargetViews.HealthCheckRequested.class,
       TargetViews.SignInView.class,
+      TargetViews.WarmImageDto.class,
       TargetController.StartSignInRequest.class,
       TargetController.SignInCodeRequest.class,
       TargetController.CreateTargetRequest.class,
@@ -115,6 +117,8 @@ public class TargetController {
   @Inject TargetAddresses addresses;
 
   @Inject TargetInstallScript installScript;
+
+  @Inject WarmImages warmImages;
 
   @Inject MachineAuth machineAuth;
 
@@ -249,6 +253,17 @@ public class TargetController {
   public String installScript() {
     installScript.requireRenderable();
     return installScript.script();
+  }
+
+  @GET
+  @Path("/warm-images")
+  @RolesAllowed({ADMIN, ADMIN_AGENT, DESK_ADMIN, SYSTEM, AGENT})
+  @Operation(operationId = "listWarmImages", summary = "The image each slot type keeps warm, by slot type")
+  @APIResponse(
+      responseCode = "200",
+      description = "One per slot type a slot image was released for, in slot type order; empty when none")
+  public List<TargetViews.WarmImageDto> warmImages() {
+    return warmImages.rows().stream().map(TargetViews::view).toList();
   }
 
   @GET

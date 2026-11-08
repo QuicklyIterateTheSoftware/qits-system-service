@@ -207,6 +207,11 @@ class ConsumerPactVerificationTest {
     return states.params(ProviderStates.A_CONNECTED_TARGET_WITH_A_LEASE_CONTAINER);
   }
 
+  @State(ProviderStates.A_RELEASED_SLOT_IMAGE)
+  Map<String, String> aReleasedSlotImage() {
+    return states.params(ProviderStates.A_RELEASED_SLOT_IMAGE);
+  }
+
   @State(ProviderStates.NO_TERMINAL)
   Map<String, String> noTerminal() {
     return states.params(ProviderStates.NO_TERMINAL);
