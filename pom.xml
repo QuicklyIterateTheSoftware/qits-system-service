@@ -108,18 +108,18 @@
              One version for both: they are released together from qits-runner-javalib. -->
         <qits.eventstream.version>2026.1107.192805</qits.eventstream.version>
         <qits.db-core.version>2026.1107.191249</qits.db-core.version>
-        <qits.runner.version>2026.1108.141634</qits.runner.version>
+        <qits.runner.version>2026.1109.3936</qits.runner.version>
         <!-- The qits-system-runner's own frames (qits-1481): SystemRunnerProtocol, SystemRunnerCodec
              and SystemRunnerBinary, whose VERSION is the runner image every target is pinned to.
              Published by qits-system-runner-daemon. -->
-        <qits.system-runner-protocol.version>2026.1108.143556</qits.system-runner-protocol.version>
+        <qits.system-runner-protocol.version>2026.1109.11252</qits.system-runner-protocol.version>
         <!-- THE LOGIN PROBE'S LAST-RESORT IMAGE (qits-1593): qits-workspace-daemon-protocol's
              WorkspaceImage carries the `qits/workspace` tag of the release that published it, so a
              brand-new target with no WORKSPACE or DESK lease yet can still be probed and sign in,
              rather than reporting UNKNOWN until its first lease. Same pin qits-projects-service
              carries for the refinement image, moved by qits-maintenance on maintenance/dependencies
              like any other internal pin; never by hand. -->
-        <qits.workspace-daemon-protocol.version>2026.1108.110945</qits.workspace-daemon-protocol.version>
+        <qits.workspace-daemon-protocol.version>2026.1109.95928</qits.workspace-daemon-protocol.version>
         <zonky.embedded-postgres.version>2.2.2</zonky.embedded-postgres.version>
         <zonky.postgres-binaries.version>18.6.0</zonky.postgres-binaries.version>
         <qits.maven.repository.url>https://registry.qits.wohlben.eu/artifacts/maven/maven</qits.maven.repository.url>
@@ -144,7 +144,7 @@
              shared golden-master reader from qits-integrations-quarkus, and the recorded answers of
              the one provider this service calls, qits-idp (OIDC discovery and JWKS). Exact pins. -->
         <qits.pact-consumer.version>2026.1106.507</qits.pact-consumer.version>
-        <qits.idp-golden-masters.version>2026.1108.62139</qits.idp-golden-masters.version>
+        <qits.idp-golden-masters.version>2026.1109.13349</qits.idp-golden-masters.version>
         <!-- The provider half: each consumer's pact, published as a jar holding
              `pacts/<consumer>_qits-system-service.json` and verified by
              contracts/ConsumerPactVerificationTest. qits-landing-app is the first (its target
@@ -156,6 +156,7 @@
         <qits.maintenance-service-pacts-qits-system-service.version>2026.1031.131646</qits.maintenance-service-pacts-qits-system-service.version>
         <qits.projects-service-pacts-qits-system-service.version>2026.1028.163552</qits.projects-service-pacts-qits-system-service.version>
         <qits.workspaces-service-pacts-qits-system-service.version>2026.1108.163532</qits.workspaces-service-pacts-qits-system-service.version>
+        <qits.bootstrap-cli-pacts-qits-system-service.version>2026.1023.225504</qits.bootstrap-cli-pacts-qits-system-service.version>
 
         <compiler-plugin.version>3.15.0</compiler-plugin.version>
         <surefire-plugin.version>3.5.4</surefire-plugin.version>
@@ -363,6 +364,13 @@
                 <groupId>${project.groupId}</groupId>
                 <artifactId>qits-workspaces-service-pacts-qits-system-service</artifactId>
                 <version>${qits.workspaces-service-pacts-qits-system-service.version}</version>
+            </dependency>
+            <dependency>
+                <!-- Test scope at every declaration site: a consumer's pact, verified by
+                     ConsumerPactVerificationTest. -->
+                <groupId>${project.groupId}</groupId>
+                <artifactId>qits-bootstrap-cli-pacts-qits-system-service</artifactId>
+                <version>${qits.bootstrap-cli-pacts-qits-system-service.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
