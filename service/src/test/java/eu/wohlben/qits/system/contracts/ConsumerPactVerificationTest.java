@@ -93,24 +93,8 @@ class ConsumerPactVerificationTest {
    * The pinned, deployed or rollback consumer pact interactions this provider cannot honour. Empty
    * when every consumer version the gate verifies holds; an entry stays only while its version is
    * pinned, deployed or a rollback target of its consumer.
-   *
-   * <p>qits-workspaces-service's {@code 2026.1024.141209} (not pinned here, but served by its
-   * rollback version 2026.1108.130121 and so verified through {@code QITS_DEPLOYED_PACTS_DIR})
-   * asks {@code createLease} for ownerRef 17 / {@code ws-17} in provider state "a queued workspace
-   * lease" — the very lease the state seeds — so this provider correctly answers 409
-   * LEASE_EXISTS. The consumer fixed it in pact {@code 2026.1108.163532} (ownerRef 18), which
-   * verifies for real. This entry stays until {@code 2026.1024.141209} is neither pinned, deployed
-   * nor a rollback target of qits-workspaces-service.
    */
-  static final List<KnownWrong> KNOWN_WRONG =
-      List.of(
-          new KnownWrong(
-              "qits-workspaces-service",
-              "2026.1024.141209",
-              "ensureWorkspaceContainer: createLease",
-              "a queued workspace lease",
-              "asks createLease for ownerRef 17, the lease the state seeds, so qits-system answers"
-                  + " 409 LEASE_EXISTS; fixed in 2026.1108.163532 (qits-1952)"));
+  static final List<KnownWrong> KNOWN_WRONG = List.of();
 
   @jakarta.inject.Inject eu.wohlben.qits.system.targets.ContractBearers bearers;
 
