@@ -375,12 +375,30 @@ public class Targets {
     if (target.registered() && target.registrationTokenSubject == null) {
       throw registeredAlready(target);
     }
-    if (subject == null
-        || subject.isBlank()
-        || !subject.equals(target.registrationTokenSubject)) {
+    if (!subjectIsLive(target, subject)) {
       throw new TargetRefusal(403, null, "This registration token is not this target's");
     }
     return target;
+  }
+
+  /**
+   * qits-2022: 404 unknown target; 403 unless {@code subject} is {@code id}'s live registration
+   * token's subject — the same comparison {@link #requireRegistrable} makes, for qits-network-access
+   * to ask without attempting a registration itself. Never answers what the stored subject is.
+   */
+  public Target requireLiveRegistrationSubject(UUID id, String subject) {
+    Target target = get(id);
+    if (!subjectIsLive(target, subject)) {
+      throw new TargetRefusal(403, null, "This registration token is not this target's");
+    }
+    return target;
+  }
+
+  /** Whether {@code subject} is {@code target}'s live registration token's subject. */
+  private static boolean subjectIsLive(Target target, String subject) {
+    return subject != null
+        && !subject.isBlank()
+        && subject.equals(target.registrationTokenSubject);
   }
 
   /** What a registration did: the target as it now is, and the client it replaced (null if none). */

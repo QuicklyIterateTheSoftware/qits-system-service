@@ -201,6 +201,11 @@ class ConsumerPactVerificationTest {
     return states.params(ProviderStates.A_ROTATED_RUNNER);
   }
 
+  @State(ProviderStates.A_TARGET_WITH_A_LIVE_REGISTRATION_SUBJECT)
+  Map<String, String> aTargetWithALiveRegistrationSubject() {
+    return states.params(ProviderStates.A_TARGET_WITH_A_LIVE_REGISTRATION_SUBJECT);
+  }
+
   @State(ProviderStates.A_QUEUED_LEASE)
   Map<String, String> aQueuedLease() {
     return states.params(ProviderStates.A_QUEUED_LEASE);

@@ -941,6 +941,21 @@ components:
           description: "The one line that installs the target's runner: it fetches\
             \ install.sh with the registration token and pipes it into sudo sh. Returned\
             \ once"
+    TargetRegistrationCheck:
+      type: object
+      properties:
+        targetId:
+          $ref: "#/components/schemas/UUID"
+        targetName:
+          type: string
+    TargetRegistrationCheckRequest:
+      type: object
+      required:
+      - subject
+      properties:
+        subject:
+          type: string
+          description: Compared to the target's live registration token's subject
     TargetSignIn:
       type: object
       properties:
@@ -2450,6 +2465,45 @@ paths:
       security:
       - SecurityScheme:
         - qits:target-runner-registration
+  /system/api/targets/{id}/registration-check:
+    post:
+      summary: Whether subject is target id's live registration token's subject
+      description: For a service with its own idp client (qits-network-access) to
+        ask without attempting a registration itself. Never answers what the stored
+        subject is.
+      operationId: checkTargetRegistration
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TargetRegistrationCheckRequest"
+        required: true
+      responses:
+        "200":
+          description: subject is this target's live registration token's subject
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TargetRegistrationCheck"
+        "403":
+          description: "subject differs, or no token is live"
+        "404":
+          description: No such target
+        "401":
+          description: Not Authorized
+        "400":
+          description: Bad Request
+      tags:
+      - Target Controller
+      security:
+      - SecurityScheme:
+        - qits:system
   /system/api/targets/{id}/registration-token:
     post:
       summary: Replace a target's registration token; answers a new install line

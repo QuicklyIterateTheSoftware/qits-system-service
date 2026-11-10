@@ -260,7 +260,15 @@ type's reservation is 409 `MAXIMUM_BELOW_RESERVATION`; one above the total is ha
   target's node counter (`nodeOomKills`, else `kernelOomKills`) rose — `delta`, and the `projectIds`
   of the leases occupying it then; a first value is the baseline and a drop (a reboot) the new one;
   `TargetLoginChanged` on every sign-in change, `TargetConnectionChanged` when whether a target's
-  runner serves it flips (a handover publishes nothing). Owners also reconcile from `GET /leases`.
+  runner serves it flips (a handover publishes nothing); `TargetDeleted` (qits-2022) once `DELETE
+  /targets/{id}` decommissions a target — never for a 404 delete. Owners also reconcile from `GET
+  /leases`.
+- **Registration check** (qits-2022): `POST /targets/{id}/registration-check` `{subject}`,
+  `qits:system` only — 200 `{targetId, targetName}` when `subject` is the target's live
+  registration token's subject, 403 otherwise (the subject differs, or none is live), 404 unknown
+  target. The same comparison `register` makes, for a service with its own idp client (eg.
+  qits-network-access) to ask without attempting a registration itself; it never answers what the
+  stored subject is.
 - **Store**: postgres (`resources: postgresql:db, postgresql:eventstream:…` in deployments.yml),
   flyway `db/system/migration`, named persistence unit `system`.
 

@@ -1768,6 +1768,39 @@
           }
         }
       ]
+    },
+    {
+      "name": "target 00000000-0000-4000-8000-000000000001 has registration subject contract-registration-subject",
+      "slug": "target-00000000-0000-4000-8000-000000000001-has-registration-subject-contract-registration-subject",
+      "params": {
+        "authorization": "Bearer qits_tok_contract-qits-network-access",
+        "subject": "contract-registration-subject",
+        "targetId": "00000000-0000-4000-8000-000000000001"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "checkTargetRegistration",
+          "method": "POST",
+          "path": "/system/api/targets/{targetId}/registration-check",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "body": {
+            "subject": "{subject}"
+          },
+          "status": 200,
+          "file": "target-00000000-0000-4000-8000-000000000001-has-registration-subject-contract-registration-subject/checkTargetRegistration.json",
+          "frozen": {
+            "ids": [
+              "$.targetId"
+            ],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
     }
   ]
 }

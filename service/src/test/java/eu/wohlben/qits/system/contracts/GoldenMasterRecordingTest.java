@@ -267,6 +267,15 @@ class GoldenMasterRecordingTest {
               null,
               Map.of()),
           call(ProviderStates.A_DECLARED_TARGET, "deleteTarget", "DELETE", TARGET, 204, null, Map.of()),
+          // --- the registration check (qits-2022) ---
+          call(
+              ProviderStates.A_TARGET_WITH_A_LIVE_REGISTRATION_SUBJECT,
+              "checkTargetRegistration",
+              "POST",
+              TARGET + "/registration-check",
+              200,
+              "{\"subject\":\"{subject}\"}",
+              BEARER),
           // --- the sign-in doors (qits-1593) ---
           call(
               ProviderStates.A_CONNECTED_TARGET,

@@ -4,7 +4,9 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -36,6 +38,8 @@ class TargetDoorsTest {
   @Inject Targets targets;
 
   @Inject ContractBearers bearers;
+
+  @Inject RecordingEventBus bus;
 
   @TestHTTPResource("/")
   java.net.URI base;
@@ -250,6 +254,35 @@ class TargetDoorsTest {
     assertNull(TargetRows.reloadTarget(id));
     assertNull(TargetRows.reload(lease).targetId, "an ended lease outlives its target, unplaced");
     assertTrue(IdpStub.requests().contains("DELETE /idp/api/clients/client-busy"));
+  }
+
+  @Test
+  void aSuccessfulDeletePublishesExactlyOneTargetDeleted() throws Exception {
+    UUID id = UUID.randomUUID();
+    TargetRows.target(id, "gone-soon", 4, "client-gone-soon", false);
+    admin().delete(API + "/" + id).then().statusCode(204);
+    java.util.List<eu.wohlben.qits.system.targets.events.TargetDeleted> events =
+        bus.await(
+            eu.wohlben.qits.system.targets.events.TargetDeleted.class,
+            e -> e.targetId().equals(id.toString()),
+            1,
+            java.time.Duration.ofMillis(500));
+    assertEquals(1, events.size(), events.toString());
+    assertEquals("gone-soon", events.get(0).targetName());
+    assertEquals("TargetDeleted", events.get(0).name());
+  }
+
+  @Test
+  void aDeleteOfAnUnknownTargetPublishesNoTargetDeleted() throws Exception {
+    UUID id = UUID.randomUUID();
+    admin().delete(API + "/" + id).then().statusCode(404);
+    java.util.List<eu.wohlben.qits.system.targets.events.TargetDeleted> events =
+        bus.await(
+            eu.wohlben.qits.system.targets.events.TargetDeleted.class,
+            e -> e.targetId().equals(id.toString()),
+            0,
+            java.time.Duration.ofMillis(500));
+    assertEquals(0, events.size(), events.toString());
   }
 
   @Test
@@ -671,5 +704,69 @@ class TargetDoorsTest {
         .body("login.claude", equalTo("UNKNOWN"))
         .body("kimiLoginCommand", nullValue())
         .body("runnerVersion", nullValue());
+  }
+
+  // --- the registration check (qits-2022): qits-network-access asks without registering --------
+
+  private static Response checkRegistration(UUID id, String subject) {
+    return as("dev-qits-network-access", "qits:system")
+        .contentType("application/json")
+        .body("{\"subject\":\"" + subject + "\"}")
+        .post(API + "/" + id + "/registration-check");
+  }
+
+  @Test
+  void aLiveRegistrationTokensSubjectIsConfirmed() {
+    UUID id = UUID.randomUUID();
+    TargetRows.target(id, "lab", 0, null, true);
+    TargetRows.registrationToken(id, "tok-1", "the-real-subject");
+    checkRegistration(id, "the-real-subject")
+        .then()
+        .statusCode(200)
+        .body("targetId", equalTo(id.toString()))
+        .body("targetName", equalTo("lab"))
+        .body("$", not(hasKey("subject")))
+        .body("$", not(hasKey("registrationTokenSubject")));
+  }
+
+  @Test
+  void aDifferentSubjectIsRefused() {
+    UUID id = UUID.randomUUID();
+    TargetRows.target(id, "lab", 0, null, true);
+    TargetRows.registrationToken(id, "tok-1", "the-real-subject");
+    checkRegistration(id, "not-the-subject").then().statusCode(403);
+  }
+
+  @Test
+  void noLiveTokenIsRefused() {
+    UUID id = UUID.randomUUID();
+    // Registered, its token spent: registrationTokenSubject is null, so nothing can match.
+    TargetRows.target(id, "lab", 4, "client-lab", false);
+    checkRegistration(id, "anything").then().statusCode(403);
+  }
+
+  @Test
+  void anUnknownTargetIs404() {
+    checkRegistration(UUID.randomUUID(), "anything").then().statusCode(404);
+  }
+
+  @Test
+  void theRegistrationCheckDoorIsQitsSystemOnly() {
+    UUID id = UUID.randomUUID();
+    TargetRows.target(id, "lab", 0, null, true);
+    TargetRows.registrationToken(id, "tok-1", "the-real-subject");
+    admin()
+        .contentType("application/json")
+        .body("{\"subject\":\"the-real-subject\"}")
+        .post(API + "/" + id + "/registration-check")
+        .then()
+        .statusCode(403);
+    as("dyn-agent", "qits:agent")
+        .contentType("application/json")
+        .body("{\"subject\":\"the-real-subject\"}")
+        .post(API + "/" + id + "/registration-check")
+        .then()
+        .statusCode(403);
+    checkRegistration(id, "the-real-subject").then().statusCode(200);
   }
 }

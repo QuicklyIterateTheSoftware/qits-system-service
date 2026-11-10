@@ -145,6 +145,10 @@ public class TargetViews {
   @Schema(name = "TargetHealthCheckRequested")
   public record HealthCheckRequested(String requestId) {}
 
+  /** qits-2022: never carries the stored subject, only that it matched. */
+  @Schema(name = "TargetRegistrationCheck")
+  public record RegistrationCheck(UUID targetId, String targetName) {}
+
   @Schema(name = "TargetSignIn")
   @JsonInclude(JsonInclude.Include.ALWAYS)
   public record SignInView(

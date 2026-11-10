@@ -10,6 +10,7 @@ import eu.wohlben.qits.eventstream.control.EventEnvelope;
 import eu.wohlben.qits.eventstream.control.EventFrame;
 import eu.wohlben.qits.system.targets.events.SoftwareReleaseListener.SoftwareReleasePayload;
 import eu.wohlben.qits.system.targets.events.TargetConnectionChanged;
+import eu.wohlben.qits.system.targets.events.TargetDeleted;
 import eu.wohlben.qits.system.targets.events.TargetLeaseChanged;
 import eu.wohlben.qits.system.targets.events.TargetLoginChanged;
 import eu.wohlben.qits.system.targets.events.TargetOomKilled;
@@ -48,11 +49,12 @@ class TargetEventsReflectionTest {
             TargetLoginChanged.class,
             TargetConnectionChanged.class,
             TargetOomKilled.class,
+            TargetDeleted.class,
             EventEnvelope.class,
             EventFrame.class,
             SoftwareReleasePayload.class),
         Set.of(registration.targets()),
-        "the four targets events, the PUT body, the frame and every payload a listener binds — a"
+        "the five targets events, the PUT body, the frame and every payload a listener binds — a"
             + " new QitsEvent record in targets/events/ joins here");
   }
 
@@ -131,7 +133,8 @@ class TargetEventsReflectionTest {
               7L,
               1,
               java.util.List.of(),
-              java.time.Instant.now())
+              java.time.Instant.now()),
+          new TargetDeleted("target-1", "runner-1", java.time.Instant.now())
         }) {
       assertEquals(event.getClass().getSimpleName(), event.name());
     }
@@ -210,6 +213,25 @@ class TargetEventsReflectionTest {
     assertEquals(Long.valueOf(12), back.kernelOomKills());
     assertEquals(2, back.delta());
     assertEquals(java.util.List.of(project), back.projectIds());
+  }
+
+  /**
+   * qits-2022: {@link TargetDeleted} round trip — its wire name is its signature.
+   */
+  @Test
+  void targetDeletedBindsBothWays() {
+    TargetDeleted out =
+        new TargetDeleted("target-1", "runner-1", java.time.Instant.parse("2026-11-09T18:30:05Z"));
+
+    EventEnvelope envelope = EventEnvelope.of(out);
+    assertEquals("TargetDeleted", envelope.name());
+
+    TargetDeleted back =
+        eu.wohlben.qits.eventstream.control.CanonicalJson.payloadTo(
+            envelope.payload(), TargetDeleted.class);
+
+    assertEquals(out.targetId(), back.targetId());
+    assertEquals(out.targetName(), back.targetName());
   }
 
   /**

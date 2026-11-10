@@ -5,6 +5,7 @@ import eu.wohlben.qits.auth.MachineAuth;
 import eu.wohlben.qits.auth.MachineIdentity;
 import eu.wohlben.qits.system.targets.control.LeaseSpecs;
 import eu.wohlben.qits.system.targets.control.TargetAllocation;
+import eu.wohlben.qits.system.targets.control.TargetEvents;
 import eu.wohlben.qits.system.targets.control.TargetRefusal;
 import eu.wohlben.qits.system.targets.control.Targets;
 import eu.wohlben.qits.system.targets.control.WarmImages;
@@ -70,7 +71,9 @@ import org.jboss.logging.Logger;
       TargetController.CreateTargetRequest.class,
       TargetController.PatchTargetRequest.class,
       TargetController.RegisterTargetRequest.class,
-      TargetController.RotateTargetRegistrationTokenRequest.class
+      TargetController.RotateTargetRegistrationTokenRequest.class,
+      TargetController.RegistrationCheckRequest.class,
+      TargetViews.RegistrationCheck.class
     })
 public class TargetController {
 
@@ -119,6 +122,8 @@ public class TargetController {
   @Inject TargetInstallScript installScript;
 
   @Inject WarmImages warmImages;
+
+  @Inject TargetEvents events;
 
   @Inject MachineAuth machineAuth;
 
@@ -178,6 +183,16 @@ public class TargetController {
   @Schema(name = "RegisterTargetRequest")
   public record RegisterTargetRequest(
       @Schema(description = "What the runner says about itself: a JSON object") JsonNode capabilities) {}
+
+  @Schema(name = "TargetRegistrationCheckRequest")
+  public record RegistrationCheckRequest(
+      @Schema(description = "Compared to the target's live registration token's subject", required = true)
+          String subject) {
+    @Override
+    public String toString() {
+      return "RegistrationCheckRequest[subject=<redacted>]";
+    }
+  }
 
   @POST
   @Consumes(MediaType.APPLICATION_JSON)
@@ -345,8 +360,33 @@ public class TargetController {
     if (gone.registrationTokenId != null) {
       idp.deleteToken(gone.registrationTokenId);
     }
+    events.targetDeleted(gone.id, gone.name);
     LOG.infof("Target %s (%s) decommissioned", gone.name, gone.id);
     return Response.noContent().build();
+  }
+
+  @POST
+  @Path("/{id}/registration-check")
+  @Consumes(MediaType.APPLICATION_JSON)
+  @RolesAllowed(SYSTEM)
+  @Operation(
+      operationId = "checkTargetRegistration",
+      summary = "Whether subject is target id's live registration token's subject",
+      description =
+          "For a service with its own idp client (qits-network-access) to ask without attempting a"
+              + " registration itself. Never answers what the stored subject is.")
+  @APIResponse(
+      responseCode = "200",
+      description = "subject is this target's live registration token's subject",
+      content = @Content(schema = @Schema(implementation = TargetViews.RegistrationCheck.class)))
+  @APIResponse(responseCode = "403", description = "subject differs, or no token is live")
+  @APIResponse(responseCode = "404", description = "No such target")
+  public TargetViews.RegistrationCheck checkRegistration(
+      @PathParam("id") String id, RegistrationCheckRequest request) {
+    UUID targetId = targetId(id);
+    String subject = request == null ? null : request.subject();
+    Target target = targets.requireLiveRegistrationSubject(targetId, subject);
+    return new TargetViews.RegistrationCheck(target.id, target.name);
   }
 
   @POST

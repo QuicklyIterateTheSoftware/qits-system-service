@@ -6,6 +6,7 @@ import eu.wohlben.qits.eventstream.QitsEventBus;
 import eu.wohlben.qits.system.targets.entity.Lease;
 import eu.wohlben.qits.system.targets.entity.Target;
 import eu.wohlben.qits.system.targets.events.TargetConnectionChanged;
+import eu.wohlben.qits.system.targets.events.TargetDeleted;
 import eu.wohlben.qits.system.targets.events.TargetLeaseChanged;
 import eu.wohlben.qits.system.targets.events.TargetLoginChanged;
 import eu.wohlben.qits.system.targets.events.TargetOomKilled;
@@ -23,7 +24,7 @@ import java.util.concurrent.TimeUnit;
 import org.jboss.logging.Logger;
 
 /**
- * The targets module's four events, handed to {@link QitsEventBus} on a thread of their own — never
+ * The targets module's five events, handed to {@link QitsEventBus} on a thread of their own — never
  * on the caller's, which may still be inside the transaction that made the change, and never in a
  * way that can fail it. qits-workspaces-service's {@code EventstreamLifecycleAnnouncer}, kept in
  * shape: the causation of the caller is captured here and carried over.
@@ -31,7 +32,7 @@ import org.jboss.logging.Logger;
  * <p>{@code QitsEventBus.publish} serializes these with Jackson, which the native-image build
  * cannot see through: the only JAX-RS-declared types it discovers reflection for are return types,
  * and an event handed to the bus is neither. {@link EventWireReflection} is where that
- * registration lives now — for these four records, the PUT body ({@code EventEnvelope}) and the
+ * registration lives now — for these five records, the PUT body ({@code EventEnvelope}) and the
  * canonical mix-in together, so there is one place a new wire type joins rather than two to keep in
  * sync. Without it the native binary logs "could not be published or recorded" for every lease or
  * login or connection change while every JVM test stays green, because the JVM needs no such registration.
@@ -106,6 +107,15 @@ public class TargetEvents {
     announce(
         new TargetConnectionChanged(
             targetId.toString(), targetName, connected, runnerVersion, Instant.now()));
+  }
+
+  /**
+   * {@link TargetDeleted}: {@code target} was decommissioned (qits-2022). Called once {@code
+   * registry.deleted} and the client decommission have both succeeded; the controller publishes
+   * nothing for a delete that answered 404.
+   */
+  public void targetDeleted(UUID targetId, String targetName) {
+    announce(new TargetDeleted(targetId.toString(), targetName, Instant.now()));
   }
 
   void announce(QitsEvent event) {

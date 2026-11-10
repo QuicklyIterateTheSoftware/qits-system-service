@@ -215,7 +215,23 @@ public class ProviderStates {
 
   static final String REGISTRATION_SUBJECT = "contract-registration-subject";
 
+  /**
+   * qits-2022: target {@link #TARGET_ID} ({@code lab}), unregistered, its live registration
+   * token's subject {@link #REGISTRATION_SUBJECT} — qits-network-access-service's future consumer
+   * pact for {@code checkTargetRegistration}, the dossier's {@code "target <id> has registration
+   * subject <s>"}. The literal below must repeat {@link #TARGET_ID} and {@link
+   * #REGISTRATION_SUBJECT} rather than reference them: a {@code @State} annotation's value must be
+   * a compile-time constant, and {@link Freezer#frozenId} (what builds {@code TARGET_ID}) is a
+   * method call.
+   */
+  public static final String A_TARGET_WITH_A_LIVE_REGISTRATION_SUBJECT =
+      "target 00000000-0000-4000-8000-000000000001 has registration subject"
+          + " contract-registration-subject";
+
   static final String CI_BEARER = "Bearer qits_tok_contract-qits-ci";
+
+  /** qits-2022: qits-network-access-service's bearer, a {@code qits:system} client like qits-ci's. */
+  static final String NETWORK_ACCESS_BEARER = "Bearer qits_tok_contract-qits-network-access";
 
   static final String WORKSPACES_BEARER = "Bearer qits_tok_contract-qits-workspaces";
 
@@ -273,6 +289,8 @@ public class ProviderStates {
     states.put(AN_UNREGISTERED_RUNNER, this::anUnregisteredRunner);
     states.put(A_REGISTERED_RUNNER, this::aRegisteredRunner);
     states.put(A_ROTATED_RUNNER, this::aRotatedRunner);
+    states.put(
+        A_TARGET_WITH_A_LIVE_REGISTRATION_SUBJECT, this::aTargetWithALiveRegistrationSubject);
     states.put(A_QUEUED_LEASE, this::aQueuedLease);
     states.put(AN_UNUSED_WORK_VOLUME, this::anUnusedWorkVolume);
     states.put(A_QUEUED_WORKSPACE_LEASE, () -> tenantLease(WORKSPACES, LeaseState.QUEUED));
@@ -413,6 +431,24 @@ public class ProviderStates {
     TargetRows.registrationToken(id, "tok-contract", REGISTRATION_SUBJECT);
     bearers.grant(REGISTRATION_BEARER, REGISTRATION_SUBJECT, "qits:target-runner-registration");
     return new Setup(Map.of("authorization", REGISTRATION_BEARER, "runnerId", TARGET_ID));
+  }
+
+  /**
+   * qits-2022: target {@code lab}, unregistered, its live registration token's subject {@link
+   * #REGISTRATION_SUBJECT}. The caller is qits-network-access-service's own {@code qits:system}
+   * client, never the runner's registration bearer: this door asks on the caller's own identity.
+   */
+  private Setup aTargetWithALiveRegistrationSubject() {
+    fresh();
+    UUID id = UUID.fromString(TARGET_ID);
+    TargetRows.target(id, "lab", 0, null, true);
+    TargetRows.registrationToken(id, "tok-contract", REGISTRATION_SUBJECT);
+    bearers.grant(NETWORK_ACCESS_BEARER, "dev-qits-network-access", "qits:system");
+    Map<String, String> params = new TreeMap<>();
+    params.put("authorization", NETWORK_ACCESS_BEARER);
+    params.put("targetId", TARGET_ID);
+    params.put("subject", REGISTRATION_SUBJECT);
+    return new Setup(Collections.unmodifiableMap(params));
   }
 
   private Setup aQueuedLease() {
