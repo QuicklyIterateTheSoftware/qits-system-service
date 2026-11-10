@@ -63,7 +63,8 @@ public class TargetInstallScript {
 
   public String script() {
     try {
-      return InstallScript.script(identity(version()), PAGE, addresses.registryHost());
+      return InstallScript.script(
+          identity(version()), PAGE, addresses.registryHost(), addresses.networkAccessUrl());
     } catch (IllegalStateException unrenderable) {
       throw new TargetRefusal(503, null, unrenderable.getMessage());
     }

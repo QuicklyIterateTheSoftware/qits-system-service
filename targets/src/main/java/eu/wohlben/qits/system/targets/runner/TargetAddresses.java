@@ -58,6 +58,18 @@ public class TargetAddresses {
     return host("mirror");
   }
 
+  /**
+   * The node install script's {@code {{NETWORK_ACCESS_URL}}} fill (qits-1977): blank whenever
+   * there is no public domain, even though {@code qits.system.targets.network-access-url} always
+   * resolves (it defaults the embedded {@code QITS_DOMAIN} to empty, the same way {@link
+   * #publicDomain()} does) — a domain-less value would still match the toolkit's URL shape and
+   * send a node joining a host that does not exist. {@code TargetInstallScript} passes this
+   * straight through; the toolkit treats blank as "this kind of node does not join".
+   */
+  public String networkAccessUrl() {
+    return configured() ? config.networkAccessUrl().orElse("") : "";
+  }
+
   /** {@code registry.qits.<d>/qits/qits-system-runner:<version>}: an upgrade's image. */
   public String runnerImage(String version) {
     return registryHost() + "/" + SystemRunnerProtocol.IMAGE_REPOSITORY + ":" + version;

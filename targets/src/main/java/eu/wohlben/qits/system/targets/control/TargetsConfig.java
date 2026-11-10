@@ -1,5 +1,6 @@
 package eu.wohlben.qits.system.targets.control;
 
+import eu.wohlben.qits.system.targets.runner.TargetAddresses;
 import io.smallrye.config.ConfigMapping;
 import java.time.Duration;
 import java.util.List;
@@ -30,6 +31,15 @@ public interface TargetsConfig {
 
   /** The wss base a runner's socket url is composed on. */
   String publicUrl();
+
+  /**
+   * qits-network-access-service's own base, filled into the runner-toolkit install script's
+   * {@code {{NETWORK_ACCESS_URL}}} placeholder (qits-1977); blank is "this deployment has no
+   * private network to join". {@link TargetAddresses#networkAccessUrl()} is the value to read —
+   * it is blank whenever there is no public domain, even if this key resolves to something, since
+   * the key embeds {@code QITS_DOMAIN} the same way {@link #domain()} does.
+   */
+  Optional<String> networkAccessUrl();
 
   RegistryMirrors registryMirrors();
 
