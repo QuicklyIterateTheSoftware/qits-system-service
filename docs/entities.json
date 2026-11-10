@@ -189,6 +189,12 @@
           "site" : "TargetController.register(String, RegisterTargetRequest)"
         },
         {
+          "type" : "eu.wohlben.qits.system.targets.api.TargetViews$RegistrationCheck",
+          "kind" : "assembler",
+          "via" : null,
+          "site" : "TargetController.checkRegistration(String, RegistrationCheckRequest)"
+        },
+        {
           "type" : "eu.wohlben.qits.system.targets.api.TargetViews$SignInView",
           "kind" : "assembler",
           "via" : null,
@@ -244,6 +250,13 @@
           "path" : "/targets/{id}/sign-ins/{signInId}",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$SignInView",
           "kind" : "schema"
+        },
+        {
+          "operationId" : "checkTargetRegistration",
+          "method" : "POST",
+          "path" : "/targets/{id}/registration-check",
+          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$RegistrationCheck",
+          "kind" : "returns"
         },
         {
           "operationId" : "createLease",
