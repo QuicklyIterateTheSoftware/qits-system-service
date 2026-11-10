@@ -35,6 +35,11 @@ record SuiteTargetsConfig(String idpUrl, String clientId, String secret) impleme
   }
 
   @Override
+  public Optional<String> networkAccessUrl() {
+    return Optional.empty();
+  }
+
+  @Override
   public String publicUrl() {
     return "wss://system.qits.invalid";
   }
