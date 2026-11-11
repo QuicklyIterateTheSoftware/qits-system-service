@@ -15,6 +15,7 @@ erDiagram
     instant ending_nudged_at
     instant ending_since
     int exit_code
+    long generation "not null"
     instant granted_at
     long memory_peak_bytes
     long oom_events
@@ -26,6 +27,8 @@ erDiagram
     int priority "not null"
     uuid project_id
     instant requested_at "not null"
+    jsonb resolvers "not null"
+    boolean resolvers_stale "not null"
     enum slot_type "not null"
     jsonb spec "not null"
     string spec_hash
