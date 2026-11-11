@@ -18,6 +18,9 @@ import java.util.List;
  * <p>The page passes through three of the runner's own variables an operator may add to the line:
  * {@code QITS_SYSTEM_RUNNER_CREDENTIAL_VOLUME}, {@code _M2_VOLUME} and {@code _PNPM_VOLUME} (on the
  * platform host {@code qits_shared_dot_claude}, {@code qits_shared_m2}, {@code qits_shared_pnpm}).
+ * The line itself never carries them, so a rotated line names none: the runner records its choice
+ * in its state volume and keeps it across a reinstall, and {@code -} sends one back to the runner's
+ * own volume (qits-2088, qits-system-runner-daemon's {@code NodeVolumeRecord}).
  *
  * <p><b>The identity is the runner's, built the runner's way</b>: {@link SystemRunnerProtocol}'s
  * roots in {@link RunnerIdentity}'s order, at the pinned version ({@link TargetPins}), exactly as the
