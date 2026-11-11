@@ -22,6 +22,8 @@ public class TargetRefusal extends SystemException {
   public static final String IMAGE_NOT_ALLOWED = "IMAGE_NOT_ALLOWED";
   public static final String ENV_KEY_NOT_ALLOWED = "ENV_KEY_NOT_ALLOWED";
   public static final String WORK_VOLUME_IN_USE = "WORK_VOLUME_IN_USE";
+  /** A refresh of a lease that is not RUNNING (qits-2091): only a running container is recreated. */
+  public static final String LEASE_NOT_RUNNING = "LEASE_NOT_RUNNING";
   public static final String TARGET_NAME_TAKEN = "TARGET_NAME_TAKEN";
   public static final String ALREADY_REGISTERED = "ALREADY_REGISTERED";
   public static final String RUNNER_PLANE_UNCONFIGURED = "RUNNER_PLANE_UNCONFIGURED";

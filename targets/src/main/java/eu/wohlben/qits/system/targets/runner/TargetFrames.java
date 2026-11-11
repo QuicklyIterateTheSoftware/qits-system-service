@@ -104,7 +104,8 @@ public class TargetFrames {
               entry.workKey(),
               adopt == null
                   ? null
-                  : new Adopt(text(adopt, "container"), text(adopt, "volume"))));
+                  : new Adopt(text(adopt, "container"), text(adopt, "volume")),
+              entry.generation()));
     }
     return new Estate(leases, view.purges());
   }

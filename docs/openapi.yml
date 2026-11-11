@@ -479,6 +479,24 @@ components:
           type: boolean
           description: docker's State.OOMKilled of the lease's exited container; else
             null
+        resolvers:
+          type: array
+          items:
+            type: string
+          description: "The lease container's --dns servers in order, as its runner\
+            \ last reported them; empty is the node's own resolvers, or no container\
+            \ (qits-2091)"
+        resolversStale:
+          type: boolean
+          description: "The runner says the node now has a resolver (its tunnel's\
+            \ or the private edge's) this container lacks first; POST /leases/{id}/refresh\
+            \ recreates it"
+        generation:
+          type: integer
+          format: int64
+          description: "The refresh counter: each refresh raises it by one and the\
+            \ runner recreates the container, keeping its work volume; 0 is never\
+            \ refreshed"
     LogChunk:
       type: object
       properties:
@@ -1289,6 +1307,43 @@ paths:
       - Lease Logs Controller
       security:
       - SecurityScheme:
+        - qits:admin
+        - qits:admin-agent
+        - qits:desk-admin
+  /system/api/leases/{id}/refresh:
+    post:
+      summary: "Refresh a RUNNING lease: its generation is raised by one and the runner\
+        \ recreates its container, keeping its work volume, so it picks up what the\
+        \ runner decides only at create (its resolvers). Its owner refreshes its own;\
+        \ an operator (qits:admin, qits:admin-agent, qits:desk-admin) any lease, audited"
+      operationId: refreshLease
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: The lease with its new generation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lease"
+        "403":
+          description: "NOT_YOUR_LEASE: a qits:system caller's refresh of another's\
+            \ lease"
+        "404":
+          description: No such lease
+        "409":
+          description: "LEASE_NOT_RUNNING: the lease is not RUNNING"
+        "401":
+          description: Not Authorized
+      tags:
+      - Lease Controller
+      security:
+      - SecurityScheme:
+        - qits:system
         - qits:admin
         - qits:admin-agent
         - qits:desk-admin

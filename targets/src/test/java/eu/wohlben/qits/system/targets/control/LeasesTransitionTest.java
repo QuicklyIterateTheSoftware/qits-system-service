@@ -177,4 +177,49 @@ class LeasesTransitionTest {
     assertEquals("NODE", Lease.oomScope(1L, 0L));
     assertEquals("NODE", Lease.oomScope(2L, null));
   }
+
+  // --- resolvers (qits-2091) ----------------------------------------------------------------------
+
+  private static Held withResolvers(UUID leaseId, java.util.List<String> resolvers, Boolean stale) {
+    return new Held(leaseId, "RUNNING", null, null, null, null, null, null, null, resolvers, stale);
+  }
+
+  @Test
+  void aRunningReportOnARunningLeaseStoresItsResolversWithoutMovingIt() {
+    Lease lease = lease(LeaseState.RUNNING, "kept");
+    Held report = withResolvers(lease.id, java.util.List.of("1.1.1.1", "8.8.8.8"), true);
+    assertFalse(Leases.transition(lease, report, T0), "RUNNING on RUNNING is still no transition");
+    assertTrue(Leases.recordResolvers(lease, report));
+    assertEquals(java.util.List.of("1.1.1.1", "8.8.8.8"), Leases.resolvers(lease.resolvers));
+    assertTrue(lease.resolversStale);
+    assertEquals("kept", lease.detail);
+    assertEquals(LeaseState.RUNNING, lease.state);
+
+    assertFalse(Leases.recordResolvers(lease, report), "the same values again write nothing");
+
+    Held refreshed = withResolvers(lease.id, java.util.List.of("100.96.0.1", "1.1.1.1"), false);
+    assertTrue(Leases.recordResolvers(lease, refreshed));
+    assertEquals(java.util.List.of("100.96.0.1", "1.1.1.1"), Leases.resolvers(lease.resolvers));
+    assertFalse(lease.resolversStale);
+  }
+
+  @Test
+  void aReportWithoutResolversLeavesTheStoredOnesAndEmptyMeansTheNodesOwn() {
+    Lease lease = lease(LeaseState.RUNNING, null);
+    assertEquals(java.util.List.of(), Leases.resolvers(lease.resolvers), "a new row has none");
+    Leases.recordResolvers(lease, withResolvers(lease.id, java.util.List.of("1.1.1.1"), true));
+    assertFalse(Leases.recordResolvers(lease, new Held(lease.id, "RUNNING", null, null, null)));
+    assertEquals(java.util.List.of("1.1.1.1"), Leases.resolvers(lease.resolvers));
+    assertTrue(lease.resolversStale);
+    assertTrue(Leases.recordResolvers(lease, withResolvers(lease.id, java.util.List.of(), false)));
+    assertEquals(java.util.List.of(), Leases.resolvers(lease.resolvers));
+    assertFalse(Leases.recordResolvers(lease, null));
+  }
+
+  @Test
+  void storedResolversThatAreNotAnArrayReadAsNone() {
+    assertEquals(java.util.List.of(), Leases.resolvers(null));
+    assertEquals(java.util.List.of(), Leases.resolvers("{}"));
+    assertEquals(java.util.List.of("a", "b"), Leases.resolvers("[\"a\", \"b\"]"));
+  }
 }

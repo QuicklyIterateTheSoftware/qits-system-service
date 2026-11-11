@@ -242,7 +242,8 @@ public class TargetAllocation {
 
   /**
    * One lease as a target's estate carries it. Spec and adopt are JSON text; {@code workKey} is what
-   * the wire's {@code workVolume} carries (the runner derives the volume's name from it).
+   * the wire's {@code workVolume} carries (the runner derives the volume's name from it); {@code
+   * generation} is the lease's refresh counter (qits-2091), which the runner recreates on.
    */
   public record EstateEntry(
       UUID leaseId,
@@ -251,7 +252,8 @@ public class TargetAllocation {
       String spec,
       String specHash,
       String workKey,
-      String adopt) {}
+      String adopt,
+      long generation) {}
 
   /**
    * A target's whole desired state. {@code warmImages} are the full references its runner keeps
@@ -298,7 +300,8 @@ public class TargetAllocation {
                             lease.spec,
                             lease.specHash,
                             lease.workKey,
-                            lease.adopt));
+                            lease.adopt,
+                            lease.generation));
                   }
                   Target target = Target.findById(targetId);
                   List<String> warm =

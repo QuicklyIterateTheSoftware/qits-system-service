@@ -42,7 +42,9 @@ import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
  * {@code qits:admin-agent}, {@code qits:desk-admin}) ends any lease, and every such end is a
  * {@code target_audit} row. An owner's {@code ?reason=} lands in the lease's detail; qits-ci's
  * {@code never-dialled-back} feeds its target's dial-back streak, and a quarantine that streak
- * begins is told to the runner here (qits-1809, {@link Leases#end(UUID, String, String)}).
+ * begins is told to the runner here (qits-1809, {@link Leases#end(UUID, String, String)}). A
+ * RUNNING lease is refreshed — its container recreated on a raised generation — by its owner or an
+ * operator, audited like an operator's end (qits-2091).
  */
 @Path("/leases")
 @Produces(MediaType.APPLICATION_JSON)
@@ -187,6 +189,38 @@ public class LeaseController {
   public TargetViews.LeaseDto replaceSpec(@PathParam("id") String id, ReplaceSpecRequest request) {
     return TargetViews.view(
         leases.replaceSpec(leaseId(id), owners.application(identity), request == null ? null : request.spec()));
+  }
+
+  @POST
+  @Path("/{id}/refresh")
+  @RolesAllowed({SYSTEM, ADMIN, ADMIN_AGENT, DESK_ADMIN})
+  @Operation(
+      operationId = "refreshLease",
+      summary =
+          "Refresh a RUNNING lease: its generation is raised by one and the runner recreates its"
+              + " container, keeping its work volume, so it picks up what the runner decides only"
+              + " at create (its resolvers). Its owner refreshes its own; an operator (qits:admin,"
+              + " qits:admin-agent, qits:desk-admin) any lease, audited")
+  @APIResponse(
+      responseCode = "200",
+      description = "The lease with its new generation",
+      content = @Content(schema = @Schema(implementation = TargetViews.LeaseDto.class)))
+  @APIResponse(responseCode = "403", description = "NOT_YOUR_LEASE: a qits:system caller's refresh of another's lease")
+  @APIResponse(responseCode = "404", description = "No such lease")
+  @APIResponse(responseCode = "409", description = "LEASE_NOT_RUNNING: the lease is not RUNNING")
+  public TargetViews.LeaseDto refresh(@PathParam("id") String id) {
+    if (!operates()) {
+      return TargetViews.view(leases.refresh(leaseId(id), owners.application(identity)));
+    }
+    UUID leaseId;
+    try {
+      leaseId = UUID.fromString(id);
+    } catch (IllegalArgumentException | NullPointerException notAUuid) {
+      leaseId = null;
+    }
+    Leases.Operator operator =
+        new Leases.Operator(owners.clientId(identity), TargetAuditLog.roles(identity));
+    return TargetViews.view(leases.refreshByOperator(leaseId, id, operator));
   }
 
   @DELETE

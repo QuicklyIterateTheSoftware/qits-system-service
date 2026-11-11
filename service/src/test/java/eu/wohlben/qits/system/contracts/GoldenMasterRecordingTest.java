@@ -126,7 +126,7 @@ class GoldenMasterRecordingTest {
   /**
    * One tenant's lease doors over its three states, every call with its bearer: a create (beside
    * the queued lease, for another ownerRef), the reads, a roll and an end of the queued and of the
-   * running lease, and the purge of the unused work volume.
+   * running lease, the running lease's refresh, and the purge of the unused work volume.
    */
   private static List<Interaction> tenant(
       String queued,
@@ -166,6 +166,8 @@ class GoldenMasterRecordingTest {
           call(state, "replaceLeaseSpec", "PUT", LEASE + "/spec", 200, "{\"spec\":" + spec + "}", BEARER));
       rows.add(call(state, "endLease", "DELETE", LEASE, 200, null, BEARER));
     }
+    // A running lease's refresh (qits-2091): its generation raised, its container recreated.
+    rows.add(call(running, "refreshLease", "POST", LEASE + "/refresh", 200, null, BEARER));
     rows.add(
         call(unused, "purgeWorkVolume", "DELETE", API + "/work-volumes/{workKey}", 202, null, BEARER));
     return rows;

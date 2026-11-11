@@ -378,6 +378,95 @@ class LeaseDoorsTest {
                 .call(() -> TargetAudit.count("resource = ?1 and outcome = ?2", "not-a-lease", "NOT_FOUND")));
   }
 
+  // --- the refresh (qits-2091) -------------------------------------------------------------------
+
+  @Test
+  void anOwnerRefreshesItsRunningLeaseAndTheEstateCarriesTheNewGeneration() {
+    UUID target = UUID.randomUUID();
+    TargetRows.target(target, "lab", 4, "client-lab", false);
+    UUID id = UUID.randomUUID();
+    TargetRows.lease(id, SlotType.WORKSPACE, "qits-workspaces", "17", LeaseState.RUNNING, target);
+    assertEquals(0L, allocation.estateOf(target).leases().get(0).generation());
+    service("dev-qits-workspaces")
+        .post(API + "/" + id + "/refresh")
+        .then()
+        .statusCode(200)
+        .body("id", equalTo(id.toString()))
+        .body("state", equalTo("RUNNING"))
+        .body("generation", equalTo(1))
+        .body("resolvers", hasSize(0))
+        .body("resolversStale", equalTo(false));
+    service("dev-qits-workspaces")
+        .post(API + "/" + id + "/refresh")
+        .then()
+        .statusCode(200)
+        .body("generation", equalTo(2));
+    assertEquals(2L, TargetRows.reload(id).generation);
+    assertEquals(LeaseState.RUNNING, TargetRows.reload(id).state, "a refresh moves no state");
+    assertEquals(
+        2L,
+        allocation.estateOf(target).leases().get(0).generation(),
+        "the estate entry carries the lease's generation");
+    assertTrue(TargetRows.audit(id).isEmpty(), "an owner's refresh writes no audit row");
+  }
+
+  @Test
+  void anOperatorRefreshesAnyRunningLeaseAndItIsAudited() {
+    UUID target = UUID.randomUUID();
+    TargetRows.target(target, "lab", 4, "client-lab", false);
+    UUID id = UUID.randomUUID();
+    TargetRows.lease(id, SlotType.DESK, "qits-projects", "desk-1", LeaseState.RUNNING, target);
+    for (String role : new String[] {"qits:admin", "qits:admin-agent", "qits:desk-admin"}) {
+      operator("an-operator", role).post(API + "/" + id + "/refresh").then().statusCode(200);
+    }
+    assertEquals(3L, TargetRows.reload(id).generation);
+    List<TargetAudit> audit = TargetRows.audit(id);
+    assertEquals(3, audit.size());
+    assertEquals("LEASE_REFRESH", audit.get(0).operation);
+    assertEquals("REFRESHED", audit.get(0).outcome);
+    assertEquals("an-operator", audit.get(0).actor);
+    assertEquals("qits:admin", audit.get(0).roles);
+    assertEquals(target, audit.get(0).targetId);
+    assertEquals("generation 1", audit.get(0).detail);
+  }
+
+  @Test
+  void aRefreshIsRefusedAnotherOwnerAnAgentAndALeaseThatIsNotRunning() {
+    UUID target = UUID.randomUUID();
+    TargetRows.target(target, "lab", 4, "client-lab", false);
+    UUID id = UUID.randomUUID();
+    TargetRows.lease(id, SlotType.CI, "qits-ci", "run-9", LeaseState.RUNNING, target);
+    service("dev-qits-workspaces")
+        .post(API + "/" + id + "/refresh")
+        .then()
+        .statusCode(403)
+        .body("code", equalTo("NOT_YOUR_LEASE"));
+    operator("dyn-agent", "qits:agent").post(API + "/" + id + "/refresh").then().statusCode(403);
+    assertEquals(0L, TargetRows.reload(id).generation);
+
+    UUID granted = UUID.randomUUID();
+    TargetRows.lease(granted, SlotType.CI, "qits-ci", "run-10", LeaseState.GRANTED, target);
+    service("dev-qits-ci")
+        .post(API + "/" + granted + "/refresh")
+        .then()
+        .statusCode(409)
+        .body("code", equalTo("LEASE_NOT_RUNNING"))
+        .body("message", org.hamcrest.Matchers.containsString("GRANTED"));
+    operator("an-operator", "qits:admin")
+        .post(API + "/" + granted + "/refresh")
+        .then()
+        .statusCode(409)
+        .body("code", equalTo("LEASE_NOT_RUNNING"));
+    assertEquals("LEASE_NOT_RUNNING", TargetRows.audit(granted).get(0).outcome);
+    assertEquals(0L, TargetRows.reload(granted).generation);
+
+    UUID missing = UUID.randomUUID();
+    service("dev-qits-ci").post(API + "/" + missing + "/refresh").then().statusCode(404);
+    operator("an-operator", "qits:admin").post(API + "/" + missing + "/refresh").then().statusCode(404);
+    assertEquals("NOT_FOUND", TargetRows.audit(missing).get(0).outcome);
+    service("dev-qits-ci").post(API + "/not-a-lease/refresh").then().statusCode(404);
+  }
+
   @Test
   void aRollReplacesTheSpecAndItsHash() {
     Response created = lease("dev-qits-ci", "CI", "run-1", CI_IMAGE, "");

@@ -368,6 +368,94 @@ public class Leases {
     return lease;
   }
 
+  // --- the refresh (qits-2091) -------------------------------------------------------------------
+
+  /**
+   * The owner's refresh: its RUNNING lease's {@code generation} raised by one and its target's
+   * estate pushed, so the runner recreates the container — keeping its work volume — and decides
+   * again what it decides only at create (its resolvers). Nothing else of the lease moves.
+   *
+   * @throws TargetRefusal 404, 403 {@link TargetRefusal#NOT_YOUR_LEASE}, 409 {@link
+   *     TargetRefusal#LEASE_NOT_RUNNING}
+   */
+  public Lease refresh(UUID id, String ownerApp) {
+    owned(id, ownerApp);
+    Lease lease = refreshOne(id);
+    LOG.infof(
+        "%s refreshed lease %s (%s %s); generation %d",
+        ownerApp, lease.id, lease.slotType, lease.ownerRef, lease.generation);
+    return lease;
+  }
+
+  /**
+   * An operator's refresh of any RUNNING lease, whoever owns it; {@link #refresh} otherwise. Every
+   * call writes a {@link TargetAuditLog#LEASE_REFRESH} row, a refused one too: outcome REFRESHED,
+   * NOT_FOUND or the refusal's code.
+   *
+   * @param id null for an id that is not one, which is NOT_FOUND
+   * @param asWritten the id as the caller wrote it, recorded as the row's resource when it is no
+   *     lease's
+   */
+  public Lease refreshByOperator(UUID id, String asWritten, Operator operator) {
+    Lease lease;
+    try {
+      if (id == null) {
+        throw TargetRefusal.notFound("No lease " + asWritten);
+      }
+      lease = refreshOne(id);
+    } catch (TargetRefusal refused) {
+      audit.record(
+          new TargetAuditLog.Entry(
+              operator.actor(),
+              operator.roles(),
+              null,
+              id,
+              TargetAuditLog.LEASE_REFRESH,
+              id == null ? asWritten : null,
+              null,
+              refused.status() == 404 ? "NOT_FOUND" : refused.code(),
+              refused.getMessage()));
+      throw refused;
+    }
+    LOG.infof(
+        "%s refreshed lease %s (%s %s of %s); generation %d",
+        operator.actor(), lease.id, lease.slotType, lease.ownerRef, lease.ownerApp, lease.generation);
+    audit.record(
+        new TargetAuditLog.Entry(
+            operator.actor(),
+            operator.roles(),
+            lease.targetId,
+            lease.id,
+            TargetAuditLog.LEASE_REFRESH,
+            null,
+            null,
+            "REFRESHED",
+            "generation " + lease.generation));
+    return lease;
+  }
+
+  /** The one refresh: a RUNNING lease's generation raised by one, then its target's estate. */
+  private Lease refreshOne(UUID id) {
+    Lease refreshed =
+        QuarkusTransaction.requiringNew()
+            .call(
+                () -> {
+                  Lease lease = Lease.findById(id, LockModeType.PESSIMISTIC_WRITE);
+                  if (lease == null) {
+                    throw TargetRefusal.notFound("No lease " + id);
+                  }
+                  if (lease.state != LeaseState.RUNNING) {
+                    throw TargetRefusal.conflict(
+                        TargetRefusal.LEASE_NOT_RUNNING,
+                        "Lease " + id + " is " + lease.state + "; only a RUNNING lease is refreshed");
+                  }
+                  lease.generation = lease.generation + 1;
+                  return lease;
+                });
+    allocation.estateChanged(refreshed.targetId);
+    return refreshed;
+  }
+
   /** A lease after an end, and the state it was in before. */
   private record Ended(Lease lease, LeaseState before) {}
 
@@ -588,7 +676,37 @@ public class Leases {
       Long oomKills,
       Long oomEvents,
       Long memoryPeakBytes,
-      Boolean oomKilled) {
+      Boolean oomKilled,
+      List<String> resolvers,
+      Boolean resolversStale) {
+
+    /**
+     * A report without the resolvers (qits-2091): both null, which leaves the stored ones as they
+     * were.
+     */
+    public Held(
+        UUID leaseId,
+        String state,
+        String specHash,
+        Integer exitCode,
+        String detail,
+        Long oomKills,
+        Long oomEvents,
+        Long memoryPeakBytes,
+        Boolean oomKilled) {
+      this(
+          leaseId,
+          state,
+          specHash,
+          exitCode,
+          detail,
+          oomKills,
+          oomEvents,
+          memoryPeakBytes,
+          oomKilled,
+          null,
+          null);
+    }
 
     /** A report without the memory facts: the shape before qits-1818. */
     public Held(UUID leaseId, String state, String specHash, Integer exitCode, String detail) {
@@ -608,6 +726,10 @@ public class Leases {
    * their own they are not a change and publish nothing, except an {@code oomKills} that rose — a
    * process of the lease was just killed — which is announced like a state change, on a lease whose
    * state held too.
+   *
+   * <p>Each report's resolvers (qits-2091) are written to its row by {@link #recordResolvers}, on
+   * every report and whatever its state did — RUNNING on a RUNNING lease included — and are never a
+   * change: they publish nothing.
    *
    * <p>A CI lease that goes from GRANTED to FAILED — its runner could not start it — counts one
    * more failure in its target's dial-back streak (qits-525), which {@link #end(UUID, String,
@@ -663,6 +785,7 @@ public class Leases {
                   for (Lease lease : mine) {
                     Held report = reported.get(lease.id);
                     boolean killed = recordMemory(lease, report);
+                    recordResolvers(lease, report);
                     before.put(lease.id, lease.state);
                     if (transition(lease, report, now) | killed) {
                       moved.add(lease);
@@ -818,6 +941,46 @@ public class Leases {
       lease.oomKilled = report.oomKilled();
     }
     return lease.oomKills != null && lease.oomKills > (before == null ? 0 : before);
+  }
+
+  /**
+   * A report's resolvers onto its lease's row (qits-2091), written only when they differ from the
+   * stored ones; a null (a runner before qits-2091) leaves the stored value. True when it wrote.
+   */
+  static boolean recordResolvers(Lease lease, Held report) {
+    if (report == null) {
+      return false;
+    }
+    boolean wrote = false;
+    if (report.resolvers() != null) {
+      List<String> reported = List.copyOf(report.resolvers());
+      if (!reported.equals(resolvers(lease.resolvers))) {
+        lease.resolvers = resolversText(reported);
+        wrote = true;
+      }
+    }
+    if (report.resolversStale() != null && report.resolversStale() != lease.resolversStale) {
+      lease.resolversStale = report.resolversStale();
+      wrote = true;
+    }
+    return wrote;
+  }
+
+  /** A stored resolvers column as a list; empty for null or anything that is not a JSON array. */
+  public static List<String> resolvers(String stored) {
+    JsonNode node = LeaseSpecs.parse(stored);
+    if (node == null || !node.isArray()) {
+      return List.of();
+    }
+    List<String> out = new ArrayList<>();
+    node.forEach(member -> out.add(member.asText()));
+    return List.copyOf(out);
+  }
+
+  static String resolversText(List<String> resolvers) {
+    var array = JsonNodeFactory.instance.arrayNode();
+    resolvers.forEach(array::add);
+    return LeaseSpecs.text(array);
   }
 
   private static Long highest(Long stored, Long reported) {

@@ -3,6 +3,7 @@ package eu.wohlben.qits.system.targets.api;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 import eu.wohlben.qits.system.targets.control.LeaseSpecs;
+import eu.wohlben.qits.system.targets.control.Leases;
 import eu.wohlben.qits.system.targets.control.Targets;
 import eu.wohlben.qits.system.targets.entity.Lease;
 import eu.wohlben.qits.system.targets.entity.SlotType;
@@ -14,6 +15,7 @@ import eu.wohlben.qits.system.targets.runner.TargetSignIns;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
@@ -209,7 +211,23 @@ public class TargetViews {
       @Schema(description = "The lease container's peak memory (memory.peak); null when unread")
           Long memoryPeakBytes,
       @Schema(description = "docker's State.OOMKilled of the lease's exited container; else null")
-          Boolean oomKilled) {}
+          Boolean oomKilled,
+      @Schema(
+              description =
+                  "The lease container's --dns servers in order, as its runner last reported them;"
+                      + " empty is the node's own resolvers, or no container (qits-2091)")
+          List<String> resolvers,
+      @Schema(
+              description =
+                  "The runner says the node now has a resolver (its tunnel's or the private"
+                      + " edge's) this container lacks first; POST /leases/{id}/refresh recreates"
+                      + " it")
+          boolean resolversStale,
+      @Schema(
+              description =
+                  "The refresh counter: each refresh raises it by one and the runner recreates the"
+                      + " container, keeping its work volume; 0 is never refreshed")
+          long generation) {}
 
   @Schema(name = "WorkVolume")
   public record WorkVolumeDto(
@@ -316,7 +334,10 @@ public class TargetViews {
         lease.oomKills,
         lease.oomScope(),
         lease.memoryPeakBytes,
-        lease.oomKilled);
+        lease.oomKilled,
+        Leases.resolvers(lease.resolvers),
+        lease.resolversStale,
+        lease.generation);
   }
 
   public static WarmImageDto view(WarmImage row) {

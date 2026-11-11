@@ -1079,6 +1079,32 @@
           }
         },
         {
+          "operationId": "refreshLease",
+          "method": "POST",
+          "path": "/system/api/leases/{leaseId}/refresh",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 200,
+          "file": "a-running-desk-lease/refreshLease.json",
+          "frozen": {
+            "ids": [
+              "$.id",
+              "$.ownerRef",
+              "$.targetId"
+            ],
+            "instants": [
+              "$.requestedAt",
+              "$.grantedAt",
+              "$.startedAt"
+            ],
+            "strings": [
+              "$.workKey"
+            ],
+            "listFilteredTo": null
+          }
+        },
+        {
           "operationId": "replaceLeaseSpec",
           "method": "PUT",
           "path": "/system/api/leases/{leaseId}/spec",
@@ -1194,6 +1220,29 @@
               "$[*].requestedAt",
               "$[*].grantedAt",
               "$[*].startedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "refreshLease",
+          "method": "POST",
+          "path": "/system/api/leases/{leaseId}/refresh",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 200,
+          "file": "a-running-workspace-lease/refreshLease.json",
+          "frozen": {
+            "ids": [
+              "$.id",
+              "$.targetId"
+            ],
+            "instants": [
+              "$.requestedAt",
+              "$.grantedAt",
+              "$.startedAt"
             ],
             "strings": [],
             "listFilteredTo": null
