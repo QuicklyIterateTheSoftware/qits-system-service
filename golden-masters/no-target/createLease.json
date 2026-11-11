@@ -31,5 +31,8 @@
   "oomKills": null,
   "oomScope": null,
   "memoryPeakBytes": null,
-  "oomKilled": null
+  "oomKilled": null,
+  "resolvers": [],
+  "resolversStale": false,
+  "generation": 0
 }

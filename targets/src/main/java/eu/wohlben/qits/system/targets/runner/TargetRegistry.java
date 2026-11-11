@@ -458,7 +458,9 @@ public class TargetRegistry implements TargetPresence {
                 lease.oomKills(),
                 lease.oomEvents(),
                 lease.memoryPeakBytes(),
-                lease.oomKilled()));
+                lease.oomKilled(),
+                lease.resolvers(),
+                lease.resolversStale()));
       }
     }
     try {

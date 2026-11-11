@@ -107,6 +107,29 @@ public class Lease extends PanacheEntityBase implements CausedRow {
   @Column(name = "oom_killed")
   public Boolean oomKilled;
 
+  /**
+   * The lease container's {@code --dns} servers in order, as its runner last reported them
+   * (qits-2091): a JSON array of strings, {@code []} for the node's own resolvers or no container.
+   */
+  @JdbcTypeCode(SqlTypes.JSON)
+  @Column(nullable = false, columnDefinition = "jsonb")
+  public String resolvers = "[]";
+
+  /**
+   * Whether the runner says the node now has a resolver — the tunnel's or the private edge's — that
+   * this lease's container lacks first (qits-2091), as last reported; a refresh ({@link
+   * #generation}) is what cures it, and the runner's next report after it says so.
+   */
+  @Column(name = "resolvers_stale", nullable = false)
+  public boolean resolversStale;
+
+  /**
+   * The owner's refresh counter (qits-2091), carried on every estate entry: the runner recreates
+   * the container, keeping its work volume, when it differs from the container's label. 0 is none.
+   */
+  @Column(nullable = false)
+  public long generation;
+
   /** When it last went ENDING; {@code LeaseEndingDeadline} counts from here. */
   @Column(name = "ending_since")
   public Instant endingSince;

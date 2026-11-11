@@ -30,6 +30,9 @@ public class TargetAuditLog {
   public static final String LEASE_END = "LEASE_END";
   public static final String LEASE_ENDING_DEADLINE = "LEASE_ENDING_DEADLINE";
 
+  /** An operator's refresh of a lease: its generation raised, its container recreated (qits-2091). */
+  public static final String LEASE_REFRESH = "LEASE_REFRESH";
+
   /** A GRANTED lease queued again because its target never started it (qits-1829). */
   public static final String LEASE_REQUEUED = "LEASE_REQUEUED";
 

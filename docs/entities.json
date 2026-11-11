@@ -91,6 +91,13 @@
           "kind" : "returns"
         },
         {
+          "operationId" : "refreshLease",
+          "method" : "POST",
+          "path" : "/leases/{id}/refresh",
+          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
+          "kind" : "returns"
+        },
+        {
           "operationId" : "removeTargetContainer",
           "method" : "DELETE",
           "path" : "/targets/{id}/docker/containers/{name}",
@@ -340,6 +347,13 @@
           "method" : "PATCH",
           "path" : "/targets/{id}",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$Login",
+          "kind" : "returns"
+        },
+        {
+          "operationId" : "refreshLease",
+          "method" : "POST",
+          "path" : "/leases/{id}/refresh",
+          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
           "kind" : "returns"
         },
         {
