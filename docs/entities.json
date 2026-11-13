@@ -1,5 +1,5 @@
 {
-  "formatVersion" : 1,
+  "formatVersion" : 2,
   "application" : "qits-system",
   "entities" : [
     {
@@ -53,77 +53,88 @@
           "method" : "POST",
           "path" : "/leases",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
-          "kind" : "schema"
+          "kind" : "schema",
+          "cardinality" : "single"
         },
         {
           "operationId" : "endLease",
           "method" : "DELETE",
           "path" : "/leases/{id}",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "single"
         },
         {
           "operationId" : "execInTargetContainer",
           "method" : "POST",
           "path" : "/targets/{id}/docker/containers/{name}/exec",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetDockerController$ExecResult",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "single"
         },
         {
           "operationId" : "getLease",
           "method" : "GET",
           "path" : "/leases/{id}",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "single"
         },
         {
           "operationId" : "leaseLogs",
           "method" : "GET",
           "path" : "/leases/{id}/logs",
           "dto" : "eu.wohlben.qits.system.targets.api.DockerDoor$Call",
-          "kind" : "body"
+          "kind" : "body",
+          "cardinality" : "single"
         },
         {
           "operationId" : "listLeases",
           "method" : "GET",
           "path" : "/leases",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "collection"
         },
         {
           "operationId" : "refreshLease",
           "method" : "POST",
           "path" : "/leases/{id}/refresh",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "single"
         },
         {
           "operationId" : "removeTargetContainer",
           "method" : "DELETE",
           "path" : "/targets/{id}/docker/containers/{name}",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetDockerController$DockerDone",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "single"
         },
         {
           "operationId" : "replaceLeaseSpec",
           "method" : "PUT",
           "path" : "/leases/{id}/spec",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "single"
         },
         {
           "operationId" : "stopTargetContainer",
           "method" : "POST",
           "path" : "/targets/{id}/docker/containers/{name}/stop",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetDockerController$DockerDone",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "single"
         },
         {
           "operationId" : "targetContainerLogs",
           "method" : "GET",
           "path" : "/targets/{id}/docker/containers/{name}/logs",
           "dto" : "eu.wohlben.qits.system.targets.api.DockerDoor$Call",
-          "kind" : "body"
+          "kind" : "body",
+          "cardinality" : "single"
         }
       ]
     },
@@ -256,175 +267,200 @@
           "method" : "DELETE",
           "path" : "/targets/{id}/sign-ins/{signInId}",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$SignInView",
-          "kind" : "schema"
+          "kind" : "schema",
+          "cardinality" : "single"
         },
         {
           "operationId" : "checkTargetRegistration",
           "method" : "POST",
           "path" : "/targets/{id}/registration-check",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$RegistrationCheck",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "single"
         },
         {
           "operationId" : "createLease",
           "method" : "POST",
           "path" : "/leases",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
-          "kind" : "schema"
+          "kind" : "schema",
+          "cardinality" : "single"
         },
         {
           "operationId" : "createTarget",
           "method" : "POST",
           "path" : "/targets",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$Login",
-          "kind" : "schema"
+          "kind" : "schema",
+          "cardinality" : "single"
         },
         {
           "operationId" : "endLease",
           "method" : "DELETE",
           "path" : "/leases/{id}",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "single"
         },
         {
           "operationId" : "execInTargetContainer",
           "method" : "POST",
           "path" : "/targets/{id}/docker/containers/{name}/exec",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetDockerController$ExecResult",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "single"
         },
         {
           "operationId" : "getLease",
           "method" : "GET",
           "path" : "/leases/{id}",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "single"
         },
         {
           "operationId" : "getTarget",
           "method" : "GET",
           "path" : "/targets/{id}",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$Login",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "single"
         },
         {
           "operationId" : "getTargetSignIn",
           "method" : "GET",
           "path" : "/targets/{id}/sign-ins/{signInId}",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$SignInView",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "single"
         },
         {
           "operationId" : "greenlightTarget",
           "method" : "POST",
           "path" : "/targets/{id}/greenlight",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$Login",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "single"
         },
         {
           "operationId" : "leaseLogs",
           "method" : "GET",
           "path" : "/leases/{id}/logs",
           "dto" : "eu.wohlben.qits.system.targets.api.DockerDoor$Call",
-          "kind" : "body"
+          "kind" : "body",
+          "cardinality" : "single"
         },
         {
           "operationId" : "listLeases",
           "method" : "GET",
           "path" : "/leases",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "collection"
         },
         {
           "operationId" : "listTargets",
           "method" : "GET",
           "path" : "/targets",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$Login",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "collection"
         },
         {
           "operationId" : "patchTarget",
           "method" : "PATCH",
           "path" : "/targets/{id}",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$Login",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "single"
         },
         {
           "operationId" : "refreshLease",
           "method" : "POST",
           "path" : "/leases/{id}/refresh",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "single"
         },
         {
           "operationId" : "registerTarget",
           "method" : "POST",
           "path" : "/targets/{id}/register",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$RegisteredTarget",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "single"
         },
         {
           "operationId" : "removeTargetContainer",
           "method" : "DELETE",
           "path" : "/targets/{id}/docker/containers/{name}",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetDockerController$DockerDone",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "single"
         },
         {
           "operationId" : "replaceLeaseSpec",
           "method" : "PUT",
           "path" : "/leases/{id}/spec",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "single"
         },
         {
           "operationId" : "requestTargetHealthCheck",
           "method" : "POST",
           "path" : "/targets/{id}/healthcheck",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$HealthCheckRequested",
-          "kind" : "schema"
+          "kind" : "schema",
+          "cardinality" : "single"
         },
         {
           "operationId" : "rotateTargetRegistrationToken",
           "method" : "POST",
           "path" : "/targets/{id}/registration-token",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$Login",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "single"
         },
         {
           "operationId" : "startTargetSignIn",
           "method" : "POST",
           "path" : "/targets/{id}/sign-ins",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$SignInView",
-          "kind" : "schema"
+          "kind" : "schema",
+          "cardinality" : "single"
         },
         {
           "operationId" : "stopTargetContainer",
           "method" : "POST",
           "path" : "/targets/{id}/docker/containers/{name}/stop",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetDockerController$DockerDone",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "single"
         },
         {
           "operationId" : "submitTargetSignInCode",
           "method" : "POST",
           "path" : "/targets/{id}/sign-ins/{signInId}/code",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$SignInView",
-          "kind" : "schema"
+          "kind" : "schema",
+          "cardinality" : "single"
         },
         {
           "operationId" : "targetAudit",
           "method" : "GET",
           "path" : "/targets/{id}/docker/audit",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetDockerController$AuditRow",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "collection"
         },
         {
           "operationId" : "targetContainerLogs",
           "method" : "GET",
           "path" : "/targets/{id}/docker/containers/{name}/logs",
           "dto" : "eu.wohlben.qits.system.targets.api.DockerDoor$Call",
-          "kind" : "body"
+          "kind" : "body",
+          "cardinality" : "single"
         }
       ]
     },
@@ -449,7 +485,8 @@
           "method" : "GET",
           "path" : "/targets/{id}/docker/audit",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetDockerController$AuditRow",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "collection"
         }
       ]
     },
@@ -474,7 +511,8 @@
           "method" : "GET",
           "path" : "/targets/warm-images",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$WarmImageDto",
-          "kind" : "returns"
+          "kind" : "returns",
+          "cardinality" : "collection"
         }
       ]
     },
@@ -499,7 +537,8 @@
           "method" : "DELETE",
           "path" : "/work-volumes/{workKey}",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$WorkVolumeDto",
-          "kind" : "schema"
+          "kind" : "schema",
+          "cardinality" : "single"
         }
       ]
     }
