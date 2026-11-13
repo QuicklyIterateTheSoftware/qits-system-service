@@ -65,7 +65,7 @@
              property so the image build can point it at the address the builder container can
              actually reach — see docker/Dockerfile and .qits-maven-settings.xml. -->
         <qits.auth-core.version>2026.1106.507</qits.auth-core.version>
-        <qits.arch-rules.version>2026.1108.20205</qits.arch-rules.version>
+        <qits.arch-rules.version>2026.1113.14706</qits.arch-rules.version>
         <!-- CallerServerFilter/CallerClientFilter: jandex-indexed filters that record inbound
              X-Qits-Caller as the qits.caller span attribute and stamp it on outgoing REST-client
              calls. Also published by qits-integrations-quarkus. -->
@@ -119,7 +119,7 @@
              rather than reporting UNKNOWN until its first lease. Same pin qits-projects-service
              carries for the refinement image, moved by qits-maintenance on maintenance/dependencies
              like any other internal pin; never by hand. -->
-        <qits.workspace-daemon-protocol.version>2026.1112.132640</qits.workspace-daemon-protocol.version>
+        <qits.workspace-daemon-protocol.version>2026.1113.50218</qits.workspace-daemon-protocol.version>
         <zonky.embedded-postgres.version>2.2.2</zonky.embedded-postgres.version>
         <zonky.postgres-binaries.version>18.6.0</zonky.postgres-binaries.version>
         <qits.maven.repository.url>https://registry.qits.wohlben.eu/artifacts/maven/maven</qits.maven.repository.url>
