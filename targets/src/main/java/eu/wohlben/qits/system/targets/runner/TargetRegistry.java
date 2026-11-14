@@ -555,10 +555,16 @@ public class TargetRegistry implements TargetPresence {
     signIns.onProgress(session, progress);
   }
 
-  /** A connection went away; when it was the target's last, the reconnect grace starts. */
+  /**
+   * A connection went away; when it was the target's last, the reconnect grace starts.
+   *
+   * <p><b>The drop is on record before the last connection stops counting as open</b> (qits-2233):
+   * it is written inside the {@code compute} that takes the session out, so a reader that finds no
+   * open connection finds the drop too — never {@link #started}, which would read a target that
+   * just closed as gone since the process began. The session is marked closed after that.
+   */
   public void onClose(Session session) {
-    session.open = false;
-    signIns.onClose(session);
+    Instant closedAt = Instant.now();
     boolean[] last = {false};
     sessions.computeIfPresent(
         session.targetId,
@@ -567,17 +573,20 @@ public class TargetRegistry implements TargetPresence {
           kept.remove(session);
           kept.removeIf(other -> !other.isOpen());
           last[0] = kept.isEmpty();
+          if (last[0]) {
+            connectedSince.remove(id);
+            droppedAt.put(id, closedAt);
+          }
           return kept.isEmpty() ? null : List.copyOf(kept);
         });
+    session.open = false;
+    signIns.onClose(session);
     announceConnection(session.targetId, session.targetName);
-    if (!last[0] || sessions.containsKey(session.targetId)) {
-      return;
+    if (last[0]) {
+      LOG.infof(
+          "Target %s (%s) disconnected (connection %s); it is waited for %s",
+          session.targetName, session.targetId, session.connection.id(), config.reconnectGrace());
     }
-    LOG.infof(
-        "Target %s (%s) disconnected (connection %s); it is waited for %s",
-        session.targetName, session.targetId, session.connection.id(), config.reconnectGrace());
-    connectedSince.remove(session.targetId);
-    droppedAt.put(session.targetId, Instant.now());
   }
 
   // --- presence ---------------------------------------------------------------------------------
@@ -609,7 +618,9 @@ public class TargetRegistry implements TargetPresence {
   /**
    * Empty while the target holds an open connection — greeted or not, since an open socket is one
    * its runner can still report on; otherwise its drop on record, or {@link #started} when there is
-   * none (qits-2227).
+   * none (qits-2227). A drop gone missing between the two reads is a reconnect's ({@link #admit}
+   * adds the session before it clears the drop), so the connections are asked again before {@link
+   * #started} is answered (qits-2233).
    */
   @Override
   public Optional<Instant> absentSince(UUID targetId) {
@@ -619,7 +630,11 @@ public class TargetRegistry implements TargetPresence {
     if (!open(targetId).isEmpty()) {
       return Optional.empty();
     }
-    return Optional.of(droppedAt.getOrDefault(targetId, started));
+    Instant dropped = droppedAt.get(targetId);
+    if (dropped == null && !open(targetId).isEmpty()) {
+      return Optional.empty();
+    }
+    return Optional.of(dropped == null ? started : dropped);
   }
 
   /** Whether a {@code loginState} arrived on the target's serving connection. */
@@ -764,35 +779,40 @@ public class TargetRegistry implements TargetPresence {
    * is closed 1008 {@link #REREGISTERED} — no {@code retire{DELETED}}, since the target, its leases
    * and its work volumes stay, and the runner installed with the new token takes them over. A
    * connection the new client opens is untouched; a later dial with the old client finds no row and
-   * is refused at the socket.
+   * is refused at the socket. When they were all it had, the drop is recorded before they stop
+   * counting as open, inside the {@code compute} a racing {@link #admit} waits for (qits-2233).
    */
   public void reregistered(UUID targetId, String previousClientId) {
     if (targetId == null || previousClientId == null) {
       return;
     }
-    String closed = null;
-    for (Session session : open(targetId)) {
-      if (!previousClientId.equals(session.clientId)) {
-        continue;
-      }
-      closed = session.targetName;
+    Instant closedAt = Instant.now();
+    List<Session> replaced = new ArrayList<>();
+    sessions.computeIfPresent(
+        targetId,
+        (id, present) -> {
+          List<Session> open = present.stream().filter(Session::isOpen).toList();
+          open.stream().filter(s -> previousClientId.equals(s.clientId)).forEach(replaced::add);
+          if (!replaced.isEmpty() && replaced.size() == open.size()) {
+            connectedSince.remove(id);
+            droppedAt.put(id, closedAt);
+          }
+          replaced.forEach(s -> s.open = false);
+          return present;
+        });
+    if (replaced.isEmpty()) {
+      return;
+    }
+    for (Session session : replaced) {
       LOG.infof(
           "Target %s (%s) registered again; closing its connection %s of replaced client %s",
           session.targetName, session.targetId, session.connection.id(), previousClientId);
-      session.open = false;
       closeBounded(
           session.connection,
           new CloseReason(CLOSE_POLICY, REREGISTERED),
           "the replaced connection of target " + session.targetName);
     }
-    if (closed == null) {
-      return;
-    }
-    announceConnection(targetId, closed);
-    if (open(targetId).isEmpty()) {
-      connectedSince.remove(targetId);
-      droppedAt.put(targetId, Instant.now());
-    }
+    announceConnection(targetId, replaced.get(0).targetName);
   }
 
   /**
