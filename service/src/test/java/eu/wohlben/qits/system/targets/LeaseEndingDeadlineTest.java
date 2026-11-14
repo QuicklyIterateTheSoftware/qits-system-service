@@ -105,6 +105,11 @@ class LeaseEndingDeadlineTest {
     return presence.absentSince(target).orElseThrow();
   }
 
+  /** {@code i} as the store keeps it: pgjdbc rounds to the microsecond, half up. */
+  private static Instant stored(Instant i) {
+    return i.plusNanos(500).truncatedTo(ChronoUnit.MICROS);
+  }
+
   private static String sentence() {
     return "ENDING deadline passed: the runner on lab never reported the container gone (since "
         + SINCE
@@ -187,6 +192,9 @@ class LeaseEndingDeadlineTest {
       TargetRows.lease(exited, SlotType.CI, "qits-ci", "run-2", LeaseState.EXITED, target);
     }
     since = absentSince(target);
+    assertTrue(
+        since.isAfter(presence.absentSince(UUID.randomUUID()).orElseThrow()),
+        "since is the drop, not the process start");
     // ENDING recently enough that its own deadline (PT10M) has not passed when the absent one does.
     TargetRows.ending(ending, SlotType.CI, "qits-ci", "run-3", target, since.plus(Duration.ofMinutes(25)));
 
@@ -205,7 +213,7 @@ class LeaseEndingDeadlineTest {
 
     Lease failed = TargetRows.reload(running);
     assertEquals(LeaseState.FAILED, failed.state);
-    assertEquals(due.truncatedTo(ChronoUnit.MICROS), failed.endedAt);
+    assertEquals(stored(due), failed.endedAt);
     assertEquals(detail, failed.detail);
     List<TargetAudit> audit = TargetRows.audit(running);
     assertEquals(1, audit.size());
@@ -228,7 +236,7 @@ class LeaseEndingDeadlineTest {
 
     Lease ended = TargetRows.reload(ending);
     assertEquals(LeaseState.ENDED, ended.state);
-    assertEquals(due.truncatedTo(ChronoUnit.MICROS), ended.endedAt);
+    assertEquals(stored(due), ended.endedAt);
     assertEquals(detail, ended.detail);
     assertEquals("ENDED", TargetRows.audit(ending).get(0).outcome);
     assertEquals("LEASE_ABANDONED", TargetRows.audit(ending).get(0).operation);
