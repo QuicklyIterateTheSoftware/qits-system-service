@@ -11,6 +11,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -53,8 +54,20 @@ import org.jboss.logging.Logger;
  * queued again ({@link Leases#requeue}), announced, recorded as a {@link
  * TargetAuditLog#LEASE_REQUEUED} row, and the pass places it on another target, or on its pinned one
  * when that returns. A lease with a work key is left alone: its work volume's row pins it to that
- * target, so queuing it again would change only its detail. RUNNING, EXITED, FAILED and ENDING
- * leases are left as they are: their containers outlive the socket.
+ * target, so queuing it again would change only its detail.
+ *
+ * <p><b>A target gone for good takes its leases with it</b> (qits-2227). A container outlives its
+ * runner's socket, so a RUNNING, ENDING or work-keyed GRANTED lease is left as it is through the
+ * reconnect grace — but not for ever: a target that went to sleep held three CI leases RUNNING for
+ * an hour and a half, and their slots with them. So the third pass settles every such lease whose
+ * target has been without a connection ({@link TargetPresence#absentSince}) for {@code
+ * qits.system.leases.absent-deadline}: GRANTED and RUNNING are FAILED, so their owners see the work
+ * did not finish, and ENDING is ENDED ({@link Leases#abandon}), each with {@code detail = "target
+ * <name> offline since <instant>"}, announced, recorded as a {@link TargetAuditLog#LEASE_ABANDONED}
+ * row, and its slot handed to the pass. The deadline is long (PT30M) because the runner's socket
+ * crosses the edge, which an outage can cut for longer than the reconnect grace while the node runs
+ * on. A target dropped before a restart counts from the restart, since the drop is held in memory;
+ * EXITED, FAILED, ENDED and QUEUED leases have nothing left to settle.
  *
  * <p>{@link #sweep} takes the clock as an argument, which is how the suite drives it.
  */
@@ -77,6 +90,9 @@ public class LeaseEndingDeadline {
   @ConfigProperty(name = "qits.system.leases.ending-grace")
   Duration grace;
 
+  @ConfigProperty(name = "qits.system.leases.absent-deadline")
+  Duration absentDeadline;
+
   /**
    * The quarantine reason of a target whose runner was nudged about {@code leaseId} and still did not
    * act on its estate (qits-1829).
@@ -86,11 +102,23 @@ public class LeaseEndingDeadline {
   }
 
   /**
-   * What one sweep did, the numbers the tests read: the leases nudged, ENDED and queued again, and
-   * the targets quarantined.
+   * The detail of a lease settled because its target has been without a connection since {@code
+   * since} (qits-2227), to the second.
+   */
+  public static String offlineSince(String targetName, Instant since) {
+    return "target " + targetName + " offline since " + since.truncatedTo(ChronoUnit.SECONDS);
+  }
+
+  /**
+   * What one sweep did, the numbers the tests read: the leases nudged, ENDED and queued again, the
+   * targets quarantined, and the leases settled because their target was gone (qits-2227).
    */
   public record Swept(
-      List<UUID> nudged, List<UUID> ended, List<UUID> requeued, List<UUID> quarantined) {}
+      List<UUID> nudged,
+      List<UUID> ended,
+      List<UUID> requeued,
+      List<UUID> quarantined,
+      List<UUID> abandoned) {}
 
   @Scheduled(
       every = "{qits.system.leases.ending-check-interval}",
@@ -100,11 +128,21 @@ public class LeaseEndingDeadline {
     sweep(Instant.now());
   }
 
-  /** One sweep as of {@code now}: the ENDING deadline, then the requeue; never throws. */
+  /**
+   * One sweep as of {@code now}: the ENDING deadline, then the requeue, then the absent deadline;
+   * never throws.
+   */
   public Swept sweep(Instant now) {
-    Swept swept = new Swept(new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
+    Swept swept =
+        new Swept(
+            new ArrayList<>(),
+            new ArrayList<>(),
+            new ArrayList<>(),
+            new ArrayList<>(),
+            new ArrayList<>());
     endingDeadline(now, swept);
     requeueAbsent(now, swept);
+    settleAbandoned(now, swept);
     return swept;
   }
 
@@ -247,6 +285,53 @@ public class LeaseEndingDeadline {
         requeue(lease, detail, now, swept);
       } catch (RuntimeException e) {
         LOG.warnf("The requeue of lease %s did not complete: %s", lease.id(), e.toString());
+      }
+    }
+  }
+
+  /**
+   * Every lease that may still hold a container on a target without a connection since before
+   * {@code now - absent-deadline} is settled: GRANTED and RUNNING FAILED, ENDING ENDED (qits-2227).
+   */
+  private void settleAbandoned(Instant now, Swept swept) {
+    List<Leases.OnTarget> onTargets;
+    try {
+      onTargets = leases.onTargets();
+    } catch (RuntimeException e) {
+      if (LaunchMode.current() != LaunchMode.TEST) {
+        LOG.warnf("Could not read the leases on targets: %s", e.toString());
+      }
+      return;
+    }
+    for (Leases.OnTarget lease : onTargets) {
+      try {
+        Instant since = presence.absentSince(lease.targetId()).orElse(null);
+        if (since == null || now.isBefore(since.plus(absentDeadline))) {
+          continue;
+        }
+        String detail = offlineSince(targetName(lease.targetId()), since);
+        Leases.Abandoned settled = leases.abandon(lease, now, detail);
+        if (settled == null) {
+          continue;
+        }
+        ObjectNode args = JsonNodeFactory.instance.objectNode();
+        args.put("from", settled.before().name());
+        args.put("to", settled.lease().state.name());
+        audit.record(
+            new TargetAuditLog.Entry(
+                TargetAuditLog.SYSTEM_ACTOR,
+                "",
+                lease.targetId(),
+                lease.id(),
+                TargetAuditLog.LEASE_ABANDONED,
+                null,
+                args,
+                settled.lease().state.name(),
+                detail),
+            now);
+        swept.abandoned().add(lease.id());
+      } catch (RuntimeException e) {
+        LOG.warnf("The absent deadline of lease %s did not complete: %s", lease.id(), e.toString());
       }
     }
   }

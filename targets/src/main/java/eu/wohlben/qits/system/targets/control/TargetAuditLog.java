@@ -36,6 +36,12 @@ public class TargetAuditLog {
   /** A GRANTED lease queued again because its target never started it (qits-1829). */
   public static final String LEASE_REQUEUED = "LEASE_REQUEUED";
 
+  /**
+   * A GRANTED, RUNNING or ENDING lease settled (FAILED, or ENDED) because its target was gone past
+   * the absent deadline (qits-2227).
+   */
+  public static final String LEASE_ABANDONED = "LEASE_ABANDONED";
+
   /** The most rows one read answers. */
   public static final int MAX_READ = 500;
 

@@ -36,6 +36,7 @@ import eu.wohlben.qits.systemrunner.protocol.SlotImages;
 import eu.wohlben.qits.systemrunner.protocol.SystemRunnerAck;
 import eu.wohlben.qits.systemrunner.protocol.SystemRunnerCapabilities;
 import eu.wohlben.qits.systemrunner.protocol.SystemRunnerProtocol;
+import io.quarkus.runtime.Startup;
 import io.quarkus.websockets.next.CloseReason;
 import io.quarkus.websockets.next.WebSocketConnection;
 import jakarta.annotation.PreDestroy;
@@ -86,9 +87,10 @@ import org.jboss.logging.Logger;
  * socket does), and a socket inside the grace is not a comeback. One after it is, and is quarantined
  * until a health check passes. A disconnected target is granted nothing. Once the grace has passed
  * its GRANTED leases without a work key go back to QUEUED ({@code LeaseEndingDeadline}, qits-1829):
- * nothing was started for them, so nothing would ever report them; RUNNING, EXITED, FAILED and
- * ENDING ones are still left as they are. A process that just started has seen no runner yet, and
- * gives each the same grace from its own start.
+ * nothing was started for them, so nothing would ever report them. Its other GRANTED, RUNNING and
+ * ENDING leases are left as they are for {@code qits.system.leases.absent-deadline}, counted from
+ * {@link #absentSince}, and settled after it (qits-2227). A process that just started has seen no
+ * runner yet, and counts each from its own start — the grace and the absent deadline alike.
  *
  * <p><b>Sign-in.</b> {@code loginState} is written to the row ({@link Targets#recordLogin}) and
  * announced when it changed; the login commands are rendered only once one has arrived on the
@@ -108,6 +110,7 @@ import org.jboss.logging.Logger;
  * unconfigured runner image) and {@code settle}'s replacement from each needing a rule of their own;
  * a comparison made while a {@code hello} is still in flight is deferred to the one it ends with.
  */
+@Startup
 @ApplicationScoped
 public class TargetRegistry implements TargetPresence {
 
@@ -166,7 +169,11 @@ public class TargetRegistry implements TargetPresence {
 
   private final ConcurrentHashMap<UUID, Instant> droppedAt = new ConcurrentHashMap<>();
 
-  /** When this registry began: the drop of every target it has not seen since (qits-1829). */
+  /**
+   * When this registry began: the drop of every target it has not seen since (qits-1829). The bean
+   * is created at boot ({@code @Startup}), so this is the process's start and a restart does not
+   * push the absent deadline out to whenever the registry was first used (qits-2227).
+   */
   private final Instant started = Instant.now();
 
   /**
@@ -594,11 +601,25 @@ public class TargetRegistry implements TargetPresence {
     if (targetId == null) {
       return false;
     }
-    if (!open(targetId).isEmpty()) {
-      return true;
+    return absentSince(targetId)
+        .map(since -> since.plus(config.reconnectGrace()).isAfter(now))
+        .orElse(true);
+  }
+
+  /**
+   * Empty while the target holds an open connection — greeted or not, since an open socket is one
+   * its runner can still report on; otherwise its drop on record, or {@link #started} when there is
+   * none (qits-2227).
+   */
+  @Override
+  public Optional<Instant> absentSince(UUID targetId) {
+    if (targetId == null) {
+      return Optional.of(started);
     }
-    Instant dropped = droppedAt.getOrDefault(targetId, started);
-    return dropped.plus(config.reconnectGrace()).isAfter(now);
+    if (!open(targetId).isEmpty()) {
+      return Optional.empty();
+    }
+    return Optional.of(droppedAt.getOrDefault(targetId, started));
   }
 
   /** Whether a {@code loginState} arrived on the target's serving connection. */

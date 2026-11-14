@@ -65,6 +65,8 @@ public class Leases {
 
   @Inject Targets targets;
 
+  @Inject TargetPresence presence;
+
   /** What an owner asks for. {@code spec} is checked by {@link LeaseSpecs#require}. */
   public record NewLease(
       SlotType slotType,
@@ -236,8 +238,9 @@ public class Leases {
    * The owner is done with it: a QUEUED lease (or one with no target) is ENDED at once, and so is an
    * EXITED or FAILED one, whose container has stopped and whose slot is free already — the estate no
    * longer lists it, so the runner removes the container. A GRANTED or RUNNING lease is ENDING until
-   * the runner reports its container gone. Ending an ENDING or ENDED lease is a no-op.
-   * A {@code reason} lands in the detail of a lease it moves.
+   * the runner reports its container gone — unless its target holds no connection, when no runner
+   * is there to report it and it is ENDED at once (qits-2227). Ending an ENDING or ENDED lease is a
+   * no-op. A {@code reason} lands in the detail of a lease it moves.
    *
    * <p><b>The dial-back streak</b> (qits-1809). The end of a CI lease that was RUNNING tells whether
    * its ci daemon dialled back: {@link #NEVER_DIALLED_BACK} counts one more failure on its target,
@@ -307,8 +310,9 @@ public class Leases {
 
   /**
    * An operator ends any lease, whoever owns it — the stuck-lease door. QUEUED (or targetless),
-   * EXITED or FAILED is ENDED and GRANTED or RUNNING is ENDING, as for its owner; an ENDING lease is
-   * ENDED at once, without the runner's word. A lease it moves gets {@code detail = "ended by
+   * EXITED or FAILED is ENDED and GRANTED or RUNNING is ENDING, or ENDED on a target without a
+   * connection (qits-2227), as for its owner; an ENDING lease is ENDED at once, without the runner's
+   * word. A lease it moves gets {@code detail = "ended by
    * <actor>[: <reason>]"}. Every call writes a {@link TargetAuditLog#LEASE_END} row, a refused one
    * too: outcome ENDED, ENDING, NOOP (already ENDED) or NOT_FOUND.
    *
@@ -463,6 +467,16 @@ public class Leases {
    * The one end transition. An owner's end ({@code byOperator} false) leaves an ENDING lease alone;
    * an operator's also ends an ENDING lease. A non-null {@code detail} is left on any lease it
    * moves. Every entry into ENDING stamps {@code ending_since}.
+   *
+   * <p><b>ENDING waits for a runner, so it needs one</b> (qits-2227). ENDING becomes ENDED when the
+   * target's runner reports the container gone; a GRANTED or RUNNING lease whose target holds no
+   * open connection ({@link TargetPresence#absentSince} is set) has no runner to say so, and ENDING
+   * would only hold its slot until the ENDING deadline (an operator once had to end the same lease
+   * twice for it). So it is ENDED at once, by its owner and an operator alike. Nothing is lost when
+   * the runner comes back: the estate it is sent no longer lists the lease, and it removes the
+   * container. A target that holds a connection keeps the path through ENDING; one that dropped
+   * moments ago, inside its reconnect grace, does not — until it is back, nothing reports for it,
+   * and when it is back its estate settles the container either way.
    */
   private Ended endOne(UUID id, boolean byOperator, String detail) {
     LeaseState[] before = {null};
@@ -488,7 +502,8 @@ public class Leases {
                       || lease.state == LeaseState.QUEUED
                       || lease.state == LeaseState.EXITED
                       || lease.state == LeaseState.FAILED
-                      || lease.targetId == null) {
+                      || lease.targetId == null
+                      || presence.absentSince(lease.targetId).isPresent()) {
                     lease.state = LeaseState.ENDED;
                     lease.endedAt = now;
                   } else {
@@ -640,6 +655,77 @@ public class Leases {
       allocation.requestPass();
     }
     return queued;
+  }
+
+  // --- the absent target (LeaseEndingDeadline, qits-2227) ---------------------------------------
+
+  /** A lease on a target as the absent pass reads it. */
+  public record OnTarget(UUID id, UUID targetId, LeaseState state) {}
+
+  /**
+   * Every lease whose container may still be on its target, in id order: RUNNING, ENDING, and
+   * GRANTED with a work key — the ones {@link #abandon} may settle. A GRANTED lease without a work
+   * key is left out: {@link #requeue} has it back in the queue long before.
+   */
+  public List<OnTarget> onTargets() {
+    return QuarkusTransaction.requiringNew()
+        .call(
+            () ->
+                Lease.<Lease>find(
+                        "targetId is not null and (state in ?1 or (state = ?2 and workKey is not"
+                            + " null)) order by id",
+                        Set.of(LeaseState.RUNNING, LeaseState.ENDING),
+                        LeaseState.GRANTED)
+                    .stream()
+                    .map(lease -> new OnTarget(lease.id, lease.targetId, lease.state))
+                    .toList());
+  }
+
+  /** A lease the absent pass settled, and the state it was in before. */
+  public record Abandoned(Lease lease, LeaseState before) {}
+
+  /**
+   * Settled without the runner's word, because its target has been gone past {@code
+   * qits.system.leases.absent-deadline} (qits-2227): a GRANTED or RUNNING lease is FAILED — its
+   * owner learns its work did not finish, and ends it as it ends any FAILED one — and an ENDING one
+   * is ENDED; both with {@code ended_at = now} and {@code detail}. Only while it is still on {@code
+   * onTarget}'s target in one of those states, re-read under the row lock. Announced; the target's
+   * estate is pushed (FAILED and ENDED are both {@code desired: ENDED}, so a runner that comes back
+   * removes the container) and a pass is asked for, since the slot is free. Answers the lease and
+   * what it was, or null when something else moved it first.
+   */
+  public Abandoned abandon(OnTarget onTarget, Instant now, String detail) {
+    LeaseState[] before = {null};
+    Lease settled =
+        QuarkusTransaction.requiringNew()
+            .call(
+                () -> {
+                  Lease lease = Lease.findById(onTarget.id(), LockModeType.PESSIMISTIC_WRITE);
+                  if (lease == null || !Objects.equals(lease.targetId, onTarget.targetId())) {
+                    return null;
+                  }
+                  before[0] = lease.state;
+                  switch (lease.state) {
+                    case GRANTED, RUNNING -> lease.state = LeaseState.FAILED;
+                    case ENDING -> lease.state = LeaseState.ENDED;
+                    default -> {
+                      return null;
+                    }
+                  }
+                  lease.endedAt = now;
+                  lease.detail = detail;
+                  return lease;
+                });
+    if (settled == null) {
+      return null;
+    }
+    LOG.warnf(
+        "Lease %s (%s %s of %s) is %s: %s",
+        settled.id, settled.slotType, settled.ownerRef, settled.ownerApp, settled.state, detail);
+    events.leaseChanged(settled);
+    allocation.estateChanged(settled.targetId);
+    allocation.requestPass();
+    return new Abandoned(settled, before[0]);
   }
 
   /**

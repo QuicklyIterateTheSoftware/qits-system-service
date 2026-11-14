@@ -87,7 +87,12 @@ throws. ENDING has a deadline, `LeaseEndingDeadline` — one nudge (the estate a
 after the grace; its `sweep(Instant)` takes the clock, which is how the suite drives it. A nudged
 lease ENDED on a still-connected target quarantines that target BEFORE the end (whose pass would grant
 the slot back), and the same sweep queues again every GRANTED lease without a work key whose target
-is not `TargetPresence.present` (qits-1829).
+is not `TargetPresence.present` (qits-1829). Its third pass settles the leases of a target without a
+connection for `qits.system.leases.absent-deadline` (PT30M, from `TargetPresence.absentSince`, which
+counts from the process's start for a target not seen since): GRANTED with a work key and RUNNING
+are FAILED, ENDING is ENDED, each a `LEASE_ABANDONED` audit row (qits-2227). An end of a GRANTED or
+RUNNING lease whose target holds no connection is ENDED at once, never ENDING: no runner is there to
+report the container gone.
 
 **Docker on a target is a request/answer pair on the runner socket, and every call is audited**
 (epic qits-1621). `runner/TargetDocker` sends `Docker` and waits on a future keyed by `requestId`

@@ -13,7 +13,8 @@ import org.hibernate.type.SqlTypes;
 /**
  * One thing done to a target or a lease beyond its owner's own doors: an operator's lease end
  * ({@code LEASE_END}), the ENDING deadline ({@code LEASE_ENDING_DEADLINE}), a GRANTED lease queued
- * again off a target that never started it ({@code LEASE_REQUEUED}), and the Docker API's
+ * again off a target that never started it ({@code LEASE_REQUEUED}), a lease settled because its
+ * target was gone past the absent deadline ({@code LEASE_ABANDONED}), and the Docker API's
  * operations ({@code DOCKER_<OP>}). Written only by {@code control/TargetAuditLog}, never updated.
  */
 @Entity

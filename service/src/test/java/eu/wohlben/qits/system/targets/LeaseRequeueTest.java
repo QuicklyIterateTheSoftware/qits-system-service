@@ -216,7 +216,10 @@ class LeaseRequeueTest {
 
   @Test
   void onlyAGrantedLeaseWithoutAWorkKeyIsQueuedAgain() {
-    // No runner has dialled for this target, and the clock is an hour past this process's start.
+    // No runner has dialled for this target: it is absent since this process started. The clock is
+    // ten minutes past that — past the reconnect grace, inside the absent deadline (qits-2227), which
+    // would settle the RUNNING and ENDING leases below.
+    Instant sweptAt = presence.absentSince(target).orElseThrow().plus(Duration.ofMinutes(10));
     UUID ci = UUID.randomUUID();
     TargetRows.lease(ci, SlotType.CI, "qits-ci", "run-1", LeaseState.GRANTED, target);
     UUID keyed = UUID.randomUUID();
@@ -237,8 +240,9 @@ class LeaseRequeueTest {
                     UUID.randomUUID(), SlotType.CI, "qits-ci", "run-5", LeaseState.ENDING, target)
                 .id);
 
-    LeaseEndingDeadline.Swept swept = deadline.sweep(Instant.now().plus(Duration.ofHours(1)));
+    LeaseEndingDeadline.Swept swept = deadline.sweep(sweptAt);
     assertEquals(List.of(ci), swept.requeued());
+    assertTrue(swept.abandoned().isEmpty(), "inside the absent deadline");
     assertEquals(LeaseState.QUEUED, TargetRows.reload(ci).state);
 
     Lease stays = TargetRows.reload(keyed);

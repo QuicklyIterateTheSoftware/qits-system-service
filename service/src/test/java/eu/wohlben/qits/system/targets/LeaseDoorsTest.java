@@ -8,9 +8,11 @@ import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import eu.wohlben.qits.runner.protocol.Ack;
 import eu.wohlben.qits.system.targets.control.LeaseSpecs;
 
 import eu.wohlben.qits.system.targets.control.TargetAllocation;
@@ -19,14 +21,18 @@ import eu.wohlben.qits.system.targets.entity.LeaseState;
 import eu.wohlben.qits.system.targets.entity.SlotType;
 import eu.wohlben.qits.system.targets.entity.TargetAudit;
 import eu.wohlben.qits.system.targets.entity.WorkVolume;
+import eu.wohlben.qits.systemrunner.protocol.Estate;
 import io.quarkus.narayana.jta.QuarkusTransaction;
+import io.quarkus.test.common.http.TestHTTPResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.response.Response;
 import io.restassured.specification.RequestSpecification;
 import jakarta.inject.Inject;
+import java.net.URI;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -41,9 +47,40 @@ class LeaseDoorsTest {
 
   @Inject TargetAllocation allocation;
 
+  @Inject ContractBearers bearers;
+
+  @TestHTTPResource("/")
+  URI base;
+
   @BeforeEach
   void clean() {
     TargetRows.clear();
+    bearers.reset();
+  }
+
+  /** The runner {@link #connectedLab} dialled, closed after each test. */
+  private FakeTargetRunner runner;
+
+  @AfterEach
+  void disarm() {
+    if (runner != null) {
+      runner.close();
+      runner = null;
+    }
+    bearers.reset();
+  }
+
+  /**
+   * Target {@code lab} with its runner connected, registered as {@code client-lab}: a RUNNING lease
+   * on it ends through ENDING, since a runner is there to report its container gone (qits-2227).
+   */
+  private void connectedLab(UUID target) throws InterruptedException {
+    TargetRows.target(target, "lab", 4, "client-lab", false);
+    bearers.grant("Bearer runner-lab", "client-lab", "qits:target-runner");
+    runner = FakeTargetRunner.dial(base, "Bearer runner-lab");
+    runner.hello(4, "qits-system-runner-dot-claude-lab");
+    runner.await(Ack.class);
+    runner.await(Estate.class);
   }
 
   static RequestSpecification service(String clientId) {
@@ -257,13 +294,44 @@ class LeaseDoorsTest {
   }
 
   @Test
-  void endingAGrantedLeaseIsEndingUntilTheRunnerSaysItIsGone() {
+  void endingARunningLeaseIsEndingUntilTheRunnerSaysItIsGone() throws Exception {
     UUID target = UUID.randomUUID();
-    TargetRows.target(target, "lab", 4, "client-lab", false);
+    connectedLab(target);
     UUID id = UUID.randomUUID();
     TargetRows.lease(id, SlotType.CI, "qits-ci", "run-9", LeaseState.RUNNING, target);
     service("dev-qits-ci").delete(API + "/" + id).then().statusCode(200).body("state", equalTo("ENDING"));
     assertEquals(LeaseState.ENDING, TargetRows.reload(id).state);
+  }
+
+  @Test
+  void endingARunningLeaseOnATargetWithNoRunnerEndsItAtOnce() {
+    // No runner has dialled for lab: nothing would ever report the container gone (qits-2227).
+    UUID target = UUID.randomUUID();
+    TargetRows.target(target, "lab", 4, "client-lab", false);
+    UUID running = UUID.randomUUID();
+    TargetRows.lease(running, SlotType.CI, "qits-ci", "run-9", LeaseState.RUNNING, target);
+    service("dev-qits-ci")
+        .delete(API + "/" + running)
+        .then()
+        .statusCode(200)
+        .body("state", equalTo("ENDED"))
+        .body("endedAt", notNullValue());
+    Lease row = TargetRows.reload(running);
+    assertEquals(LeaseState.ENDED, row.state);
+    assertNull(row.endingSince, "it never was ENDING");
+    assertTrue(
+        allocation.estateOf(target).leases().isEmpty(),
+        "an ENDED lease leaves the estate, so a runner that comes back removes its container");
+
+    UUID granted = UUID.randomUUID();
+    TargetRows.lease(granted, SlotType.WORKSPACE, "qits-workspaces", "17", LeaseState.GRANTED, target);
+    operator("an-operator", "qits:admin")
+        .delete(API + "/" + granted + "?reason=the node is gone")
+        .then()
+        .statusCode(200)
+        .body("state", equalTo("ENDED"))
+        .body("detail", equalTo("ended by an-operator: the node is gone"));
+    assertEquals("ENDED", TargetRows.audit(granted).get(0).outcome);
   }
 
   static RequestSpecification operator(String principal, String roles) {
@@ -271,9 +339,9 @@ class LeaseDoorsTest {
   }
 
   @Test
-  void anOperatorEndsARunningLeaseOfAnyOwnerAndItIsEnding() {
+  void anOperatorEndsARunningLeaseOfAnyOwnerAndItIsEnding() throws Exception {
     UUID target = UUID.randomUUID();
-    TargetRows.target(target, "lab", 4, "client-lab", false);
+    connectedLab(target);
     UUID id = UUID.randomUUID();
     TargetRows.lease(id, SlotType.CI, "qits-ci", "run-9", LeaseState.RUNNING, target);
     operator("an-operator", "qits:admin")
@@ -343,9 +411,9 @@ class LeaseDoorsTest {
   }
 
   @Test
-  void aServiceIsStillRefusedAnotherOwnersLeaseAndAnOperatorRoleWins() {
+  void aServiceIsStillRefusedAnotherOwnersLeaseAndAnOperatorRoleWins() throws Exception {
     UUID target = UUID.randomUUID();
-    TargetRows.target(target, "lab", 4, "client-lab", false);
+    connectedLab(target);
     UUID id = UUID.randomUUID();
     TargetRows.lease(id, SlotType.CI, "qits-ci", "run-9", LeaseState.RUNNING, target);
     service("dev-qits-workspaces")

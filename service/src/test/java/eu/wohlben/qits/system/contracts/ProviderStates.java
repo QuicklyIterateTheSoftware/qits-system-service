@@ -103,7 +103,11 @@ public class ProviderStates {
   /** qits-workspaces' WORKSPACE lease {@code 17} (work key {@code ws-17}), QUEUED. */
   public static final String A_QUEUED_WORKSPACE_LEASE = "a queued workspace lease";
 
-  /** The same lease RUNNING on target {@code lab}, its work volume there. */
+  /**
+   * The same lease RUNNING on target {@code lab}, its work volume there, and the target's runner
+   * connected: an end of a RUNNING lease on a target with no runner to report it is ENDED at once
+   * (qits-2227), and the consumers' pacts pin ENDING.
+   */
   public static final String A_RUNNING_WORKSPACE_LEASE = "a running workspace lease";
 
   /** qits-workspaces' work volume {@code ws-17} on target {@code lab}, its last lease ENDED. */
@@ -112,7 +116,7 @@ public class ProviderStates {
   /** qits-projects' DESK lease for the front desk of project {@link #PROJECT_ID}, QUEUED. */
   public static final String A_QUEUED_DESK_LEASE = "a queued desk lease";
 
-  /** The same lease RUNNING on target {@code lab}, its work volume there. */
+  /** The same lease RUNNING on target {@code lab}, its work volume there, its runner connected. */
   public static final String A_RUNNING_DESK_LEASE = "a running desk lease";
 
   /** qits-projects' work volume {@code desk-<project>} on target {@code lab}, its lease ENDED. */
@@ -545,6 +549,9 @@ public class ProviderStates {
               }
             });
     bearers.grant(tenant.bearer(), tenant.client(), "qits:system");
+    if (state == LeaseState.RUNNING) {
+      connectRunner(6);
+    }
     Map<String, String> params = new TreeMap<>();
     params.put("authorization", tenant.bearer());
     params.put("leaseId", LEASE_ID);
@@ -557,14 +564,23 @@ public class ProviderStates {
   }
 
   private Setup aConnectedTarget() {
-    if (base == null) {
-      throw new IllegalStateException("'" + A_CONNECTED_TARGET + "' dials a runner: pass the base URI");
-    }
     fresh();
     TargetRows.target(UUID.fromString(TARGET_ID), "lab", 4, RUNNER_CLIENT, false);
+    connectRunner(4);
+    return new Setup(Map.of("targetId", TARGET_ID));
+  }
+
+  /**
+   * Dials target {@code lab}'s runner with {@code slots} and holds it until the next state: its
+   * row must stand already.
+   */
+  private void connectRunner(int slots) {
+    if (base == null) {
+      throw new IllegalStateException("A connected target's state dials a runner: pass the base URI");
+    }
     bearers.grant(RUNNER_BEARER, RUNNER_CLIENT, "qits:target-runner");
     runner = FakeTargetRunner.dial(base, RUNNER_BEARER);
-    runner.hello(4, "qits-system-runner-dot-claude-00000000");
+    runner.hello(slots, "qits-system-runner-dot-claude-00000000");
     try {
       runner.await(Ack.class);
       // The estate follows the greeting: once it is here, the connection serves the target.
@@ -573,7 +589,6 @@ public class ProviderStates {
       Thread.currentThread().interrupt();
       throw new IllegalStateException(interrupted);
     }
-    return new Setup(Map.of("targetId", TARGET_ID));
   }
 
   /**

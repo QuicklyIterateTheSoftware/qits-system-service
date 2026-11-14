@@ -207,7 +207,8 @@ type's reservation is 409 `MAXIMUM_BELOW_RESERVATION`; one above the total is ha
   who ends any lease. QUEUED or targetless is ENDED at once, and so is EXITED or FAILED (qits-1813):
   its slot was freed when it stopped and may be granted again, so it must not occupy one a second
   time; the estate drops it and the runner removes the container. GRANTED or RUNNING is ENDING until
-  the runner reports the container gone. An operator's end of an ENDING lease is ENDED
+  the runner reports the container gone — or ENDED at once when its target holds no connection,
+  since no runner is there to report it (qits-2227); a runner that comes back removes it. An operator's end of an ENDING lease is ENDED
   at once — the stuck-lease door — and a lease an operator moves carries `detail = "ended by
   <principal>[: <reason>]"`. Every operator call, a refused one too, is a `target_audit` row
   (`LEASE_END`; outcome ENDED, ENDING, NOOP or NOT_FOUND).
@@ -227,6 +228,13 @@ type's reservation is 409 `MAXIMUM_BELOW_RESERVATION`; one above the total is ha
   is left GRANTED. `target_id` and `granted_at` are cleared, `detail = "target <name> went away
   before it started the lease (granted <grantedAt>); queued again"`, announced, and audited as
   `LEASE_REQUEUED` by `qits-system`. RUNNING, EXITED, FAILED and ENDING leases are left alone.
+- **A target gone past `qits.system.leases.absent-deadline` (PT30M) has its leases settled**
+  (qits-2227, same sweep): no open connection for that long — counted from its last connection's
+  close, or from this process's start for a target it has not seen since — and every GRANTED (with a
+  work key) or RUNNING lease on it is FAILED and every ENDING one ENDED, `ended_at` the sweep's
+  instant, `detail = "target <name> offline since <instant>"`, announced, and audited as
+  `LEASE_ABANDONED` by `qits-system`. The deadline is long because the runner's socket crosses the
+  edge, which an outage can cut while the node runs on (2026-11-12: 85 minutes).
 - **`target_audit`**: who did what to a target or lease beyond its owner's doors (`TargetAuditLog`,
   its own transaction per row): actor, `qits:*` roles, target, lease, operation, outcome, detail.
 - **Docker on a target, over the runner socket** (epic qits-1621, `api/TargetDockerController`,
@@ -299,7 +307,7 @@ ended `never-dialled-back` quarantine the target, and the gating `dialback` chec
 cool-off; a GRANTED CI lease its runner reports FAILED, one it could not start at all, counts in the
 same streak, qits-525, so a target that cannot start CI leases is quarantined with a `start:` reason
 instead of being granted run after run to fail),
-`idp.{url,client-id,client-secret}`, `docker.timeout=PT30S`, `docker.exec-grace=PT10S`. Beside them, `qits.system.leases.ending-deadline=PT10M`,
+`idp.{url,client-id,client-secret}`, `docker.timeout=PT30S`, `docker.exec-grace=PT10S`. Beside them, `qits.system.leases.ending-deadline=PT10M`, `absent-deadline=PT30M`,
 `ending-grace=PT2M` and `ending-check-interval=60s` (the ENDING deadline).
 
 ## Building

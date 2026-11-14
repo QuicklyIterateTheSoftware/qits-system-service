@@ -1,12 +1,14 @@
 package eu.wohlben.qits.system.targets.control;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
  * What the allocator needs from the runner sockets, and nothing more: whether a target is
- * connected (a greeted connection at the pin), whether it is still present, a way to have its estate
- * pushed, and a way to tell its runner it is quarantined. {@code runner/TargetRegistry} is the one
+ * connected (a greeted connection at the pin), whether it is still present and since when it has
+ * been without a connection, a way to have its estate pushed, and a way to tell its runner it is
+ * quarantined. {@code runner/TargetRegistry} is the one
  * implementation; keeping it an interface keeps the control layer free of socket types.
  */
 public interface TargetPresence {
@@ -21,6 +23,16 @@ public interface TargetPresence {
    * grace to dial again. {@code now} is the caller's clock, which is how the suite judges it.
    */
   boolean present(UUID targetId, Instant now);
+
+  /**
+   * Since when the target has held no open connection: empty while it holds one; otherwise the
+   * instant its last one closed, or — for a target with no drop on record (not seen since this
+   * process started, or deleted, or a null id) — the instant this process started, so that a
+   * deadline counted from it runs from boot after a restart rather than never (qits-2227). No grace
+   * is applied here: {@link #present} is this plus {@code qits.system.targets.reconnect-grace}, and
+   * a caller with a deadline of its own ({@code qits.system.leases.absent-deadline}) adds that.
+   */
+  Optional<Instant> absentSince(UUID targetId);
 
   /** The target's leases or purges changed: push its estate, off the caller's thread. */
   void estateChanged(UUID targetId);

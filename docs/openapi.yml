@@ -1230,8 +1230,9 @@ paths:
         - qits:agent
     delete:
       summary: "End a lease: ENDING, then ENDED once the runner reports it gone; a\
-        \ QUEUED, EXITED or FAILED one at once. An operator (qits:admin, qits:admin-agent,\
-        \ qits:desk-admin) ends any lease, and an ENDING one at once"
+        \ QUEUED, EXITED or FAILED one at once, and so one on a target with no runner\
+        \ connected. An operator (qits:admin, qits:admin-agent, qits:desk-admin) ends\
+        \ any lease, and an ENDING one at once"
       operationId: endLease
       parameters:
       - name: id
