@@ -8,7 +8,8 @@ import java.util.Set;
  * reconnect grace or its runner stopped acting on its estate before it started it (only a lease
  * without a work key, whose work volume would pin it there, qits-1829); RUNNING once the runner
  * reports its container running; EXITED or FAILED when the container stopped by itself or could
- * not start, and FAILED too when its target has been gone past the absent deadline (qits-2227);
+ * not start, and a RUNNING CI one FAILED too when its target has been gone past the absent
+ * deadline (qits-2227);
  * ENDING once its owner deleted a GRANTED or RUNNING one and the runner has not yet reported it
  * gone (straight to ENDED when its target holds no connection to report on, qits-2227); ENDED for
  * good (an EXITED or FAILED one at its owner's end: its slot is free already, qits-1813).

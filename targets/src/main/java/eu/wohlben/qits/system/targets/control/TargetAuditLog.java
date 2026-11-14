@@ -37,8 +37,8 @@ public class TargetAuditLog {
   public static final String LEASE_REQUEUED = "LEASE_REQUEUED";
 
   /**
-   * A GRANTED, RUNNING or ENDING lease settled (FAILED, or ENDED) because its target was gone past
-   * the absent deadline (qits-2227).
+   * A RUNNING CI lease FAILED, or an ENDING lease ENDED, because its target was gone past the absent
+   * deadline (qits-2227).
    */
   public static final String LEASE_ABANDONED = "LEASE_ABANDONED";
 

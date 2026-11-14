@@ -663,19 +663,22 @@ public class Leases {
   public record OnTarget(UUID id, UUID targetId, LeaseState state) {}
 
   /**
-   * Every lease whose container may still be on its target, in id order: RUNNING, ENDING, and
-   * GRANTED with a work key — the ones {@link #abandon} may settle. A GRANTED lease without a work
-   * key is left out: {@link #requeue} has it back in the queue long before.
+   * The leases {@link #abandon} may settle, in id order: every RUNNING CI lease and every ENDING one,
+   * whatever its type. A RUNNING WORKSPACE or DESK lease is left out: its container holds an agent
+   * session that outlives an edge outage, and settling it would have the returning runner remove it.
+   * A GRANTED lease is left out too: a CI one has no work key, so {@link #requeue} has it back in the
+   * queue after the reconnect grace, long before the absent deadline.
    */
   public List<OnTarget> onTargets() {
     return QuarkusTransaction.requiringNew()
         .call(
             () ->
                 Lease.<Lease>find(
-                        "targetId is not null and (state in ?1 or (state = ?2 and workKey is not"
-                            + " null)) order by id",
-                        Set.of(LeaseState.RUNNING, LeaseState.ENDING),
-                        LeaseState.GRANTED)
+                        "targetId is not null and (state = ?1 or (state = ?2 and slotType = ?3))"
+                            + " order by id",
+                        LeaseState.ENDING,
+                        LeaseState.RUNNING,
+                        SlotType.CI)
                     .stream()
                     .map(lease -> new OnTarget(lease.id, lease.targetId, lease.state))
                     .toList());
@@ -686,10 +689,11 @@ public class Leases {
 
   /**
    * Settled without the runner's word, because its target has been gone past {@code
-   * qits.system.leases.absent-deadline} (qits-2227): a GRANTED or RUNNING lease is FAILED — its
-   * owner learns its work did not finish, and ends it as it ends any FAILED one — and an ENDING one
+   * qits.system.leases.absent-deadline} (qits-2227): a RUNNING CI lease is FAILED — its owner learns
+   * its step did not finish, and ends it as it ends any FAILED one — and an ENDING one of any type
    * is ENDED; both with {@code ended_at = now} and {@code detail}. Only while it is still on {@code
-   * onTarget}'s target in one of those states, re-read under the row lock. Announced; the target's
+   * onTarget}'s target in one of those states, re-read under the row lock: a WORKSPACE or DESK lease
+   * is never FAILED here. Announced; the target's
    * estate is pushed (FAILED and ENDED are both {@code desired: ENDED}, so a runner that comes back
    * removes the container) and a pass is asked for, since the slot is free. Answers the lease and
    * what it was, or null when something else moved it first.
@@ -706,7 +710,12 @@ public class Leases {
                   }
                   before[0] = lease.state;
                   switch (lease.state) {
-                    case GRANTED, RUNNING -> lease.state = LeaseState.FAILED;
+                    case RUNNING -> {
+                      if (lease.slotType != SlotType.CI) {
+                        return null;
+                      }
+                      lease.state = LeaseState.FAILED;
+                    }
                     case ENDING -> lease.state = LeaseState.ENDED;
                     default -> {
                       return null;

@@ -38,9 +38,9 @@ import org.junit.jupiter.api.Test;
  * The ENDING deadline, on a fixed clock: {@link LeaseEndingDeadline#sweep} is handed the instant it
  * judges by, against the defaults (deadline PT10M, grace PT2M). A connected target's runner is
  * nudged with its estate once, then the lease is ENDED; a disconnected one's is ENDED at the
- * deadline. A target without a connection for the absent deadline (PT30M) has its RUNNING leases
+ * deadline. A target without a connection for the absent deadline (PT30M) has its RUNNING CI leases
  * FAILED and its ENDING ones ENDED (qits-2227), counted from its last close, or from this process's
- * start for a target it has not seen.
+ * start for a target it has not seen; its RUNNING WORKSPACE and DESK leases are left alone.
  */
 @QuarkusTest
 class LeaseEndingDeadlineTest {
@@ -263,7 +263,7 @@ class LeaseEndingDeadlineTest {
     // No runner has dialled for lab: after a restart there is no drop on record, and the absent
     // deadline runs from the process's start rather than never.
     UUID running = UUID.randomUUID();
-    TargetRows.lease(running, SlotType.WORKSPACE, "qits-workspaces", "17", LeaseState.RUNNING, target);
+    TargetRows.lease(running, SlotType.CI, "qits-ci", "run-1", LeaseState.RUNNING, target);
     Instant started = presence.absentSince(target).orElseThrow();
     assertEquals(started, presence.absentSince(UUID.randomUUID()).orElseThrow(), "one start for all");
     assertFalse(started.isAfter(Instant.now()));
@@ -274,5 +274,32 @@ class LeaseEndingDeadlineTest {
     assertEquals(LeaseState.FAILED, failed.state);
     assertEquals(
         "target lab offline since " + started.truncatedTo(ChronoUnit.SECONDS), failed.detail);
+  }
+
+  @Test
+  void aTargetGonePastTheAbsentDeadlineKeepsItsWorkspaceAndDeskLeasesRunning() {
+    // An edge outage longer than the deadline must not kill agent sessions: only the CI lease and
+    // the ENDING one, whose owner asked for the end, are settled.
+    UUID ci = UUID.randomUUID();
+    TargetRows.lease(ci, SlotType.CI, "qits-ci", "run-1", LeaseState.RUNNING, target);
+    UUID workspace = UUID.randomUUID();
+    TargetRows.lease(workspace, SlotType.WORKSPACE, "qits-workspaces", "17", LeaseState.RUNNING, target);
+    UUID desk = UUID.randomUUID();
+    TargetRows.lease(desk, SlotType.DESK, "qits-projects", "desk-1", LeaseState.RUNNING, target);
+    Instant started = presence.absentSince(target).orElseThrow();
+    Instant due = started.plus(ABSENT).plus(Duration.ofHours(2));
+    UUID ending = UUID.randomUUID();
+    TargetRows.ending(ending, SlotType.WORKSPACE, "qits-workspaces", "18", target, due);
+
+    LeaseEndingDeadline.Swept swept = deadline.sweep(due);
+    assertEquals(Set.of(ci, ending), Set.copyOf(swept.abandoned()));
+    assertEquals(LeaseState.FAILED, TargetRows.reload(ci).state);
+    assertEquals(LeaseState.ENDED, TargetRows.reload(ending).state);
+    for (UUID kept : List.of(workspace, desk)) {
+      Lease row = TargetRows.reload(kept);
+      assertEquals(LeaseState.RUNNING, row.state, row.slotType + " is left alone");
+      assertNull(row.endedAt);
+      assertTrue(TargetRows.audit(kept).isEmpty(), row.slotType + " is not audited");
+    }
   }
 }

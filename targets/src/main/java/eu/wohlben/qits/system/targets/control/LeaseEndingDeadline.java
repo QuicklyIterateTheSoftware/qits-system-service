@@ -56,18 +56,22 @@ import org.jboss.logging.Logger;
  * when that returns. A lease with a work key is left alone: its work volume's row pins it to that
  * target, so queuing it again would change only its detail.
  *
- * <p><b>A target gone for good takes its leases with it</b> (qits-2227). A container outlives its
- * runner's socket, so a RUNNING, ENDING or work-keyed GRANTED lease is left as it is through the
- * reconnect grace — but not for ever: a target that went to sleep held three CI leases RUNNING for
- * an hour and a half, and their slots with them. So the third pass settles every such lease whose
- * target has been without a connection ({@link TargetPresence#absentSince}) for {@code
- * qits.system.leases.absent-deadline}: GRANTED and RUNNING are FAILED, so their owners see the work
- * did not finish, and ENDING is ENDED ({@link Leases#abandon}), each with {@code detail = "target
+ * <p><b>A target gone for good takes its CI and ENDING leases with it</b> (qits-2227). A container
+ * outlives its runner's socket, so a RUNNING or ENDING lease is left as it is through the reconnect
+ * grace — but not for ever: a target that went to sleep held three CI leases RUNNING for an hour and
+ * a half, and their slots with them. So the third pass settles the leases of a target that has been
+ * without a connection ({@link TargetPresence#absentSince}) for {@code
+ * qits.system.leases.absent-deadline}: a RUNNING CI lease is FAILED, so its owner sees the step did
+ * not finish, and an ENDING lease of any type is ENDED, since its owner already asked for the end
+ * ({@link Leases#abandon}), each with {@code detail = "target
  * <name> offline since <instant>"}, announced, recorded as a {@link TargetAuditLog#LEASE_ABANDONED}
  * row, and its slot handed to the pass. The deadline is long (PT30M) because the runner's socket
  * crosses the edge, which an outage can cut for longer than the reconnect grace while the node runs
- * on. A target dropped before a restart counts from the restart, since the drop is held in memory;
- * EXITED, FAILED, ENDED and QUEUED leases have nothing left to settle.
+ * on. A target dropped before a restart counts from the restart, since the drop is held in memory.
+ * A RUNNING WORKSPACE or DESK lease is left alone however long its target is away: its container
+ * holds an agent session that survives an outage, and a FAILED lease's container is removed by the
+ * runner that comes back. A GRANTED CI lease never reaches this pass (the requeue above takes it),
+ * and EXITED, FAILED, ENDED and QUEUED leases have nothing left to settle.
  *
  * <p>{@link #sweep} takes the clock as an argument, which is how the suite drives it.
  */
@@ -290,8 +294,8 @@ public class LeaseEndingDeadline {
   }
 
   /**
-   * Every lease that may still hold a container on a target without a connection since before
-   * {@code now - absent-deadline} is settled: GRANTED and RUNNING FAILED, ENDING ENDED (qits-2227).
+   * Every RUNNING CI and every ENDING lease on a target without a connection since before {@code now
+   * - absent-deadline} is settled: RUNNING FAILED, ENDING ENDED (qits-2227).
    */
   private void settleAbandoned(Instant now, Swept swept) {
     List<Leases.OnTarget> onTargets;

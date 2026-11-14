@@ -89,8 +89,10 @@ lease ENDED on a still-connected target quarantines that target BEFORE the end (
 the slot back), and the same sweep queues again every GRANTED lease without a work key whose target
 is not `TargetPresence.present` (qits-1829). Its third pass settles the leases of a target without a
 connection for `qits.system.leases.absent-deadline` (PT30M, from `TargetPresence.absentSince`, which
-counts from the process's start for a target not seen since): GRANTED with a work key and RUNNING
-are FAILED, ENDING is ENDED, each a `LEASE_ABANDONED` audit row (qits-2227). An end of a GRANTED or
+counts from the process's start for a target not seen since): a RUNNING CI lease is FAILED and an
+ENDING lease of any type ENDED, each a `LEASE_ABANDONED` audit row (qits-2227). RUNNING WORKSPACE and
+DESK leases are left alone however long the target is away: their containers hold agent sessions
+that outlive an edge outage, and FAILED would have the returning runner remove them. An end of a GRANTED or
 RUNNING lease whose target holds no connection is ENDED at once, never ENDING: no runner is there to
 report the container gone.
 

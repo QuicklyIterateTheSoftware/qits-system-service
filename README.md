@@ -230,11 +230,14 @@ type's reservation is 409 `MAXIMUM_BELOW_RESERVATION`; one above the total is ha
   `LEASE_REQUEUED` by `qits-system`. RUNNING, EXITED, FAILED and ENDING leases are left alone.
 - **A target gone past `qits.system.leases.absent-deadline` (PT30M) has its leases settled**
   (qits-2227, same sweep): no open connection for that long — counted from its last connection's
-  close, or from this process's start for a target it has not seen since — and every GRANTED (with a
-  work key) or RUNNING lease on it is FAILED and every ENDING one ENDED, `ended_at` the sweep's
+  close, or from this process's start for a target it has not seen since — and every RUNNING CI
+  lease on it is FAILED and every ENDING lease of any type ENDED, `ended_at` the sweep's
   instant, `detail = "target <name> offline since <instant>"`, announced, and audited as
   `LEASE_ABANDONED` by `qits-system`. The deadline is long because the runner's socket crosses the
-  edge, which an outage can cut while the node runs on (2026-11-12: 85 minutes).
+  edge, which an outage can cut while the node runs on (2026-11-12: 85 minutes). RUNNING WORKSPACE
+  and DESK leases are left alone: their agent sessions survive an outage of any length today, and a
+  FAILED lease's container is removed by the runner that comes back. A GRANTED CI lease never gets
+  this far — it has no work key, so the requeue above takes it after the reconnect grace.
 - **`target_audit`**: who did what to a target or lease beyond its owner's doors (`TargetAuditLog`,
   its own transaction per row): actor, `qits:*` roles, target, lease, operation, outcome, detail.
 - **Docker on a target, over the runner socket** (epic qits-1621, `api/TargetDockerController`,

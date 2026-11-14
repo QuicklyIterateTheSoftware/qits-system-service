@@ -87,9 +87,9 @@ import org.jboss.logging.Logger;
  * socket does), and a socket inside the grace is not a comeback. One after it is, and is quarantined
  * until a health check passes. A disconnected target is granted nothing. Once the grace has passed
  * its GRANTED leases without a work key go back to QUEUED ({@code LeaseEndingDeadline}, qits-1829):
- * nothing was started for them, so nothing would ever report them. Its other GRANTED, RUNNING and
- * ENDING leases are left as they are for {@code qits.system.leases.absent-deadline}, counted from
- * {@link #absentSince}, and settled after it (qits-2227). A process that just started has seen no
+ * nothing was started for them, so nothing would ever report them. Its RUNNING CI and its ENDING
+ * leases are left as they are for {@code qits.system.leases.absent-deadline}, counted from {@link
+ * #absentSince}, and settled after it (qits-2227); its RUNNING WORKSPACE and DESK leases for good. A process that just started has seen no
  * runner yet, and counts each from its own start — the grace and the absent deadline alike.
  *
  * <p><b>Sign-in.</b> {@code loginState} is written to the row ({@link Targets#recordLogin}) and
