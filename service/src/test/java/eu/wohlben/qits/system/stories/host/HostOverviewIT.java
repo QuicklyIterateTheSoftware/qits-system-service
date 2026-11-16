@@ -59,7 +59,7 @@ import org.junit.jupiter.api.TestMethodOrder;
  * its {@code groups} is what makes the caller an operator rather than a machine.
  *
  * <p><b>The docker hop is observed and the socket behind it is declared</b>, and the split is the
- * whole discipline. {@code DockerProcess} forks the CLI and reads its pipes, so {@link StoryDocker}
+ * whole discipline. {@code ContainerProcess} forks the CLI and reads its pipes, so {@link StoryDocker}
  * stands in for the binary and records every argv with the exit code it answered: that hop is
  * evidence. What no tap out here stands in front of is the unix socket the CLI then opens, so that
  * one edge — and only that one — is a declaration.
@@ -310,7 +310,7 @@ public class HostOverviewIT {
         // The names, the labels and the timestamps of every secret — and no value on any of them,
         // because there is no docker call that would return one.
         // There is no `data` field on a secret at all — not empty, absent. Nothing in this
-        // service's vocabulary could fill one: `docker secret inspect` is not in DockerArgv.
+        // service's vocabulary could fill one: `docker secret inspect` is not among the argvs it builds.
         .body("[0].data", nullValue())
         .body(not(containsString(StoryTarget.SCRUBBED_SECRET)));
     story

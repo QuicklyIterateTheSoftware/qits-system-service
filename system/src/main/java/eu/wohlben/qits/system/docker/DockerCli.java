@@ -2,6 +2,7 @@ package eu.wohlben.qits.system.docker;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import eu.wohlben.qits.containers.driver.docker.ContainerProcess;
 import eu.wohlben.qits.system.error.DockerUnavailableException;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -16,6 +17,14 @@ import org.jboss.logging.Logger;
  * The one place a docker command is actually executed: the configured binary, the configured
  * deadline, the configured output bound, and one rule about failure.
  *
+ * <p><b>The argv and the process are qits-containers-driver's</b> (qits-2211). Every command line
+ * comes from the library's builders ({@code DockerArgv}, {@code SwarmArgv}, {@code
+ * InteractiveArgv}) and runs through its {@link ContainerProcess#run(Path, List, java.util.Map,
+ * Duration, int)} — the same bounded capture, deadline and kill-and-reap on interrupt every other
+ * component that talks to docker uses. What stays here is this service's own: its configuration,
+ * its {@code DOCKER_CONFIG} decision ({@link DockerClientConfig#environment}) and the mapping of a
+ * failure onto an HTTP answer.
+ *
  * <p><b>THE RULE: a call that did not succeed is a 503 naming docker's last words.</b> Not a 404,
  * not an empty list, not a null. A read that could not reach the daemon knows nothing, and the
  * three failures an operator actually meets — the socket not mounted, the group not added, the node
@@ -24,7 +33,7 @@ import org.jboss.logging.Logger;
  * caller that needs to tell "docker said no" from "docker could not be asked" is the exec probe,
  * and it uses {@link #attempt} to get the raw result.
  *
- * <p><b>Two output shapes, two readers</b>, matching {@link DockerArgv}'s two flavours: {@link
+ * <p><b>Two output shapes, two readers</b>, matching the two docker answers: {@link
  * #jsonLines} for {@code ls --format '{{json .}}'} (one object per line) and {@link #jsonArray} for
  * {@code inspect} (a JSON array of documents).
  */
@@ -32,6 +41,13 @@ import org.jboss.logging.Logger;
 public class DockerCli {
 
   private static final Logger LOG = Logger.getLogger(DockerCli.class);
+
+  /**
+   * One JSON object per line — the {@code ls} shape every listing asks for. The list views want the
+   * CLI's already-humanised columns ({@code "Status":"Up 4 hours (healthy)"}); a detail view asks
+   * {@code inspect} with no format, for the daemon's own document.
+   */
+  public static final String JSON_LINES = "{{json .}}";
 
   /** How much of docker's own message is quoted back in a 503. Enough to read, short enough to log. */
   private static final int MESSAGE_MAX = 400;
@@ -47,7 +63,7 @@ public class DockerCli {
 
   /**
    * Where this service writes its own docker {@code config.json} (qits-879). Every docker child
-   * is pointed at it — but only once the file exists; see {@link DockerClientConfig#applyTo}.
+   * is pointed at it — but only once the file exists; see {@link DockerClientConfig#environment}.
    */
   @ConfigProperty(name = "qits.system.docker.config-dir")
   Path configDir;
@@ -80,8 +96,8 @@ public class DockerCli {
 
   /** The same, with a bound of its own — {@code docker logs} asks for a smaller one. */
   public String run(List<String> argv, int maxChars) {
-    DockerProcess.Result result = attempt(argv, maxChars);
-    if (!result.ok()) {
+    ContainerProcess.Result result = attempt(argv, maxChars);
+    if (!ok(result)) {
       throw unavailable(argv, result);
     }
     return result.output();
@@ -91,12 +107,24 @@ public class DockerCli {
    * Run a docker command and hand back the raw result, failures included. For the two callers that
    * have to distinguish docker's "no such container" from docker being unreachable.
    */
-  public DockerProcess.Result attempt(List<String> argv) {
+  public ContainerProcess.Result attempt(List<String> argv) {
     return attempt(argv, maxOutputChars);
   }
 
-  public DockerProcess.Result attempt(List<String> argv, int maxChars) {
-    return DockerProcess.run(argv, callTimeout, maxChars, configDir);
+  /**
+   * The one fork. {@code DOCKER_CONFIG} is ADDED to this process's environment only when this
+   * service's own {@code config.json} exists; otherwise the inherited environment stands. A missing
+   * binary is {@link ContainerProcess}'s exit {@code -1} carrying the {@code IOException}'s message,
+   * which {@link #unavailable} turns into the same 503 as any other unreachable daemon.
+   */
+  public ContainerProcess.Result attempt(List<String> argv, int maxChars) {
+    return ContainerProcess.run(
+        null, argv, DockerClientConfig.environment(configDir), callTimeout, maxChars);
+  }
+
+  /** Whether docker answered at all and said yes. */
+  public static boolean ok(ContainerProcess.Result result) {
+    return result.exitCode() == 0 && !result.timedOut();
   }
 
   /**
@@ -104,8 +132,8 @@ public class DockerCli {
    * glances teardown. Logged at WARN and swallowed: neither is something a request is waiting on.
    */
   public void bestEffort(String what, List<String> argv) {
-    DockerProcess.Result result = attempt(argv);
-    if (!result.ok()) {
+    ContainerProcess.Result result = attempt(argv);
+    if (!ok(result)) {
       LOG.warnf("%s did not succeed: %s", what, oneLine(result.output()));
     }
   }
@@ -168,7 +196,7 @@ public class DockerCli {
   }
 
   /** Turn a failed result into the 503 an operator reads. */
-  public DockerUnavailableException unavailable(List<String> argv, DockerProcess.Result result) {
+  public DockerUnavailableException unavailable(List<String> argv, ContainerProcess.Result result) {
     String what = commandOf(argv);
     if (result.timedOut()) {
       return new DockerUnavailableException(

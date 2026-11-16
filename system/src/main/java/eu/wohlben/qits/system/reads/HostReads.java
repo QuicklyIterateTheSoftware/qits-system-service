@@ -1,7 +1,7 @@
 package eu.wohlben.qits.system.reads;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import eu.wohlben.qits.system.docker.DockerArgv;
+import eu.wohlben.qits.containers.driver.docker.DockerArgv;
 import eu.wohlben.qits.system.docker.DockerCli;
 import eu.wohlben.qits.system.error.DockerUnavailableException;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -16,7 +16,7 @@ public class HostReads {
 
   /** `docker info`, read once — the host facts and the swarm block both come out of it. */
   public JsonNode info() {
-    List<JsonNode> rows = docker.jsonLines(DockerArgv.info(docker.binary()));
+    List<JsonNode> rows = docker.jsonLines(DockerArgv.info(docker.binary(), DockerCli.JSON_LINES));
     if (rows.isEmpty()) {
       throw new DockerUnavailableException("docker printed no info document");
     }
@@ -27,8 +27,14 @@ public class HostReads {
     return HostInfo.from(info());
   }
 
+  /**
+   * Disk usage per class (images, containers, volumes, build cache), with sizes already rendered as
+   * {@code "308.3GB"} — the CLI does that formatting and the API does not, and showing the string the
+   * operator would see in a shell is the point.
+   */
   public DiskUsage usage() {
-    return DiskUsage.from(docker.jsonLines(DockerArgv.systemDf(docker.binary())));
+    return DiskUsage.from(
+        docker.jsonLines(DockerArgv.systemDf(docker.binary(), DockerCli.JSON_LINES)));
   }
 
   /** The swarm as this node sees it. */

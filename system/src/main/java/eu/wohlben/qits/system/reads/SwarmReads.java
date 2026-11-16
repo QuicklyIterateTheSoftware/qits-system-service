@@ -1,7 +1,8 @@
 package eu.wohlben.qits.system.reads;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import eu.wohlben.qits.system.docker.DockerArgv;
+import eu.wohlben.qits.containers.driver.docker.SwarmArgv;
+import eu.wohlben.qits.system.docker.CallerValues;
 import eu.wohlben.qits.system.docker.DockerCli;
 import eu.wohlben.qits.system.error.NotFoundException;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -28,47 +29,65 @@ import java.util.List;
 @ApplicationScoped
 public class SwarmReads {
 
+  /** What a refusal and a 404 name: the object a reference was meant to point at. */
+  private static final String NODE = "node";
+
+  private static final String SERVICE = "service";
+
+  private static final String CONFIG = "config";
+
   @Inject DockerCli docker;
 
   public List<NodeSummary> nodes() {
-    return docker.jsonLines(DockerArgv.nodeLs(docker.binary())).stream()
+    return docker.jsonLines(SwarmArgv.nodeLs(docker.binary(), DockerCli.JSON_LINES)).stream()
         .map(NodeSummary::from)
         .toList();
   }
 
   public NodeDetail node(String ref) {
-    return NodeDetail.from(inspectOne(DockerArgv.nodeInspect(docker.binary(), ref), "node", ref));
+    CallerValues.requireSwarmRef(NODE, ref);
+    return NodeDetail.from(inspectOne(SwarmArgv.nodeInspect(docker.binary(), ref), NODE, ref));
   }
 
   public List<ServiceSummary> services() {
-    return docker.jsonLines(DockerArgv.serviceLs(docker.binary())).stream()
+    return docker.jsonLines(SwarmArgv.serviceLs(docker.binary(), List.of(), DockerCli.JSON_LINES)).stream()
         .map(ServiceSummary::from)
         .toList();
   }
 
-  /** A service with its tasks — two calls, because `inspect` does not carry them. */
+  /**
+   * A service with its tasks — two calls, because `inspect` does not carry them. The task list is
+   * {@code --no-trunc} because the default truncates the error column, and a failed task's error is
+   * the entire reason anybody opens this view. {@code SwarmArgv.servicePs} does not belt its
+   * reference, so the check above it is the one that holds for both calls.
+   */
   public ServiceDetail service(String ref) {
-    JsonNode node = inspectOne(DockerArgv.serviceInspect(docker.binary(), ref), "service", ref);
+    CallerValues.requireSwarmRef(SERVICE, ref);
+    JsonNode node = inspectOne(SwarmArgv.serviceInspect(docker.binary(), ref), SERVICE, ref);
     List<TaskSummary> tasks =
-        docker.jsonLines(DockerArgv.servicePs(docker.binary(), ref)).stream()
+        docker
+            .jsonLines(
+                SwarmArgv.servicePs(docker.binary(), ref, List.of(), true, DockerCli.JSON_LINES))
+            .stream()
             .map(TaskSummary::from)
             .toList();
     return ServiceDetail.from(node, tasks);
   }
 
   public List<ConfigSummary> configs() {
-    return docker.jsonLines(DockerArgv.configLs(docker.binary())).stream()
+    return docker.jsonLines(SwarmArgv.configLs(docker.binary(), DockerCli.JSON_LINES)).stream()
         .map(ConfigSummary::from)
         .toList();
   }
 
   public ConfigDetail config(String ref) {
+    CallerValues.requireSwarmRef(CONFIG, ref);
     return ConfigDetail.from(
-        inspectOne(DockerArgv.configInspect(docker.binary(), ref), "config", ref));
+        inspectOne(SwarmArgv.configInspect(docker.binary(), ref), CONFIG, ref));
   }
 
   public List<SecretSummary> secrets() {
-    return docker.jsonLines(DockerArgv.secretLs(docker.binary())).stream()
+    return docker.jsonLines(SwarmArgv.secretLs(docker.binary(), DockerCli.JSON_LINES)).stream()
         .map(SecretSummary::from)
         .toList();
   }
@@ -79,7 +98,7 @@ public class SwarmReads {
    */
   private JsonNode inspectOne(List<String> argv, String what, String ref) {
     var result = docker.attempt(argv);
-    if (!result.ok()) {
+    if (!DockerCli.ok(result)) {
       String said = result.output() == null ? "" : result.output().toLowerCase(java.util.Locale.ROOT);
       // Docker's wording across objects: "Error: no such node: x", "service x not found".
       if (said.contains("no such") || said.contains("not found")) {

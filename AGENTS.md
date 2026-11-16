@@ -27,7 +27,7 @@ build against them. Changing one of those shapes is a plan edit and a conversati
 inheriting them, and why the suite forks a shell script instead of a daemon.
 
 **The one thing it needs besides Maven Central** is the platform's own Maven repository, for
-`qits-auth-core` and `qits-arch-rules`. `<repositories>` in the root pom points at
+`qits-auth-core`, `qits-arch-rules` and `qits-containers-driver`. `<repositories>` in the root pom points at
 `${qits.maven.repository.url}` (`https://registry.qits.wohlben.eu/artifacts/maven/maven` by
 default), which answers 401 without the commissioned client; the image build supplies it through
 `.qits-maven-settings.xml`, which mirrors the exact repository id `qits-maven` — an exact id match
@@ -156,29 +156,42 @@ qits-ci). Still no mocks.
 
 ## Docker
 
-**Every call goes through `DockerCli`, and every argv through `DockerArgv` or `TerminalArgv`.** The
-builders are pure functions with no I/O, which is what lets the suite assert them element for
-element — and the argv IS the sandbox, so a flag lost in a refactor is invisible everywhere else
-until it is invisible in production.
+**Every call goes through `DockerCli`, and every argv is qits-containers-driver's** (qits-2211).
+`DockerArgv`, `SwarmArgv` and `InteractiveArgv` in the library build every command line, and
+`DockerCli` runs the captured ones through the library's `ContainerProcess` — the same bounded
+capture, deadline and kill-and-reap on interrupt as every other component that talks to docker.
+This service keeps no argv builder and no process runner of its own; a docker CLI fix lands in the
+library once. What stays here is this service's: `DockerCli`'s configuration, its `DOCKER_CONFIG`
+decision (`DockerClientConfig.environment`) and the failure mapping below; the terminal spec
+(`terminal/TerminalContainers` — the glances name, the `qits.system.*` labels, `TERM`, the sandbox
+options); and the PTY host (`TerminalProcesses`, `ForeignPty`), which the library does not have.
+The builders are pure functions asserted element for element in the library's own suite, and the
+argv IS the sandbox, so here the proof is `service/src/test/resources/fake-docker/docker`: it
+matches on the whole argv, and it did not change when the builders moved.
 
 **A failed call is a 503 carrying docker's own last words. Never a 404, never an empty list.** A
 read that could not reach the daemon knows nothing. The three failures an operator actually meets —
 socket not mounted, group not added, node is not a manager — all arrive as a non-zero exit with one
 clear sentence, and passing that sentence through is worth more than anything this service could
-invent. The two callers that must tell "docker said no" from "docker could not be asked" use
+invent. A missing binary is `ContainerProcess`'s exit -1 with the `IOException`'s message, the same
+503. The two callers that must tell "docker said no" from "docker could not be asked" use
 `attempt` and match on docker's wording; they are `SwarmReads.inspectOne` and `NodeReads`.
 
-**Two checkpoints on every caller string, and neither is trusted alone.** The controller validates,
-and `DockerIdentifiers` validates again inside the argv builder. What they are really for is the
-element boundaries a value could forge — a leading `-` read as an option, a `:` moving a mount's
-fields.
+**Two checkpoints on every caller string, and neither is trusted alone.** `docker/CallerValues`
+checks first and answers a refusal as this service's 400 (`not a valid <what>: …`); the library's
+`ContainersIdentifiers.requireReference` belts the same value again inside the argv builder, where a
+refusal is an `IllegalArgumentException`. The shape itself is the library's. What they are really
+for is the element boundaries a value could forge — a leading `-` read as an option, a `:` moving a
+mount's fields. `SwarmArgv.servicePs` does not belt its reference, so `SwarmReads.service` checks
+before either call.
 
 **The exec target is resolved, not passed through.** `NodeReads.requireRunningContainer` hands the
 reference to the daemon and keeps only the canonical 64-hex id it printed;
-`DockerIdentifiers.requireFullId` in the argv builder is the belt that makes bypassing it fail.
+`ContainersIdentifiers.requireFullId` in `InteractiveArgv.exec` is the belt that makes bypassing it
+fail.
 
 **Never add a captured call without a timeout and a bound.** Both are required parameters of
-`DockerProcess.run` on purpose: a convenience overload is the regression.
+`ContainerProcess.run` on purpose: a convenience overload is the regression.
 
 ## Parsers
 
@@ -225,7 +238,7 @@ instantly: a reload closes and reopens the socket within a second or two, and th
 The CREATION window stays the long one for both, because nobody has attached yet.
 
 **Ending a glances session is two acts.** `--rm` fires when the CONTAINER exits; killing the CLI
-attached to it is not that. The second act is `docker rm -f` by the name the argv builder derived
+attached to it is not that. The second act is `docker rm -f` by the name `TerminalContainers` derived
 from the session id, and the boot sweep is what catches the ones a killed service left behind.
 
 **The sweep filters on the owner label's VALUE.** Two platforms can share one docker daemon, and a
@@ -350,7 +363,7 @@ in 2026.829 and there is nothing to replace it with. Four passive feeds and one 
 - **`MockIdp`'s request log**, a cumulative `NetworkCapture.source`, for the startup JWKS fetch.
 - **`stories/support/StoryDocker`**, also cumulative, for every docker call — and this is where the
   wave-5 shape changed. The docker hop is no longer declared, because it is genuinely observable:
-  `DockerProcess` spawns the CLI and reads its pipes, so `StoryDocker` STAGES the shipped
+  `ContainerProcess` spawns the CLI and reads its pipes, so `StoryDocker` STAGES the shipped
   `fake-docker/docker` script into `target/story-docker/` and points the launched artifact there.
   The copy is the point — `target/test-classes/fake-docker/` is written by the whole surefire suite,
   which finishes before failsafe starts, so a recording read from there would open with several

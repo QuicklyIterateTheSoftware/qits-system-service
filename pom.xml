@@ -75,6 +75,13 @@
              metrics reach qits-observability at its edge host. Published by
              qits-integrations-quarkus, like qits-http-core above. -->
         <qits.telemetry-core.version>2026.1106.507</qits.telemetry-core.version>
+        <!-- qits-containers-driver (qits-2211): the platform's docker layer as a plain-Java jar —
+             DockerArgv, SwarmArgv, InteractiveArgv and ContainerProcess. Every docker call this
+             service makes (the reads, the boot sweep, the terminals' argv) is built and run through
+             it rather than through a hand-assembled argv, the owner's ruling of 2026-11-13.
+             Published by qits-containers-javalib; jboss-logging is its only runtime dependency, no
+             Quarkus and no CDI, so it is native-image neutral. -->
+        <qits.containers-driver.version>2026.1116.74008</qits.containers-driver.version>
         <!-- The user-story framework (test scope): TokenValidationBootstrapIT is a userflow, so a
              `mvn verify -DskipITs=false "-Dit.test=TokenValidationBootstrapIT"` also regenerates
              service/target/userstories/ — the story's documentation, network diagram included.
@@ -104,8 +111,10 @@
         <!-- The targets module (qits-1481): its store, its outbox and the runner wire.
              qits-runner-protocol is the lifecycle frames and RunnerCodec; qits-runner-toolkit is
              linked for its pure-java install package only (RunnerIdentity, InstallScript), both
-             with a *:* exclusion so neither Vert.x nor a containers driver reaches this service.
-             One version for both: they are released together from qits-runner-javalib. -->
+             with a *:* exclusion so none of the toolkit's runtime (Vert.x, its runner-side docker
+             plumbing) reaches this service through it. qits-containers-driver is a direct
+             dependency of its own, pinned above; the exclusion does not keep it out and is not meant
+             to. One version for both: they are released together from qits-runner-javalib. -->
         <qits.eventstream.version>2026.1110.232501</qits.eventstream.version>
         <qits.db-core.version>2026.1107.191249</qits.db-core.version>
         <qits.runner.version>2026.1116.51301</qits.runner.version>
@@ -252,6 +261,12 @@
                         <artifactId>*</artifactId>
                     </exclusion>
                 </exclusions>
+            </dependency>
+            <dependency>
+                <!-- The docker layer every docker call of the system module runs through. -->
+                <groupId>${project.groupId}</groupId>
+                <artifactId>qits-containers-driver</artifactId>
+                <version>${qits.containers-driver.version}</version>
             </dependency>
             <dependency>
                 <groupId>${project.groupId}</groupId>
