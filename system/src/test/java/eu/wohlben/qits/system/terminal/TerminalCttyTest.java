@@ -34,7 +34,7 @@ import org.junit.jupiter.api.condition.OS;
 @EnabledOnOs(OS.LINUX)
 class TerminalCttyTest {
 
-  /** A real exec argv, standing in for whatever TerminalArgv builds. */
+  /** A real exec argv, standing in for whatever TerminalContainers builds. */
   private static final List<String> EXEC_ARGV =
       List.of(
           "docker",

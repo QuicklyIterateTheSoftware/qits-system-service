@@ -1,8 +1,9 @@
 package eu.wohlben.qits.system.startup;
 
-import eu.wohlben.qits.system.docker.DockerArgv;
+import eu.wohlben.qits.containers.driver.docker.ContainerProcess;
+import eu.wohlben.qits.containers.driver.docker.DockerArgv;
 import eu.wohlben.qits.system.docker.DockerCli;
-import eu.wohlben.qits.system.docker.DockerProcess;
+import eu.wohlben.qits.system.terminal.TerminalContainers;
 import eu.wohlben.qits.system.terminal.TerminalSessions;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -66,9 +67,10 @@ public class TerminalBootSweep {
    * into a fix.
    */
   private boolean probeDaemon() {
-    List<String> argv = DockerArgv.version(docker.binary());
-    DockerProcess.Result result = docker.attempt(argv);
-    if (result.ok()) {
+    // The daemon liveness probe: cheap, and the one call this sweep makes first.
+    List<String> argv = DockerArgv.version(docker.binary(), "{{.Server.Version}}");
+    ContainerProcess.Result result = docker.attempt(argv);
+    if (DockerCli.ok(result)) {
       LOG.infof("Docker daemon reachable, server version %s", result.output().trim());
       return true;
     }
@@ -95,9 +97,10 @@ public class TerminalBootSweep {
    * kill the other platform's live terminals on every restart of this one.
    */
   private void sweepLeftovers() {
-    List<String> psArgv = DockerArgv.psByOwner(docker.binary(), owner);
-    DockerProcess.Result found = docker.attempt(psArgv);
-    if (!found.ok()) {
+    List<String> psArgv =
+        DockerArgv.psByLabels(docker.binary(), TerminalContainers.ownerFilter(owner));
+    ContainerProcess.Result found = docker.attempt(psArgv);
+    if (!DockerCli.ok(found)) {
       LOG.warnf("Could not list leftover terminal containers: %s", found.output());
       return;
     }
@@ -107,7 +110,7 @@ public class TerminalBootSweep {
       return;
     }
     LOG.infof("Removing %d terminal container(s) left by a previous run", ids.size());
-    docker.bestEffort("removing leftover terminal containers", DockerArgv.rmForce(docker.binary(), ids));
+    docker.bestEffort("removing leftover terminal containers", DockerArgv.rm(docker.binary(), ids));
   }
 
   /**
@@ -124,8 +127,16 @@ public class TerminalBootSweep {
       return;
     }
     String image = sessions.glancesImage();
-    DockerProcess.Result result = docker.attempt(DockerArgv.pull(docker.binary(), image));
-    if (result.ok()) {
+    ContainerProcess.Result result;
+    try {
+      result = docker.attempt(DockerArgv.pull(docker.binary(), image));
+    } catch (IllegalArgumentException refused) {
+      // The library belts the image reference; a configured repo or version it refuses would be
+      // refused at the first terminal too, and saying so here is the earlier, clearer place.
+      LOG.warnf("Not pre-pulling glances: %s", refused.getMessage());
+      return;
+    }
+    if (DockerCli.ok(result)) {
       LOG.infof("Glances image %s is present", image);
     } else {
       LOG.warnf(

@@ -1,9 +1,8 @@
 package eu.wohlben.qits.system.terminal;
 
-import eu.wohlben.qits.system.docker.DockerArgv;
+import eu.wohlben.qits.containers.driver.docker.DockerArgv;
 import eu.wohlben.qits.system.docker.DockerCli;
 import eu.wohlben.qits.system.docker.DockerClientConfig;
-import eu.wohlben.qits.system.docker.TerminalArgv;
 import eu.wohlben.qits.system.error.ConflictException;
 import eu.wohlben.qits.system.error.DockerUnavailableException;
 import jakarta.annotation.PreDestroy;
@@ -242,10 +241,10 @@ public class TerminalSessions {
     List<String> argv =
         switch (launch) {
           case TerminalLaunch.Glances ignored ->
-              TerminalArgv.runGlances(
+              TerminalContainers.runGlances(
                   docker.binary(), glancesImage(), glancesArgs.orElse(List.of()), id, owner);
           case TerminalLaunch.Exec exec ->
-              TerminalArgv.execShell(docker.binary(), exec.containerId(), exec.shell(), id);
+              TerminalContainers.execShell(docker.binary(), exec.containerId(), exec.shell(), id);
         };
     ForeignPty pty;
     try {
@@ -260,8 +259,8 @@ public class TerminalSessions {
       // pull needs — but ONLY when that file exists. Otherwise it is inherited from this process,
       // where an older deployment spec points it at the mounted config volume; uid 1001 has no HOME
       // for the CLI to fall back to either way.
-      builder.environment().put("TERM", TerminalArgv.TERM);
-      DockerClientConfig.applyTo(builder.environment(), docker.configDir());
+      builder.environment().put("TERM", TerminalContainers.TERM);
+      builder.environment().putAll(DockerClientConfig.environment(docker.configDir()));
       Process process = builder.start();
       return new TerminalSession(
           id,
@@ -366,7 +365,7 @@ public class TerminalSessions {
    * <p>{@code --rm} only fires when a container exits. Killing the CLI that is attached to it does
    * not exit it — the container keeps running with nobody watching, holding the host's pid
    * namespace and the socket. So a glances teardown is two acts, and the second one is by the name
-   * the argv builder derived from the session id.
+   * {@link TerminalContainers#glancesContainerName} derives from the session id.
    */
   private void endSession(TerminalSession session, String why) {
     LOG.infof("Ending %s terminal %s (%s)", session.kind(), session.id(), why);
@@ -374,8 +373,8 @@ public class TerminalSessions {
     if (session.kind() == TerminalKind.GLANCES) {
       docker.bestEffort(
           "removing the glances container",
-          DockerArgv.rmForce(
-              docker.binary(), List.of(TerminalArgv.glancesContainerName(session.id()))));
+          DockerArgv.rm(
+              docker.binary(), List.of(TerminalContainers.glancesContainerName(session.id()))));
     }
   }
 

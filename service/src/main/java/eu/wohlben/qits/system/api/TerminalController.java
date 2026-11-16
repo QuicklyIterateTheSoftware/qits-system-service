@@ -1,6 +1,6 @@
 package eu.wohlben.qits.system.api;
 
-import eu.wohlben.qits.system.docker.DockerIdentifiers;
+import eu.wohlben.qits.system.docker.CallerValues;
 import eu.wohlben.qits.system.error.BadRequestException;
 import eu.wohlben.qits.system.error.NotFoundException;
 import eu.wohlben.qits.system.reads.NodeReads;
@@ -122,7 +122,7 @@ public class TerminalController {
   @APIResponse(responseCode = "204", description = "Ended")
   @APIResponse(responseCode = "404", description = "No such terminal")
   public Response close(@PathParam("id") String id) {
-    UUID sessionId = DockerIdentifiers.parseSessionId(id);
+    UUID sessionId = CallerValues.parseSessionId(id);
     if (sessionId == null || !sessions.terminate(sessionId)) {
       throw new NotFoundException("no such terminal: " + id);
     }
@@ -130,7 +130,7 @@ public class TerminalController {
   }
 
   private TerminalSession require(String id) {
-    UUID sessionId = DockerIdentifiers.parseSessionId(id);
+    UUID sessionId = CallerValues.parseSessionId(id);
     if (sessionId == null) {
       throw new NotFoundException("no such terminal: " + id);
     }
@@ -161,7 +161,7 @@ public class TerminalController {
         if (shell == null) {
           throw new BadRequestException("shell must be bash or sh, got: " + request.shell());
         }
-        DockerIdentifiers.requireContainerRef(request.container());
+        CallerValues.requireContainerRef(request.container());
         NodeReads.ContainerTarget target = nodes.requireRunningContainer(request.container());
         yield new TerminalLaunch.Exec(target.id(), target.name(), shell);
       }

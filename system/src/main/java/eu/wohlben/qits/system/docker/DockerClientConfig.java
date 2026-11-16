@@ -34,8 +34,8 @@ import java.util.stream.Collectors;
  * registry}. A repo whose host is not a {@code mirror.} name carries just that host, and a repo
  * with no host (docker.io implied) carries none.
  *
- * <p><b>THE FILE DECIDES {@code DOCKER_CONFIG}, NOT THE CONFIGURATION.</b> {@link #applyTo} points a
- * docker child at the directory only when {@code config.json} is actually there. Otherwise the
+ * <p><b>THE FILE DECIDES {@code DOCKER_CONFIG}, NOT THE CONFIGURATION.</b> {@link #environment}
+ * points a docker child at the directory only when {@code config.json} is actually there. Otherwise the
  * environment is left alone, so the {@code DOCKER_CONFIG=/work/config} an older deployment spec
  * sets — and its mounted, bootstrap-written file — keeps working for that spec and a rollback.
  *
@@ -155,17 +155,18 @@ public final class DockerClientConfig {
   }
 
   /**
-   * Point a docker child at {@code dir} — but only when {@code dir/config.json} exists. Absent, the
-   * environment is untouched and whatever this process inherited (the mounted {@code /work/config}
-   * of an older spec) still applies.
+   * What a docker child's environment gains: {@code DOCKER_CONFIG=<dir>} — but only when {@code
+   * dir/config.json} exists. Absent, nothing is added, and whatever this process inherited (the
+   * mounted {@code /work/config} of an older spec) still applies. Both forks take it: the captured
+   * calls hand it to {@code ContainerProcess.run}, which ADDS it to the inherited environment, and
+   * the terminal spawn puts it into its PTY child's.
    *
-   * @return whether {@code DOCKER_CONFIG} was set
+   * @return {@code {DOCKER_CONFIG: dir}}, or an empty map
    */
-  public static boolean applyTo(Map<String, String> environment, Path dir) {
+  public static Map<String, String> environment(Path dir) {
     if (dir == null || !Files.isRegularFile(dir.resolve(FILE))) {
-      return false;
+      return Map.of();
     }
-    environment.put(ENV, dir.toString());
-    return true;
+    return Map.of(ENV, dir.toString());
   }
 }

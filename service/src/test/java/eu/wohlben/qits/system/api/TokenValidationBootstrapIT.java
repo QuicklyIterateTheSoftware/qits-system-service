@@ -239,7 +239,7 @@ public class TokenValidationBootstrapIT {
 
     // …and it is what makes this service's answer different from a row out of a table: there is no
     // store here, so the body above can only have come from a `docker info` this request itself
-    // forked. THE HOP IS OBSERVED, not declared: DockerProcess spawns the CLI and reads its pipes,
+    // forked. THE HOP IS OBSERVED, not declared: ContainerProcess spawns the CLI and reads its pipes,
     // and the stand-in records every argv with the exit code it answered.
     assertTrue(
         StoryDocker.callsSince(0).contains(StoryDocker.label("info", "0")),

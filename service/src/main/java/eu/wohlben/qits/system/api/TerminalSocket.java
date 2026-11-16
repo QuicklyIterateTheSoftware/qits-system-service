@@ -1,7 +1,7 @@
 package eu.wohlben.qits.system.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import eu.wohlben.qits.system.docker.DockerIdentifiers;
+import eu.wohlben.qits.system.docker.CallerValues;
 import eu.wohlben.qits.system.terminal.TerminalFrame;
 import eu.wohlben.qits.system.terminal.TerminalOutputSink;
 import eu.wohlben.qits.system.terminal.TerminalSessions;
@@ -79,7 +79,7 @@ public class TerminalSocket {
   @OnOpen
   @RunOnVirtualThread
   public void onOpen(@PathParam("id") String id, WebSocketConnection connection) {
-    UUID sessionId = DockerIdentifiers.parseSessionId(id);
+    UUID sessionId = CallerValues.parseSessionId(id);
     ConnectionSink sink = new ConnectionSink(connection, writeTimeout);
     Optional<TerminalSessions.Handle> handle =
         sessionId == null

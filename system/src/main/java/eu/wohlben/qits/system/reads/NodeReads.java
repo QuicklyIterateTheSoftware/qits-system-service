@@ -1,10 +1,11 @@
 package eu.wohlben.qits.system.reads;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import eu.wohlben.qits.system.docker.DockerArgv;
+import eu.wohlben.qits.containers.driver.docker.ContainerProcess;
+import eu.wohlben.qits.containers.driver.docker.DockerArgv;
+import eu.wohlben.qits.containers.driver.docker.SwarmArgv;
+import eu.wohlben.qits.system.docker.CallerValues;
 import eu.wohlben.qits.system.docker.DockerCli;
-import eu.wohlben.qits.system.docker.DockerIdentifiers;
-import eu.wohlben.qits.system.docker.DockerProcess;
 import eu.wohlben.qits.system.error.ConflictException;
 import eu.wohlben.qits.system.error.NotFoundException;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -49,6 +50,13 @@ public class NodeReads {
   @ConfigProperty(name = "qits.system.logs.max-chars")
   int maxLogChars;
 
+  /**
+   * The three facts the exec path needs before it opens a terminal, in one call: the canonical id,
+   * whether the container is running, and its name. A format string rather than a full inspect
+   * because this runs on the request path of every terminal open.
+   */
+  static final String PROBE_FORMAT = "{{.Id}}|{{.State.Running}}|{{.Name}}";
+
   /** What the exec path learns before it opens a terminal. */
   public record ContainerTarget(String id, String name, boolean running) {}
 
@@ -70,16 +78,19 @@ public class NodeReads {
 
   public List<ContainerSummary> containers(String nodeId, boolean all) {
     requireLocal(nodeId);
-    return docker.jsonLines(DockerArgv.psAll(docker.binary(), all)).stream()
+    // --no-trunc so an id is the id; `all` adds the stopped ones, which is what an
+    // operator wants after something died.
+    return docker.jsonLines(DockerArgv.ps(docker.binary(), all, true, DockerCli.JSON_LINES)).stream()
         .map(ContainerSummary::from)
         .toList();
   }
 
   public ContainerDetail container(String nodeId, String ref) {
     requireLocal(nodeId);
-    List<String> argv = DockerArgv.containerInspect(docker.binary(), ref);
-    DockerProcess.Result result = docker.attempt(argv);
-    if (!result.ok()) {
+    CallerValues.requireContainerRef(ref);
+    List<String> argv = DockerArgv.containerInspect(docker.binary(), ref, null);
+    ContainerProcess.Result result = docker.attempt(argv);
+    if (!DockerCli.ok(result)) {
       if (saysNoSuchContainer(result.output())) {
         throw new NotFoundException("no such container: " + ref);
       }
@@ -92,13 +103,14 @@ public class NodeReads {
     return ContainerDetail.from(rows.get(0));
   }
 
-  /** A container's recent output. `tail` is bounded here as well as in the argv builder. */
+  /** A container's recent output. Timestamps off: the lines carry the workload's own format. */
   public LogChunk logs(String nodeId, String ref, int tail) {
     requireLocal(nodeId);
-    int bounded = DockerIdentifiers.requireTail(tail, maxTail);
-    List<String> argv = DockerArgv.logsTail(docker.binary(), ref, bounded);
-    DockerProcess.Result result = docker.attempt(argv, maxLogChars);
-    if (!result.ok()) {
+    CallerValues.requireContainerRef(ref);
+    int bounded = CallerValues.requireTail(tail, maxTail);
+    List<String> argv = DockerArgv.logsTailByReference(docker.binary(), ref, bounded);
+    ContainerProcess.Result result = docker.attempt(argv, maxLogChars);
+    if (!DockerCli.ok(result)) {
       if (saysNoSuchContainer(result.output())) {
         throw new NotFoundException("no such container: " + ref);
       }
@@ -109,21 +121,23 @@ public class NodeReads {
 
   public List<ImageSummary> images(String nodeId) {
     requireLocal(nodeId);
-    return docker.jsonLines(DockerArgv.imageLs(docker.binary())).stream()
+    return docker.jsonLines(DockerArgv.imageLs(docker.binary(), DockerCli.JSON_LINES)).stream()
         .map(ImageSummary::from)
         .toList();
   }
 
   public List<VolumeSummary> volumes(String nodeId) {
     requireLocal(nodeId);
-    return docker.jsonLines(DockerArgv.volumeLs(docker.binary())).stream()
+    return docker.jsonLines(DockerArgv.volumeLs(docker.binary(), DockerCli.JSON_LINES)).stream()
         .map(VolumeSummary::from)
         .toList();
   }
 
   public List<NetworkSummary> networks(String nodeId) {
     requireLocal(nodeId);
-    return docker.jsonLines(DockerArgv.networkLs(docker.binary())).stream()
+    return docker
+        .jsonLines(SwarmArgv.networkLs(docker.binary(), List.of(), DockerCli.JSON_LINES))
+        .stream()
         .map(NetworkSummary::from)
         .toList();
   }
@@ -142,9 +156,10 @@ public class NodeReads {
    *     message the browser could not act on)
    */
   public ContainerTarget requireRunningContainer(String ref) {
-    List<String> argv = DockerArgv.containerProbe(docker.binary(), ref);
-    DockerProcess.Result result = docker.attempt(argv);
-    if (!result.ok()) {
+    CallerValues.requireContainerRef(ref);
+    List<String> argv = DockerArgv.containerInspect(docker.binary(), ref, PROBE_FORMAT);
+    ContainerProcess.Result result = docker.attempt(argv);
+    if (!DockerCli.ok(result)) {
       if (saysNoSuchContainer(result.output())) {
         throw new NotFoundException("no such container: " + ref);
       }
@@ -154,7 +169,7 @@ public class NodeReads {
     if (parts.length < 3) {
       throw new NotFoundException("no such container: " + ref);
     }
-    String id = DockerIdentifiers.requireFullId(parts[0].trim());
+    String id = CallerValues.requireFullId(parts[0].trim());
     boolean running = Boolean.parseBoolean(parts[1].trim());
     String name = parts[2].trim();
     if (name.startsWith("/")) {

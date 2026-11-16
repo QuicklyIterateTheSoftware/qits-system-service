@@ -74,7 +74,8 @@ should refuse to come up.
 
 ## Modules
 
-    system/    the domain: docker argv builders, the process runner, the parsers, the PTY subsystem
+    system/    the domain: the docker call boundary (on qits-containers-driver), the parsers, the
+               PTY subsystem
     targets/   the execution targets (qits-1481): their store, doors, allocator and runner socket
     service/   the deployable: JAX-RS routes, the terminal WebSocket, the boot sweep, Quinoa
 

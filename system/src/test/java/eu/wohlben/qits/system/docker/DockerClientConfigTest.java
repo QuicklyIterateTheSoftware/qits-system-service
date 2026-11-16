@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import eu.wohlben.qits.containers.driver.docker.ContainerProcess;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -106,26 +107,32 @@ class DockerClientConfigTest {
     Path dir = tmp.resolve("docker");
     Map<String, String> env = new HashMap<>(Map.of("DOCKER_CONFIG", "/work/config"));
 
-    assertFalse(DockerClientConfig.applyTo(env, dir));
+    env.putAll(DockerClientConfig.environment(dir));
+    assertEquals(Map.of(), DockerClientConfig.environment(dir));
     assertEquals("/work/config", env.get("DOCKER_CONFIG"), "absent: the inherited value stands");
 
     DockerClientConfig.writeIfConfigured(dir, REPO, Optional.of("id"), Optional.of("secret"));
-    assertTrue(DockerClientConfig.applyTo(env, dir));
+    env.putAll(DockerClientConfig.environment(dir));
     assertEquals(dir.toString(), env.get("DOCKER_CONFIG"));
   }
 
   @Test
   void theDockerChildIsPointedAtTheDirectoryOnlyOnceTheFileExists() throws Exception {
-    // The hop itself: DockerProcess.run must carry the decision into the child's environment.
+    // The hop itself: the decision must reach the child through the library's ContainerProcess,
+    // the same call DockerCli makes.
     Path dir = tmp.resolve("docker");
     List<String> argv = List.of("sh", "-c", "printf %s \"${DOCKER_CONFIG-unset}\"");
     String inherited = Optional.ofNullable(System.getenv("DOCKER_CONFIG")).orElse("unset");
 
-    DockerProcess.Result before = DockerProcess.run(argv, Duration.ofSeconds(10), 1000, dir);
+    ContainerProcess.Result before =
+        ContainerProcess.run(
+            null, argv, DockerClientConfig.environment(dir), Duration.ofSeconds(10), 1000);
     assertEquals(inherited, before.output());
 
     DockerClientConfig.writeIfConfigured(dir, REPO, Optional.of("id"), Optional.of("secret"));
-    DockerProcess.Result after = DockerProcess.run(argv, Duration.ofSeconds(10), 1000, dir);
+    ContainerProcess.Result after =
+        ContainerProcess.run(
+            null, argv, DockerClientConfig.environment(dir), Duration.ofSeconds(10), 1000);
     assertEquals(dir.toString(), after.output());
   }
 }

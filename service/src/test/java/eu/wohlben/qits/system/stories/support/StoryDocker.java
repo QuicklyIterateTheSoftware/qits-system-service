@@ -23,7 +23,8 @@ import java.util.regex.Pattern;
  *
  * <h2>Why the docker hop is observed here and not declared</h2>
  *
- * <p>This service never opens {@code /var/run/docker.sock} itself: {@code docker/DockerProcess}
+ * <p>This service never opens {@code /var/run/docker.sock} itself: {@code docker/DockerCli}, through
+ * qits-containers-driver's {@code ContainerProcess},
  * <b>spawns the docker CLI</b> and reads its pipes, and which binary that is arrives as one runtime
  * key, {@code qits.system.docker.binary}. So the honest stand-in for its one outbound dependency is
  * not a stubbed endpoint — it is an executable, and this repository has shipped one since long
@@ -32,7 +33,7 @@ import java.util.regex.Pattern;
  * into a real echo loop on a real pseudo-terminal.
  *
  * <p>That is why the docker hop is an <b>observed</b> {@code process} edge rather than a claim. The
- * argv the stand-in receives is the argv {@code DockerArgv} and {@code TerminalArgv} produced, a
+ * argv the stand-in receives is the argv qits-containers-driver's builders produced, a
  * real {@code ProcessBuilder} forked a real child to deliver it, and the script records it with the
  * exit code it answered. What no tap out here can see is the hop <i>behind</i> that CLI — the unix
  * socket the deployment mounts into this container — and that one edge stays {@link
@@ -240,7 +241,7 @@ public final class StoryDocker {
     return summary + " -> " + exitCode;
   }
 
-  /** The container name {@code TerminalArgv} derives for a glances session, template-shaped. */
+  /** The container name {@code TerminalContainers} derives for a glances session, template-shaped. */
   public static String glancesContainer() {
     return "qits-system-glances-" + StoryTarget.ID;
   }
@@ -306,8 +307,8 @@ public final class StoryDocker {
   /**
    * One argv as the label a reader wants: the docker verb, and the one name it is addressed to.
    *
-   * <p>The vocabulary is CLOSED — {@code DockerArgv} and {@code TerminalArgv} are the complete list
-   * of command lines this service will ever run — so this is a table rather than a heuristic, with
+   * <p>The vocabulary is CLOSED — the library builders {@code reads/}, {@code startup/} and {@code
+   * terminal/} call are the complete list of command lines this service will ever run — so this is a table rather than a heuristic, with
    * a fallback that still shows a call nobody expected rather than swallowing it.
    */
   static String summarize(List<String> argv) {
@@ -319,7 +320,7 @@ public final class StoryDocker {
       case "version", "info" -> command;
       // `system df`, `node ls`, `node inspect X`, `service ps X`, … — the object, the verb, and the
       // reference where the verb takes one. In every one of these the reference is the argument
-      // straight after the verb, because that is how DockerArgv builds them; `--format`,
+      // straight after the verb, because that is how the library's builders spell them; `--format`,
       // `--no-trunc` and their values are dropped.
       case "system", "node", "service", "config", "secret", "image", "volume", "network" ->
           command + " " + second(argv) + swarmReference(argv);
