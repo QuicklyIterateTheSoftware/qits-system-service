@@ -81,7 +81,7 @@
              it rather than through a hand-assembled argv, the owner's ruling of 2026-11-13.
              Published by qits-containers-javalib; jboss-logging is its only runtime dependency, no
              Quarkus and no CDI, so it is native-image neutral. -->
-        <qits.containers-driver.version>2026.1116.74008</qits.containers-driver.version>
+        <qits.containers-driver.version>2026.1116.82048</qits.containers-driver.version>
         <!-- The user-story framework (test scope): TokenValidationBootstrapIT is a userflow, so a
              `mvn verify -DskipITs=false "-Dit.test=TokenValidationBootstrapIT"` also regenerates
              service/target/userstories/ — the story's documentation, network diagram included.
@@ -117,7 +117,7 @@
              to. One version for both: they are released together from qits-runner-javalib. -->
         <qits.eventstream.version>2026.1110.232501</qits.eventstream.version>
         <qits.db-core.version>2026.1107.191249</qits.db-core.version>
-        <qits.runner.version>2026.1116.51301</qits.runner.version>
+        <qits.runner.version>2026.1116.92331</qits.runner.version>
         <!-- The qits-system-runner's own frames (qits-1481): SystemRunnerProtocol, SystemRunnerCodec
              and SystemRunnerBinary, whose VERSION is the runner image every target is pinned to.
              Published by qits-system-runner-daemon. -->
