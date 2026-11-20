@@ -1481,6 +1481,27 @@
       ]
     },
     {
+      "name": "a swarm running no services",
+      "slug": "a-swarm-running-no-services",
+      "params": {},
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listSwarmServices",
+          "method": "GET",
+          "path": "/system/api/swarm/services",
+          "status": 200,
+          "file": "a-swarm-running-no-services/listSwarmServices.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "an open exec terminal",
       "slug": "an-open-exec-terminal",
       "params": {

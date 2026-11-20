@@ -20,6 +20,7 @@ import eu.wohlben.qits.system.terminal.TerminalLaunch;
 import eu.wohlben.qits.system.terminal.TerminalOutputSink;
 import eu.wohlben.qits.system.terminal.TerminalSession;
 import eu.wohlben.qits.system.terminal.TerminalSessions;
+import eu.wohlben.qits.system.testdocker.FakeDocker;
 import eu.wohlben.qits.systemrunner.protocol.Docker;
 import eu.wohlben.qits.systemrunner.protocol.DockerResult;
 import eu.wohlben.qits.systemrunner.protocol.DockerStatus;
@@ -29,7 +30,10 @@ import eu.wohlben.qits.systemrunner.protocol.SignInState;
 import eu.wohlben.qits.systemrunner.protocol.SystemRunnerBinary;
 import io.quarkus.arc.Arc;
 import io.quarkus.narayana.jta.QuarkusTransaction;
+import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -60,6 +64,13 @@ import java.util.function.Supplier;
 public class ProviderStates {
 
   public static final String A_SINGLE_NODE_SWARM = "a single-node swarm";
+
+  /**
+   * The same swarm with no service on it: {@code docker service ls} prints nothing and exits 0, so
+   * the service list is {@code []} (qits-2344, for a consumer's empty-swarm screen). Only the
+   * service listing differs; the fake docker reads a {@code no-services} file beside it.
+   */
+  public static final String A_SWARM_RUNNING_NO_SERVICES = "a swarm running no services";
 
   static final String NODE_ID = "iwbwrdui2z0n62kqcjfo1erwh";
 
@@ -288,6 +299,7 @@ public class ProviderStates {
     this.bearers = bearers;
     this.base = base;
     states.put(A_SINGLE_NODE_SWARM, ProviderStates::aSingleNodeSwarm);
+    states.put(A_SWARM_RUNNING_NO_SERVICES, ProviderStates::aSwarmRunningNoServices);
     states.put(NO_TARGET, this::noTarget);
     states.put(A_DECLARED_TARGET, this::aDeclaredTarget);
     states.put(AN_UNREGISTERED_RUNNER, this::anUnregisteredRunner);
@@ -317,6 +329,7 @@ public class ProviderStates {
    * state ran — the one it opened and any a recorded open started — so none outlives the state.
    */
   public void close() {
+    servicesRunning(true);
     if (runner != null) {
       runner.answering(null);
       runner.close();
@@ -338,6 +351,8 @@ public class ProviderStates {
       throw new IllegalArgumentException(
           "No provider state '" + state + "' — this provider answers for " + states.keySet());
     }
+    // Only the empty swarm turns the services off; every other state starts with them on.
+    servicesRunning(true);
     return setup.get();
   }
 
@@ -358,6 +373,29 @@ public class ProviderStates {
     params.put("configId", CONFIG_ID);
     params.put("containerId", CONTAINER_ID);
     return new Setup(Collections.unmodifiableMap(params));
+  }
+
+  private static Setup aSwarmRunningNoServices() {
+    servicesRunning(false);
+    return new Setup(Map.of());
+  }
+
+  /**
+   * Whether the fake docker's {@code service ls} prints its services, or nothing at all. The file
+   * sits beside the script, which every test in the run shares, so {@link #close} turns them back
+   * on.
+   */
+  private static void servicesRunning(boolean running) {
+    Path marker = FakeDocker.directory().resolve("no-services");
+    try {
+      if (running) {
+        Files.deleteIfExists(marker);
+      } else {
+        Files.writeString(marker, "");
+      }
+    } catch (IOException e) {
+      throw new IllegalStateException("could not set the fake docker's services: " + marker, e);
+    }
   }
 
   /** Every targets state starts here: no runner, no sign-in, no rows, a fresh idp stub, no bearer. */
