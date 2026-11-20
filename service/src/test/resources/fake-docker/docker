@@ -128,6 +128,11 @@ JSON
   service)
     case "$2" in
       ls)
+        # A swarm running no services prints nothing and exits 0, which is what docker does. A
+        # state that wants one writes this file (ProviderStates.A_SWARM_RUNNING_NO_SERVICES).
+        if [ -f "$here/no-services" ]; then
+          exit 0
+        fi
         cat <<'JSON'
 {"ID":"l2izhr0o4tjq","Image":"registry.dev.localhost:8080/qits/qits-artifacts:09920e6","Mode":"replicated","Name":"dev-qits-artifacts","Ports":"","Replicas":"1/1"}
 {"ID":"qz3slj0owlxd","Image":"registry.dev.localhost:8080/qits/qits-ci:3e501b6","Mode":"replicated","Name":"dev-qits-ci","Ports":"","Replicas":"1/1"}
