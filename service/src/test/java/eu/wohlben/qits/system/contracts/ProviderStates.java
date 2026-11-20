@@ -73,6 +73,14 @@ public class ProviderStates {
   public static final String A_SWARM_RUNNING_NO_SERVICES = "a swarm running no services";
 
   /**
+   * A manager with no node on it: {@code docker node ls} prints nothing and exits 0, so the node
+   * list is {@code []}. A real manager always lists at least itself, so this never happens on a
+   * live swarm — it is the defensive empty answer a consumer must still render (qits-2346). Only
+   * the node listing differs; the fake docker reads a {@code no-nodes} file beside it.
+   */
+  public static final String A_SWARM_LISTING_NO_NODES = "a swarm listing no nodes";
+
+  /**
    * The same swarm, read for a service scaled to zero that mounts nothing: {@code service inspect
    * dev-qits-idle} answers it and {@code service ps} prints no task, so its detail carries {@code
    * tasks: []} and {@code mounts: []} (qits-2345). Param {@code serviceId}. The fake docker's
@@ -85,14 +93,6 @@ public class ProviderStates {
    * docker's "no such service", which is the door's 404 (qits-2345). Param {@code serviceId}.
    */
   public static final String NO_SUCH_SWARM_SERVICE = "no such swarm service";
-
-  /**
-   * A manager with no node on it: {@code docker node ls} prints nothing and exits 0, so the node
-   * list is {@code []}. A real manager always lists at least itself, so this never happens on a
-   * live swarm — it is the defensive empty answer a consumer must still render (qits-2346). Only
-   * the node listing differs; the fake docker reads a {@code no-nodes} file beside it.
-   */
-  public static final String A_SWARM_LISTING_NO_NODES = "a swarm listing no nodes";
 
   static final String NODE_ID = "iwbwrdui2z0n62kqcjfo1erwh";
 
@@ -326,10 +326,10 @@ public class ProviderStates {
     this.base = base;
     states.put(A_SINGLE_NODE_SWARM, ProviderStates::aSingleNodeSwarm);
     states.put(A_SWARM_RUNNING_NO_SERVICES, ProviderStates::aSwarmRunningNoServices);
+    states.put(A_SWARM_LISTING_NO_NODES, ProviderStates::aSwarmListingNoNodes);
     states.put(
         A_SWARM_SERVICE_WITH_NO_TASKS, () -> new Setup(Map.of("serviceId", IDLE_SERVICE_ID)));
     states.put(NO_SUCH_SWARM_SERVICE, () -> new Setup(Map.of("serviceId", UNKNOWN_SERVICE_ID)));
-    states.put(A_SWARM_LISTING_NO_NODES, ProviderStates::aSwarmListingNoNodes);
     states.put(NO_TARGET, this::noTarget);
     states.put(A_DECLARED_TARGET, this::aDeclaredTarget);
     states.put(AN_UNREGISTERED_RUNNER, this::anUnregisteredRunner);
