@@ -115,7 +115,7 @@
              plumbing) reaches this service through it. qits-containers-driver is a direct
              dependency of its own, pinned above; the exclusion does not keep it out and is not meant
              to. One version for both: they are released together from qits-runner-javalib. -->
-        <qits.eventstream.version>2026.1118.215113</qits.eventstream.version>
+        <qits.eventstream.version>2026.1120.94334</qits.eventstream.version>
         <qits.db-core.version>2026.1107.191249</qits.db-core.version>
         <qits.runner.version>2026.1117.173956</qits.runner.version>
         <!-- The qits-system-runner's own frames (qits-1481): SystemRunnerProtocol, SystemRunnerCodec
