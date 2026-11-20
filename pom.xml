@@ -117,11 +117,11 @@
              to. One version for both: they are released together from qits-runner-javalib. -->
         <qits.eventstream.version>2026.1120.94334</qits.eventstream.version>
         <qits.db-core.version>2026.1107.191249</qits.db-core.version>
-        <qits.runner.version>2026.1117.173956</qits.runner.version>
+        <qits.runner.version>2026.1120.181043</qits.runner.version>
         <!-- The qits-system-runner's own frames (qits-1481): SystemRunnerProtocol, SystemRunnerCodec
              and SystemRunnerBinary, whose VERSION is the runner image every target is pinned to.
              Published by qits-system-runner-daemon. -->
-        <qits.system-runner-protocol.version>2026.1119.182748</qits.system-runner-protocol.version>
+        <qits.system-runner-protocol.version>2026.1120.181942</qits.system-runner-protocol.version>
         <!-- THE LOGIN PROBE'S LAST-RESORT IMAGE (qits-1593): qits-workspace-daemon-protocol's
              WorkspaceImage carries the `qits/workspace` tag of the release that published it, so a
              brand-new target with no WORKSPACE or DESK lease yet can still be probed and sign in,
