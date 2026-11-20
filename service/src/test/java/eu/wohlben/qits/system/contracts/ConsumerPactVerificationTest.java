@@ -181,6 +181,16 @@ class ConsumerPactVerificationTest {
     return states.params(ProviderStates.A_SWARM_RUNNING_NO_SERVICES);
   }
 
+  @State(ProviderStates.A_SWARM_SERVICE_WITH_NO_TASKS)
+  Map<String, String> aSwarmServiceWithNoTasks() {
+    return states.params(ProviderStates.A_SWARM_SERVICE_WITH_NO_TASKS);
+  }
+
+  @State(ProviderStates.NO_SUCH_SWARM_SERVICE)
+  Map<String, String> noSuchSwarmService() {
+    return states.params(ProviderStates.NO_SUCH_SWARM_SERVICE);
+  }
+
   @State(ProviderStates.NO_TARGET)
   Map<String, String> noTarget() {
     return states.params(ProviderStates.NO_TARGET);

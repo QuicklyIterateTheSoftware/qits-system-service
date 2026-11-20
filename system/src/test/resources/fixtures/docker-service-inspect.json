@@ -43,6 +43,20 @@
       "QUARKUS_OIDC_AUTH_SERVER_URL=http://qits-platform-idp:8080/idp"
      ],
      "Init": false,
+     "Mounts": [
+      {
+       "Type": "volume",
+       "Source": "dev-qits-artifacts-store",
+       "Target": "/data",
+       "VolumeOptions": {}
+      },
+      {
+       "Type": "bind",
+       "Source": "/etc/qits/edge",
+       "Target": "/etc/qits/edge",
+       "ReadOnly": true
+      }
+     ],
      "StopGracePeriod": 10000000000,
      "Healthcheck": {
       "Test": [

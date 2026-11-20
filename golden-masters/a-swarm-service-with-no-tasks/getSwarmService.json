@@ -1,0 +1,29 @@
+{
+  "id": "h7x2kq9m4v1c8p0d5w3n6e2rt",
+  "name": "dev-qits-idle",
+  "image": "registry.dev.localhost:8080/qits/qits-idle:5c0ffee",
+  "mode": "replicated",
+  "replicas": "0/0",
+  "ports": null,
+  "createdAt": "2026-08-18T02:40:11.204118733Z",
+  "updatedAt": "2026-08-23T12:30:02.512309871Z",
+  "labels": {
+    "qits.platform.deployments.app-name": "qits-idle"
+  },
+  "envKeys": [
+    "QITS_ENVIRONMENT"
+  ],
+  "networks": [
+    {
+      "networkId": "mulnl3uqqi0hkr0yuutakpyed",
+      "address": "10.0.1.114/24"
+    }
+  ],
+  "mounts": [],
+  "updateOrder": "stop-first",
+  "updateParallelism": 1,
+  "updateFailureAction": "pause",
+  "restartCondition": "any",
+  "healthcheck": [],
+  "tasks": []
+}

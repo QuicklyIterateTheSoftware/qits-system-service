@@ -52,6 +52,16 @@
             <artifactId>qits-containers-driver</artifactId>
         </dependency>
         <dependency>
+            <!-- Annotations only, compile time: a nested wire record whose simple name another one
+                 already takes (ServiceDetail.Mount beside ContainerDetail.Mount) names its OpenAPI
+                 schema with @Schema(name = ...), as targets/'s TargetViews does, rather than
+                 publishing whichever one smallrye happened to find second as `Mount1`. The service
+                 brings the API at run time through quarkus-smallrye-openapi. -->
+            <groupId>org.eclipse.microprofile.openapi</groupId>
+            <artifactId>microprofile-openapi-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
         </dependency>

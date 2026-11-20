@@ -33,9 +33,9 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
  * the ones that happen to need it" is a list somebody has to reason about before adding to it.
  *
  * <p><b>Nested records are NOT automatic.</b> {@code DiskUsage.Entry}, {@code
- * ServiceDetail.NetworkAttachment}, {@code ContainerDetail.Mount}/{@code NetworkBinding} and
- * {@code TerminalView.Container} each have their own entry: registering the outer record does not
- * reach the types of its components.
+ * ServiceDetail.NetworkAttachment}/{@code Mount}, {@code ContainerDetail.Mount}/{@code
+ * NetworkBinding} and {@code TerminalView.Container} each have their own entry: registering the
+ * outer record does not reach the types of its components.
  *
  * <p>ADD A RESPONSE TYPE, ADD IT HERE, IN THE SAME COMMIT. {@code PackagedSurfaceIT} is what
  * catches a forgotten one, and only when run against the binary.
@@ -52,6 +52,7 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
       ServiceSummary.class,
       ServiceDetail.class,
       ServiceDetail.NetworkAttachment.class,
+      ServiceDetail.Mount.class,
       TaskSummary.class,
       ConfigSummary.class,
       ConfigDetail.class,

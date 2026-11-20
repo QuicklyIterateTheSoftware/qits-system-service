@@ -188,6 +188,22 @@ class GoldenMasterRecordingTest {
               null,
               Map.of()),
           get("getSwarmService", API + "/swarm/services/" + ProviderStates.SERVICE_ID),
+          call(
+              ProviderStates.A_SWARM_SERVICE_WITH_NO_TASKS,
+              "getSwarmService",
+              "GET",
+              API + "/swarm/services/{serviceId}",
+              200,
+              null,
+              Map.of()),
+          call(
+              ProviderStates.NO_SUCH_SWARM_SERVICE,
+              "getSwarmService",
+              "GET",
+              API + "/swarm/services/{serviceId}",
+              404,
+              null,
+              Map.of()),
           get("listSwarmConfigs", API + "/swarm/configs"),
           get("getSwarmConfig", API + "/swarm/configs/" + ProviderStates.CONFIG_ID),
           get("listSwarmSecrets", API + "/swarm/secrets"),
@@ -628,7 +644,9 @@ class GoldenMasterRecordingTest {
       body = JSON.readTree(text);
     }
     if (interaction.state().equals(STATE)
-        || interaction.state().equals(ProviderStates.A_SWARM_RUNNING_NO_SERVICES)) {
+        || interaction.state().equals(ProviderStates.A_SWARM_RUNNING_NO_SERVICES)
+        || interaction.state().equals(ProviderStates.A_SWARM_SERVICE_WITH_NO_TASKS)
+        || interaction.state().equals(ProviderStates.NO_SUCH_SWARM_SERVICE)) {
       // The swarm reads are the fake docker's captures, the same every run: nothing to freeze.
       return new Recorded(body, params, new Freezer());
     }
