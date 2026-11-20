@@ -72,6 +72,14 @@ public class ProviderStates {
    */
   public static final String A_SWARM_RUNNING_NO_SERVICES = "a swarm running no services";
 
+  /**
+   * A manager with no node on it: {@code docker node ls} prints nothing and exits 0, so the node
+   * list is {@code []}. A real manager always lists at least itself, so this never happens on a
+   * live swarm — it is the defensive empty answer a consumer must still render (qits-2346). Only
+   * the node listing differs; the fake docker reads a {@code no-nodes} file beside it.
+   */
+  public static final String A_SWARM_LISTING_NO_NODES = "a swarm listing no nodes";
+
   static final String NODE_ID = "iwbwrdui2z0n62kqcjfo1erwh";
 
   static final String SERVICE_ID = "dev-qits-artifacts";
@@ -300,6 +308,7 @@ public class ProviderStates {
     this.base = base;
     states.put(A_SINGLE_NODE_SWARM, ProviderStates::aSingleNodeSwarm);
     states.put(A_SWARM_RUNNING_NO_SERVICES, ProviderStates::aSwarmRunningNoServices);
+    states.put(A_SWARM_LISTING_NO_NODES, ProviderStates::aSwarmListingNoNodes);
     states.put(NO_TARGET, this::noTarget);
     states.put(A_DECLARED_TARGET, this::aDeclaredTarget);
     states.put(AN_UNREGISTERED_RUNNER, this::anUnregisteredRunner);
@@ -330,6 +339,7 @@ public class ProviderStates {
    */
   public void close() {
     servicesRunning(true);
+    nodesListed(true);
     if (runner != null) {
       runner.answering(null);
       runner.close();
@@ -351,8 +361,9 @@ public class ProviderStates {
       throw new IllegalArgumentException(
           "No provider state '" + state + "' — this provider answers for " + states.keySet());
     }
-    // Only the empty swarm turns the services off; every other state starts with them on.
+    // Only the empty-swarm states turn their marker off; every other state starts both on.
     servicesRunning(true);
+    nodesListed(true);
     return setup.get();
   }
 
@@ -380,21 +391,43 @@ public class ProviderStates {
     return new Setup(Map.of());
   }
 
+  private static Setup aSwarmListingNoNodes() {
+    nodesListed(false);
+    return new Setup(Map.of());
+  }
+
   /**
    * Whether the fake docker's {@code service ls} prints its services, or nothing at all. The file
    * sits beside the script, which every test in the run shares, so {@link #close} turns them back
    * on.
    */
   private static void servicesRunning(boolean running) {
-    Path marker = FakeDocker.directory().resolve("no-services");
+    marker("no-services", !running);
+  }
+
+  /**
+   * Whether the fake docker's {@code node ls} prints its nodes, or nothing at all. The file sits
+   * beside the script, which every test in the run shares, so {@link #close} turns them back on.
+   */
+  private static void nodesListed(boolean listed) {
+    marker("no-nodes", !listed);
+  }
+
+  /**
+   * Writes or removes a marker file beside the fake docker script, one of its scripted branches
+   * checks for. {@code present} writes it, which is what turns the empty answer on; {@link #close}
+   * and {@link #setUp} clear every marker, so a state never outlives the test that set it.
+   */
+  private static void marker(String name, boolean present) {
+    Path marker = FakeDocker.directory().resolve(name);
     try {
-      if (running) {
-        Files.deleteIfExists(marker);
-      } else {
+      if (present) {
         Files.writeString(marker, "");
+      } else {
+        Files.deleteIfExists(marker);
       }
     } catch (IOException e) {
-      throw new IllegalStateException("could not set the fake docker's services: " + marker, e);
+      throw new IllegalStateException("could not set the fake docker's marker: " + marker, e);
     }
   }
 
