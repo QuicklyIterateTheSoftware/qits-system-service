@@ -144,15 +144,27 @@ JSON
 JSON
         ;;
       inspect)
+        # dev-qits-idle is scaled to zero and mounts nothing: it answers inspect and ps but is not
+        # in `ls`, so the service list (and every recording of it) stays the two above.
+        if [ "$3" = "dev-qits-idle" ]; then
+          cat <<'JSON'
+[{"ID":"h7x2kq9m4v1c8p0d5w3n6e2rt","Version":{"Index":234420},"CreatedAt":"2026-08-18T02:40:11.204118733Z","UpdatedAt":"2026-08-23T12:30:02.512309871Z","Spec":{"Name":"dev-qits-idle","Labels":{"qits.platform.deployments.app-name":"qits-idle"},"TaskTemplate":{"ContainerSpec":{"Image":"registry.dev.localhost:8080/qits/qits-idle:5c0ffee","Env":["QITS_ENVIRONMENT=dev"]},"RestartPolicy":{"Condition":"any"}},"Mode":{"Replicated":{"Replicas":0}},"UpdateConfig":{"Parallelism":1,"FailureAction":"pause","Order":"stop-first"}},"Endpoint":{"Spec":{"Mode":"vip"},"VirtualIPs":[{"NetworkID":"mulnl3uqqi0hkr0yuutakpyed","Addr":"10.0.1.114/24"}]}}]
+JSON
+          exit 0
+        fi
         if [ "$3" != "dev-qits-artifacts" ]; then
           echo "Error: no such service: $3" >&2
           exit 1
         fi
         cat <<'JSON'
-[{"ID":"l2izhr0o4tjq34f7arurhgmm8","Version":{"Index":234413},"CreatedAt":"2026-08-18T02:32:15.775211499Z","UpdatedAt":"2026-08-23T12:27:33.349751944Z","Spec":{"Name":"dev-qits-artifacts","Labels":{"qits.platform.deployments.app-name":"qits-artifacts"},"TaskTemplate":{"ContainerSpec":{"Image":"registry.dev.localhost:8080/qits/qits-artifacts:09920e6","Env":["QITS_ENVIRONMENT=dev","QITS_RESOURCE_DB_PASSWORD=not-a-real-secret-scrubbed-for-the-fixture"],"Healthcheck":{"Test":["CMD-SHELL","curl -fsS localhost:8080/artifacts/q/health/ready"]}},"RestartPolicy":{"Condition":"any"}},"Mode":{"Replicated":{"Replicas":1}},"UpdateConfig":{"Parallelism":1,"FailureAction":"rollback","Order":"stop-first"}},"Endpoint":{"Spec":{"Mode":"vip"},"VirtualIPs":[{"NetworkID":"mulnl3uqqi0hkr0yuutakpyed","Addr":"10.0.1.110/24"}]}}]
+[{"ID":"l2izhr0o4tjq34f7arurhgmm8","Version":{"Index":234413},"CreatedAt":"2026-08-18T02:32:15.775211499Z","UpdatedAt":"2026-08-23T12:27:33.349751944Z","Spec":{"Name":"dev-qits-artifacts","Labels":{"qits.platform.deployments.app-name":"qits-artifacts"},"TaskTemplate":{"ContainerSpec":{"Image":"registry.dev.localhost:8080/qits/qits-artifacts:09920e6","Env":["QITS_ENVIRONMENT=dev","QITS_RESOURCE_DB_PASSWORD=not-a-real-secret-scrubbed-for-the-fixture"],"Healthcheck":{"Test":["CMD-SHELL","curl -fsS localhost:8080/artifacts/q/health/ready"]},"Mounts":[{"Type":"volume","Source":"dev-qits-artifacts-store","Target":"/data"},{"Type":"bind","Source":"/etc/qits/edge","Target":"/etc/qits/edge","ReadOnly":true}]},"RestartPolicy":{"Condition":"any"}},"Mode":{"Replicated":{"Replicas":1}},"UpdateConfig":{"Parallelism":1,"FailureAction":"rollback","Order":"stop-first"}},"Endpoint":{"Spec":{"Mode":"vip"},"VirtualIPs":[{"NetworkID":"mulnl3uqqi0hkr0yuutakpyed","Addr":"10.0.1.110/24"}]}}]
 JSON
         ;;
       ps)
+        # `service ps <ref> --no-trunc --format …`: a service scaled to zero has no task to print.
+        if [ "$3" = "dev-qits-idle" ]; then
+          exit 0
+        fi
         cat <<'JSON'
 {"CurrentState":"Running 4 hours ago","DesiredState":"Running","Error":"","ID":"abx4yo2tk0ls7z5z5t80pweo9","Image":"registry.dev.localhost:8080/qits/qits-artifacts:09920e6","Name":"dev-qits-artifacts.1","Node":"fake-host","Ports":""}
 {"CurrentState":"Failed 4 hours ago","DesiredState":"Shutdown","Error":"\"No such container: dev-qits-artifacts.1.n512nrfshfr8qfrm60sv4nyfo\"","ID":"n512nrfshfr8qfrm60sv4nyfo","Image":"registry.dev.localhost:8080/qits/qits-artifacts:09920e6","Name":"dev-qits-artifacts.1","Node":"fake-host","Ports":""}

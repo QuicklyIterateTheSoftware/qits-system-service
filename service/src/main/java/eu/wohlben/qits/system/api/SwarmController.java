@@ -17,6 +17,9 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import java.util.List;
 import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.media.Content;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 
 /**
  * The cluster-wide reads. These are answered by the swarm MANAGER this service runs on, so they
@@ -56,6 +59,14 @@ public class SwarmController {
   @GET
   @Path("/services/{id}")
   @Operation(operationId = "getSwarmService", summary = "Service")
+  @APIResponse(
+      responseCode = "200",
+      description = "OK",
+      content =
+          @Content(
+              mediaType = MediaType.APPLICATION_JSON,
+              schema = @Schema(implementation = ServiceDetail.class)))
+  @APIResponse(responseCode = "404", description = "No such service")
   public ServiceDetail service(@PathParam("id") String id) {
     return swarm.service(id);
   }

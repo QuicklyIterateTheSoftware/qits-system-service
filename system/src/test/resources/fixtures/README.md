@@ -15,6 +15,12 @@ holds no swarm configs or secrets, so these follow docker's documented shapes (t
 base64 in a config inspect, the `Driver` column a secret list carries and a config list does not).
 Replace them with a real capture the first time this runs against a platform that has some.
 
+One part of a captured file is hand-added, for the same reason: the captured
+`docker-service-inspect.json` mounted nothing, so its `Spec.TaskTemplate.ContainerSpec.Mounts` — a
+volume and a read-only bind (qits-2345) — follow docker's documented `Mount` shape (`Type`, `Source`,
+`Target`, `ReadOnly` omitted when false, `VolumeOptions` on a volume). Replace them with a capture of
+a service that mounts something.
+
 **Environment values are scrubbed.** `docker-container-inspect.json` and
 `docker-service-inspect.json` are real captures of live platform services, whose environment carried
 real database passwords and idp client secrets. Every value under a key matching

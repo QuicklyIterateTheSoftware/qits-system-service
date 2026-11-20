@@ -103,12 +103,43 @@ class SystemApiTest {
             .body("tasks[0].slot", Matchers.equalTo(1))
             .body("tasks[1].error", Matchers.containsString("No such container"))
             .body("envKeys", Matchers.hasItem("QITS_RESOURCE_DB_PASSWORD"))
+            .body("mounts", Matchers.hasSize(2))
+            .body("mounts[0].type", Matchers.equalTo("volume"))
+            .body("mounts[0].source", Matchers.equalTo("dev-qits-artifacts-store"))
+            .body("mounts[0].target", Matchers.equalTo("/data"))
+            .body("mounts[0].readOnly", Matchers.equalTo(false))
+            .body("mounts[1].type", Matchers.equalTo("bind"))
+            .body("mounts[1].readOnly", Matchers.equalTo(true))
             .extract()
             .asString();
 
     // The one assertion worth more than the rest: the fake service's env carries a value shaped
     // like a secret, and nothing this service answers may contain it.
     assertFalse(body.contains("not-a-real-secret"), "an environment VALUE reached the wire: " + body);
+  }
+
+  @Test
+  void aServiceScaledToZeroHasNoTasksAndNoMounts() {
+    given()
+        .when()
+        .get("/system/api/swarm/services/dev-qits-idle")
+        .then()
+        .statusCode(200)
+        .body("name", Matchers.equalTo("dev-qits-idle"))
+        .body("replicas", Matchers.equalTo("0/0"))
+        .body("tasks", Matchers.empty())
+        .body("mounts", Matchers.empty());
+  }
+
+  @Test
+  void anUnknownServiceIsA404WithAMessage() {
+    given()
+        .when()
+        .get("/system/api/swarm/services/no-such-service")
+        .then()
+        .statusCode(404)
+        .contentType(ContentType.JSON)
+        .body("message", Matchers.equalTo("no such service: no-such-service"));
   }
 
   @Test

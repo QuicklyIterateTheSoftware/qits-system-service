@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -82,6 +83,12 @@ class SwarmParsersTest {
         "qits-artifacts", service.labels().get("qits.platform.deployments.app-name"));
     assertEquals(1, service.networks().size());
     assertEquals("10.0.1.110/24", service.networks().get(0).address());
+    // ContainerSpec.Mounts, in the spec's order; an absent ReadOnly is docker's false.
+    assertEquals(
+        List.of(
+            new ServiceDetail.Mount("volume", "dev-qits-artifacts-store", "/data", false),
+            new ServiceDetail.Mount("bind", "/etc/qits/edge", "/etc/qits/edge", true)),
+        service.mounts());
 
     // THE POINT OF THIS TEST. The captured service is a real platform one whose environment
     // carried a database password; the fixture scrubbed it to a marker, and the marker must not
@@ -95,6 +102,21 @@ class SwarmParsersTest {
     assertFalse(
         service.toString().contains("not-a-real-secret"),
         "no environment VALUE may reach the wire");
+  }
+
+  @Test
+  void aServiceThatMountsNothingHasNoMounts() throws Exception {
+    ServiceDetail service =
+        ServiceDetail.from(
+            new ObjectMapper()
+                .readTree(
+                    "{\"Spec\":{\"Name\":\"dev-qits-idle\",\"TaskTemplate\":{\"ContainerSpec\":{}},"
+                        + "\"Mode\":{\"Replicated\":{\"Replicas\":0}}}}"),
+            List.of());
+
+    assertEquals(List.of(), service.mounts());
+    assertEquals("0/0", service.replicas());
+    assertEquals(List.of(), service.tasks());
   }
 
   @Test

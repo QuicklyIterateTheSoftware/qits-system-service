@@ -20,6 +20,20 @@
       "address": "10.0.1.110/24"
     }
   ],
+  "mounts": [
+    {
+      "type": "volume",
+      "source": "dev-qits-artifacts-store",
+      "target": "/data",
+      "readOnly": false
+    },
+    {
+      "type": "bind",
+      "source": "/etc/qits/edge",
+      "target": "/etc/qits/edge",
+      "readOnly": true
+    }
+  ],
   "updateOrder": "stop-first",
   "updateParallelism": 1,
   "updateFailureAction": "rollback",

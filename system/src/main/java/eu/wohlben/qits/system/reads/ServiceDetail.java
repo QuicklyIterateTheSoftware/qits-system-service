@@ -3,6 +3,7 @@ package eu.wohlben.qits.system.reads;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
 import java.util.Map;
+import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
 /**
  * One service, from `docker service inspect`, with its tasks alongside.
@@ -18,6 +19,8 @@ import java.util.Map;
  * {@link Json#envKeys}.
  *
  * @param networks the attached networks, as swarm records them — an id and this service's VIP on it
+ * @param mounts what the service's containers mount, as its spec declares it — a volume, a bind or
+ *     a tmpfs, where from and where to, and whether read-only; empty when it mounts nothing
  */
 public record ServiceDetail(
     String id,
@@ -31,6 +34,7 @@ public record ServiceDetail(
     Map<String, String> labels,
     List<String> envKeys,
     List<NetworkAttachment> networks,
+    List<Mount> mounts,
     String updateOrder,
     int updateParallelism,
     String updateFailureAction,
@@ -41,6 +45,14 @@ public record ServiceDetail(
   /** A network this service is on, and the virtual address it answers on there. */
   public record NetworkAttachment(String networkId, String address) {}
 
+  /**
+   * One mount of the service's containers: its type in docker's words ({@code volume}, {@code bind},
+   * {@code tmpfs}, …), the volume name or host path it comes from, the path it lands on, and whether
+   * it is read-only — false when the spec says nothing, which is docker's own default.
+   */
+  @Schema(name = "ServiceMount")
+  public record Mount(String type, String source, String target, boolean readOnly) {}
+
   public static ServiceDetail from(JsonNode node, List<TaskSummary> tasks) {
     JsonNode spec = Json.at(node, "Spec");
     JsonNode container = Json.at(spec, "TaskTemplate", "ContainerSpec");
@@ -50,6 +62,16 @@ public record ServiceDetail(
     List<NetworkAttachment> networks =
         Json.nodes(node, "Endpoint", "VirtualIPs").stream()
             .map(vip -> new NetworkAttachment(Json.text(vip, "NetworkID"), Json.text(vip, "Addr")))
+            .toList();
+    List<Mount> mounts =
+        Json.nodes(container, "Mounts").stream()
+            .map(
+                mount ->
+                    new Mount(
+                        Json.text(mount, "Type"),
+                        Json.text(mount, "Source"),
+                        Json.text(mount, "Target"),
+                        Json.boolAt(mount, "ReadOnly")))
             .toList();
     return new ServiceDetail(
         Json.text(node, "ID"),
@@ -65,6 +87,7 @@ public record ServiceDetail(
         Json.map(spec, "Labels"),
         Json.envKeys(container, "Env"),
         networks,
+        mounts,
         Json.textAt(spec, "UpdateConfig", "Order"),
         Json.intAt(spec, "UpdateConfig", "Parallelism"),
         Json.textAt(spec, "UpdateConfig", "FailureAction"),

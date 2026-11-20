@@ -1523,6 +1523,29 @@
       ]
     },
     {
+      "name": "a swarm service with no tasks",
+      "slug": "a-swarm-service-with-no-tasks",
+      "params": {
+        "serviceId": "dev-qits-idle"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getSwarmService",
+          "method": "GET",
+          "path": "/system/api/swarm/services/{serviceId}",
+          "status": 200,
+          "file": "a-swarm-service-with-no-tasks/getSwarmService.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "an open exec terminal",
       "slug": "an-open-exec-terminal",
       "params": {
@@ -1732,6 +1755,29 @@
             "instants": [
               "$.purgeRequestedAt"
             ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "no such swarm service",
+      "slug": "no-such-swarm-service",
+      "params": {
+        "serviceId": "no-such-service"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getSwarmService",
+          "method": "GET",
+          "path": "/system/api/swarm/services/{serviceId}",
+          "status": 404,
+          "file": "no-such-swarm-service/getSwarmService.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
             "strings": [],
             "listFilteredTo": null
           }

@@ -717,6 +717,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/NetworkAttachment"
+        mounts:
+          type: array
+          items:
+            $ref: "#/components/schemas/ServiceMount"
         updateOrder:
           type: string
         updateParallelism:
@@ -734,6 +738,17 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/TaskSummary"
+    ServiceMount:
+      type: object
+      properties:
+        type:
+          type: string
+        source:
+          type: string
+        target:
+          type: string
+        readOnly:
+          type: boolean
     ServiceSummary:
       type: object
       properties:
@@ -1800,6 +1815,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ServiceDetail"
+        "404":
+          description: No such service
         "401":
           description: Not Authorized
         "403":
