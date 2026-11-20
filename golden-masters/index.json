@@ -1481,6 +1481,27 @@
       ]
     },
     {
+      "name": "a swarm listing no nodes",
+      "slug": "a-swarm-listing-no-nodes",
+      "params": {},
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listSwarmNodes",
+          "method": "GET",
+          "path": "/system/api/swarm/nodes",
+          "status": 200,
+          "file": "a-swarm-listing-no-nodes/listSwarmNodes.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a swarm running no services",
       "slug": "a-swarm-running-no-services",
       "params": {},

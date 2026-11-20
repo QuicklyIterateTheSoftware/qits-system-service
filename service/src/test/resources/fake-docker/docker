@@ -111,6 +111,11 @@ JSON
   node)
     case "$2" in
       ls)
+        # A swarm listing no nodes prints nothing and exits 0, which is what docker does. A
+        # state that wants one writes this file (ProviderStates.A_SWARM_LISTING_NO_NODES).
+        if [ -f "$here/no-nodes" ]; then
+          exit 0
+        fi
         echo '{"Availability":"Active","EngineVersion":"29.7.2","Hostname":"fake-host","ID":"iwbwrdui2z0n62kqcjfo1erwh","ManagerStatus":"Leader","Self":true,"Status":"Ready","TLSStatus":"Ready"}'
         ;;
       inspect)
