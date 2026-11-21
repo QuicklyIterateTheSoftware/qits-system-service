@@ -336,7 +336,8 @@ DESK, lease's image first), `registry-mirrors.{registry-hosts,mirror-hosts,
 upstreams}`, `runner-version-override`, `reconnect-grace=PT2M`, `commission-reconcile-interval=1h`,
 `public-url` (wss base), `estate-interval=PT1M`, `node-memory-reserve=2g` (qits-2362: a target's lease capacity is min(memoryMaxBytes, memoryTotalBytes) less this), `healthcheck.schedule`, `healthcheck.timeout=PT5M`,
 `dialback.threshold=3` and `dialback.cooloff=PT30M` (qits-1809: that many RUNNING CI leases in a row
-ended `never-dialled-back` quarantine the target, and the gating `dialback` check holds it for the
+ended `never-dialled-back` — or CI leases that ran and EXITED before that end, qits-2382 — quarantine
+the target, and the gating `dialback` check holds it for the
 cool-off; a GRANTED CI lease its runner reports FAILED, one it could not start at all, counts in the
 same streak, qits-525, so a target that cannot start CI leases is quarantined with a `start:` reason
 instead of being granted run after run to fail),

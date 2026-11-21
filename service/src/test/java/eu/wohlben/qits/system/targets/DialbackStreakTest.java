@@ -35,7 +35,8 @@ import org.junit.jupiter.api.Test;
  * The dial-back streak (qits-1809): an owner's end of a RUNNING CI lease with {@code
  * never-dialled-back} counts on its target, any other end of one resets the count, three in a row
  * quarantine the target, and a greenlight resets it. A GRANTED CI lease its runner reports FAILED
- * counts in the same streak (qits-525).
+ * counts in the same streak (qits-525), and so does an owner's {@code never-dialled-back} end of a
+ * CI lease that ran and then EXITED (qits-2382).
  */
 @QuarkusTest
 class DialbackStreakTest {
@@ -272,6 +273,60 @@ class DialbackStreakTest {
       assertTrue(row.quarantined());
       assertEquals(row.quarantineReason, told.reason());
     }
+  }
+
+  /**
+   * A CI lease its runner started and then reported EXITED with {@code 3} — its ci daemon gave up
+   * dialling back — through the inventory, as a real one gets there: RUNNING stamps {@code
+   * started_at}.
+   */
+  private UUID ranThenExited(String ownerRef) {
+    UUID id = granted(SlotType.CI, ownerRef);
+    leases.applyInventory(target, List.of(new Leases.Held(id, "RUNNING", null, null, null)));
+    leases.applyInventory(
+        target, List.of(new Leases.Held(id, "EXITED", null, 3, "the ci daemon exited")));
+    Lease exited = TargetRows.reload(id);
+    assertEquals(LeaseState.EXITED, exited.state);
+    assertNotNull(exited.startedAt);
+    return id;
+  }
+
+  @Test
+  void threeCiLeasesThatRanAndExitedThenEndedNeverDialledBackQuarantineTheTarget() {
+    end(ranThenExited("run-1"), "never-dialled-back");
+    end(ranThenExited("run-2"), "never-dialled-back");
+    assertEquals(2, TargetRows.reloadTarget(target).dialbackFailures);
+    assertFalse(TargetRows.reloadTarget(target).quarantined(), "two are below the threshold");
+    UUID last = ranThenExited("run-3");
+    end(last, "never-dialled-back");
+    Target row = TargetRows.reloadTarget(target);
+    assertEquals(3, row.dialbackFailures);
+    assertTrue(row.quarantined());
+    assertEquals(
+        "dial-back: 3 CI leases in a row never dialled back their ci daemon; last lease "
+            + last
+            + " (run-3)",
+        row.quarantineReason);
+    assertEquals(LeaseState.ENDED, TargetRows.reload(last).state);
+  }
+
+  @Test
+  void aFailedCiLeaseEndedNeverDialledBackIsNotCountedAgain() {
+    UUID failed = granted(SlotType.CI, "run-1");
+    failedToStart(failed);
+    assertEquals(1, TargetRows.reloadTarget(target).dialbackFailures);
+    end(failed, "never-dialled-back");
+    assertEquals(LeaseState.ENDED, TargetRows.reload(failed).state);
+    assertEquals(1, TargetRows.reloadTarget(target).dialbackFailures);
+  }
+
+  @Test
+  void aCiLeaseThatRanAndExitedEndedWithoutTheReasonLeavesTheCountAlone() {
+    end(running("run-1"), "never-dialled-back");
+    end(ranThenExited("run-2"), null);
+    assertEquals(1, TargetRows.reloadTarget(target).dialbackFailures, "neither counts nor resets");
+    end(ranThenExited("run-3"), "cancelled");
+    assertEquals(1, TargetRows.reloadTarget(target).dialbackFailures, "another reason neither");
   }
 
   /** Sets the streak directly, for the socket test's health checks. */
