@@ -169,6 +169,38 @@ class SwarmParsersTest {
   }
 
   @Test
+  void aSecretIsUsedByTheServicesWhoseSpecReferencesIt() throws Exception {
+    var mapper = new ObjectMapper();
+    var secret = Fixtures.lines("docker-secret-ls.jsonl").get(0);
+    // The usage template's lines: name and secret references, nothing else of a spec. One service
+    // references by id, one by name alone, one an older secret of the same name (another id), one
+    // nothing at all.
+    List<com.fasterxml.jackson.databind.JsonNode> services =
+        List.of(
+            mapper.readTree(
+                "{\"name\":\"dev-qits-ci\",\"secrets\":[{\"SecretID\":\""
+                    + secret.get("ID").asText()
+                    + "\",\"SecretName\":\"renamed\"}]}"),
+            mapper.readTree(
+                "{\"name\":\"dev-qits-artifacts\",\"secrets\":[{\"SecretName\":\""
+                    + secret.get("Name").asText()
+                    + "\"},{\"SecretID\":\"other\",\"SecretName\":\"other\"}]}"),
+            mapper.readTree(
+                "{\"name\":\"dev-qits-stale\",\"secrets\":[{\"SecretID\":\"an-older-one\","
+                    + "\"SecretName\":\""
+                    + secret.get("Name").asText()
+                    + "\"}]}"),
+            mapper.readTree("{\"name\":\"dev-qits-idle\",\"secrets\":null}"));
+
+    SecretSummary used = SecretSummary.from(secret, services);
+    // Sorted, each service once; the stale reference names a secret that is not this one.
+    assertEquals(List.of("dev-qits-artifacts", "dev-qits-ci"), used.usedBy());
+
+    assertEquals(List.of(), SecretSummary.from(secret).usedBy());
+    assertEquals(List.of(), SecretSummary.from(secret, List.of(services.get(3))).usedBy());
+  }
+
+  @Test
   void aBinaryConfigSaysSoRatherThanReturningMojibake() {
     // 0xFF 0xFE is not valid UTF-8; a decode would answer replacement characters and call them
     // the config.
