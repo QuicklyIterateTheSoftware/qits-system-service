@@ -100,6 +100,11 @@ record SuiteTargetsConfig(String idpUrl, String clientId, String secret) impleme
   }
 
   @Override
+  public String nodeMemoryReserve() {
+    return "2g";
+  }
+
+  @Override
   public Healthcheck healthcheck() {
     return new Healthcheck() {
       @Override

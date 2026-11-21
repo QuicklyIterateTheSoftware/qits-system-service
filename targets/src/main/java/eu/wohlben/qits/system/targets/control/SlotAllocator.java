@@ -37,12 +37,32 @@ import java.util.UUID;
  * type may not take stay shared for the others. The door keeps {@code m[t] ≥ r[t]}; one above
  * {@code T} is harmless.
  *
+ * <p><b>Memory is one more conjunct</b> (qits-2362). A target that reports its memory has a capacity
+ * {@code C} — its {@code memory_max_bytes} less {@code qits.system.targets.node-memory-reserve} — and
+ * every lease is charged its {@code spec.limits.memory} ({@link DockerSizes#charge}). With {@code
+ * M} the charges of the target's GRANTED, RUNNING and ENDING leases of every type, and {@code c[u]}
+ * the charge of the most recently granted lease of type {@code u} there (0 if none ever was), a
+ * lease of type {@code t} charged {@code c} also needs
+ *
+ * <pre>
+ *   C unknown  or  M + Σ_{u ≠ t} max(0, r[u] − n[u]) × c[u] + c ≤ C
+ * </pre>
+ *
+ * — the memory the other types' unused reservations would need stays free for them, priced at what
+ * their last lease here asked for. That term is ignored when the reservations are ignored in slots
+ * ({@code Σ r > T}), and likewise when they cannot be met in memory: {@code Σ_u r[u] × c[u] > C},
+ * what they would hold with every type at zero use, is more than the target has (ws-proof: ci 2 and
+ * workspace 1 at 6g is 18 GiB against 14). Then only {@code M + c ≤ C} holds, and the reservations
+ * still apply as slots. A target that reports no memory is held to the slot rule alone. A lease the slots of
+ * some target would take but whose memory none can hold waits with {@code no target has memory for
+ * a 6g WORKSPACE lease}.
+ *
  * <p><b>The order.</b> One queue across types, {@code priority desc, requested_at asc} (the lease id
  * breaks a tie, so a pass is deterministic). Each lease is considered on its own: one that cannot be
  * placed does not hold back the ones behind it. A lease pinned to a target — by {@code
  * pin_target_id} or by its work volume — is considered on that target only; any other goes to the
- * target with the most free slots, ties broken by name. Every grant counts at once, so one pass
- * never over-fills a target.
+ * target with the most free slots, ties broken by name. Every grant counts at once — its slot, its
+ * charge and its type's last charge — so one pass never over-fills a target.
  *
  * <p><b>Who gets nothing.</b> A target that is not available (quarantined, or no connection) is never
  * granted anything. A WORKSPACE or DESK lease is granted only on a target that is signed in (either
@@ -63,12 +83,29 @@ public final class SlotAllocator {
       Map<SlotType, Integer> used,
       boolean connected,
       boolean quarantined,
-      boolean signedIn) {
+      boolean signedIn,
+      Memory memory) {
 
     public TargetSlots {
       reservations = counts(reservations);
       maximums = ceilings(maximums);
       used = counts(used);
+      memory = memory == null ? Memory.UNKNOWN : memory;
+    }
+
+    /** A target that reports no memory: the slot rule alone. */
+    public TargetSlots(
+        UUID id,
+        String name,
+        int total,
+        Map<SlotType, Integer> reservations,
+        Map<SlotType, Integer> maximums,
+        Map<SlotType, Integer> used,
+        boolean connected,
+        boolean quarantined,
+        boolean signedIn) {
+      this(
+          id, name, total, reservations, maximums, used, connected, quarantined, signedIn, null);
     }
 
     /** A target with no maximums. */
@@ -81,7 +118,13 @@ public final class SlotAllocator {
         boolean connected,
         boolean quarantined,
         boolean signedIn) {
-      this(id, name, total, reservations, null, used, connected, quarantined, signedIn);
+      this(id, name, total, reservations, null, used, connected, quarantined, signedIn, null);
+    }
+
+    /** The same target with {@code memory}. */
+    public TargetSlots withMemory(Memory memory) {
+      return new TargetSlots(
+          id, name, total, reservations, maximums, used, connected, quarantined, signedIn, memory);
     }
 
     public int usedTotal() {
@@ -96,17 +139,83 @@ public final class SlotAllocator {
       return connected && !quarantined;
     }
 
-    TargetSlots plus(SlotType type) {
+    TargetSlots plus(SlotType type, long chargeBytes) {
       Map<SlotType, Integer> next = new EnumMap<>(used);
       next.merge(type, 1, Integer::sum);
       return new TargetSlots(
-          id, name, total, reservations, maximums, next, connected, quarantined, signedIn);
+          id,
+          name,
+          total,
+          reservations,
+          maximums,
+          next,
+          connected,
+          quarantined,
+          signedIn,
+          memory.plus(type, chargeBytes));
     }
   }
 
-  /** A queued lease. {@code pinnedTo} is its pin or its work volume's target, else null. */
+  /**
+   * A target's memory as this pass sees it (qits-2362). {@code capacityBytes} is null when the
+   * target reports none — no memory check at all; {@code committedBytes} the charges of its
+   * GRANTED, RUNNING and ENDING leases; {@code lastCharge} the charge of the most recently granted
+   * lease of each type there, 0 for a type never granted.
+   */
+  public record Memory(Long capacityBytes, long committedBytes, Map<SlotType, Long> lastCharge) {
+
+    /** No memory reported: the slot rule alone. */
+    public static final Memory UNKNOWN = new Memory(null, 0, null);
+
+    public Memory {
+      committedBytes = Math.max(0, committedBytes);
+      Map<SlotType, Long> charges = new EnumMap<>(SlotType.class);
+      for (SlotType type : SlotType.values()) {
+        Long value = lastCharge == null ? null : lastCharge.get(type);
+        charges.put(type, value == null ? 0L : Math.max(0L, value));
+      }
+      lastCharge = charges;
+    }
+
+    /**
+     * The capacity of a node whose figures are {@code figures}: the smallest that is known, less
+     * {@code reserveBytes}, never below 0; null when none is known. Today the one figure is {@code
+     * memory_max_bytes} (the node's root {@code memory.max}); a later MemTotal is one more argument.
+     */
+    public static Long capacity(long reserveBytes, Long... figures) {
+      Long smallest = null;
+      for (Long figure : figures) {
+        if (figure != null && (smallest == null || figure < smallest)) {
+          smallest = figure;
+        }
+      }
+      return smallest == null ? null : Math.max(0L, smallest - Math.max(0L, reserveBytes));
+    }
+
+    Memory plus(SlotType type, long chargeBytes) {
+      Map<SlotType, Long> next = new EnumMap<>(lastCharge);
+      next.put(type, Math.max(0L, chargeBytes));
+      return new Memory(capacityBytes, committedBytes + Math.max(0L, chargeBytes), next);
+    }
+  }
+
+  /**
+   * A queued lease. {@code pinnedTo} is its pin or its work volume's target, else null; {@code
+   * chargeBytes} its {@code spec.limits.memory} ({@link DockerSizes#charge}).
+   */
   public record Request(
-      UUID leaseId, SlotType type, int priority, Instant requestedAt, UUID pinnedTo) {}
+      UUID leaseId,
+      SlotType type,
+      int priority,
+      Instant requestedAt,
+      UUID pinnedTo,
+      long chargeBytes) {
+
+    /** A lease charged nothing. */
+    public Request(UUID leaseId, SlotType type, int priority, Instant requestedAt, UUID pinnedTo) {
+      this(leaseId, type, priority, requestedAt, pinnedTo, 0);
+    }
+  }
 
   /** What became of one request: a target, or null and why it waits. */
   public record Decision(UUID leaseId, UUID targetId, String detail) {
@@ -135,7 +244,7 @@ public final class SlotAllocator {
     for (Request request : ordered) {
       Decision decision = decide(state, request);
       if (decision.granted()) {
-        state.computeIfPresent(decision.targetId(), (id, target) -> target.plus(request.type()));
+        state.computeIfPresent(decision.targetId(), (id, target) -> target.plus(request.type(), request.chargeBytes()));
       }
       decisions.add(decision);
     }
@@ -148,15 +257,20 @@ public final class SlotAllocator {
       if (pinned == null) {
         return new Decision(request.leaseId(), null, "the target it is pinned to is gone");
       }
-      String refusal = refusal(pinned, request.type());
+      String refusal = refusal(pinned, request.type(), request.chargeBytes());
       return refusal == null
           ? new Decision(request.leaseId(), pinned.id(), null)
           : new Decision(request.leaseId(), null, refusal);
     }
     TargetSlots best = null;
     TargetSlots signedOut = null;
+    boolean memoryShort = false;
     for (TargetSlots target : state.values()) {
-      if (!target.available() || !fits(target, request.type())) {
+      if (!target.available() || !slotsFit(target, request.type())) {
+        continue;
+      }
+      if (!memoryFits(target, request.type(), request.chargeBytes())) {
+        memoryShort = true;
         continue;
       }
       if (request.type().needsSignIn() && !target.signedIn()) {
@@ -175,12 +289,21 @@ public final class SlotAllocator {
     if (signedOut != null) {
       return new Decision(request.leaseId(), null, notSignedIn(signedOut.name()));
     }
+    if (memoryShort) {
+      return new Decision(
+          request.leaseId(),
+          null,
+          "no target has memory for " + sized(request.type(), request.chargeBytes()));
+    }
     return new Decision(
         request.leaseId(), null, "no target has a free " + request.type().name() + " slot");
   }
 
-  /** Why {@code target} would not take a lease of {@code type} now; null when it would. */
-  static String refusal(TargetSlots target, SlotType type) {
+  /**
+   * Why {@code target} would not take a lease of {@code type} charged {@code chargeBytes} now; null
+   * when it would.
+   */
+  static String refusal(TargetSlots target, SlotType type, long chargeBytes) {
     if (target.quarantined()) {
       return "target " + target.name() + " is quarantined";
     }
@@ -196,8 +319,11 @@ public final class SlotAllocator {
           + type.name()
           + " lease(s)";
     }
-    if (!fits(target, type)) {
+    if (!slotsFit(target, type)) {
       return "target " + target.name() + " has no free " + type.name() + " slot";
+    }
+    if (!memoryFits(target, type, chargeBytes)) {
+      return "target " + target.name() + " has no memory for " + sized(type, chargeBytes);
     }
     if (type.needsSignIn() && !target.signedIn()) {
       return notSignedIn(target.name());
@@ -213,9 +339,68 @@ public final class SlotAllocator {
         + targetName;
   }
 
-  /** The rule, see the class javadoc. */
+  /** {@code a 6g WORKSPACE lease}, or {@code a WORKSPACE lease} when it is charged nothing. */
+  private static String sized(SlotType type, long chargeBytes) {
+    return chargeBytes > 0
+        ? "a " + DockerSizes.format(chargeBytes) + " " + type.name() + " lease"
+        : "a " + type.name() + " lease";
+  }
+
+  /** The whole rule, see the class javadoc, for a lease charged {@code chargeBytes}. */
+  public static boolean fits(TargetSlots target, SlotType type, long chargeBytes) {
+    return slotsFit(target, type) && memoryFits(target, type, chargeBytes);
+  }
+
+  /** The whole rule for a lease charged nothing. */
   public static boolean fits(TargetSlots target, SlotType type) {
+    return fits(target, type, 0);
+  }
+
+  /** The slot rule alone. */
+  public static boolean slotsFit(TargetSlots target, SlotType type) {
     return fits(target.total(), target.reservations(), target.maximums(), target.used(), type);
+  }
+
+  /**
+   * The memory conjunct (qits-2362): {@code C} unknown, or {@code M + Σ_{u≠t} max(0, r[u] − n[u]) ×
+   * c[u] + c ≤ C}, the reserved term dropped when the reservations are ignored, in slots or in
+   * memory ({@link #reservationsExceedMemory}).
+   */
+  public static boolean memoryFits(TargetSlots target, SlotType type, long chargeBytes) {
+    Memory memory = target.memory();
+    if (memory.capacityBytes() == null) {
+      return true;
+    }
+    long needed = memory.committedBytes() + Math.max(0L, chargeBytes);
+    if (!reservationsExceedTotal(target.total(), target.reservations())
+        && !reservationsExceedMemory(target)) {
+      for (SlotType u : SlotType.values()) {
+        if (u != type) {
+          int reserved = target.reservations().getOrDefault(u, 0);
+          int unused = Math.max(0, reserved - target.used().getOrDefault(u, 0));
+          needed += unused * memory.lastCharge().getOrDefault(u, 0L);
+        }
+      }
+    }
+    return needed <= memory.capacityBytes();
+  }
+
+  /**
+   * {@code Σ_u r[u] × c[u] > C}: what the reservations would hold in memory with every type at zero
+   * use is more than the target has, so in memory they are ignored — the memory twin of {@link
+   * #reservationsExceedTotal}. They still hold as slots. False when the capacity is unknown.
+   */
+  public static boolean reservationsExceedMemory(TargetSlots target) {
+    Long capacity = target.memory().capacityBytes();
+    if (capacity == null) {
+      return false;
+    }
+    long held = 0;
+    for (SlotType u : SlotType.values()) {
+      long price = target.memory().lastCharge().getOrDefault(u, 0L);
+      held += target.reservations().getOrDefault(u, 0) * price;
+    }
+    return held > capacity;
   }
 
   /** The rule over bare numbers, with no maximums. */

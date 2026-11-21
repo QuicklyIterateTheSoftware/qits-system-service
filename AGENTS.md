@@ -47,7 +47,8 @@ its schedules in it; `service/` discovers them through the jar's jandex index. T
                flyway db/system/migration
     control/   SlotAllocator (pure), TargetAllocation (runs it, writes grants, builds estates),
                Targets, Leases, WorkVolumes, OwnerIdentity, LeaseSpecs, TargetEvents, TargetsConfig,
-               LeaseEndingDeadline, TargetAuditLog, DockerRedaction (pure), WarmImages
+               LeaseEndingDeadline, TargetAuditLog, DockerRedaction (pure), WarmImages,
+               DockerSizes (pure)
     api/       TargetController (/targets), LeaseController (/leases), WorkVolumeController,
                TargetDockerController (/targets/{id}/docker), LeaseLogsController
                (/leases/{id}/logs), DockerDoor (their audit and status mapping)
@@ -66,7 +67,17 @@ requested_at asc`, pins considered on their target only, the most free slots the
 for a quarantined or disconnected target, and the sign-in gate for WORKSPACE and DESK. A
 reservation holds slots for one type; it is not a limit, so a type may use more while shared
 slots are free. A maximum (qits-1813) is the limit, per type and optional: null is no ceiling, and
-the patch door keeps it at or above its type's reservation. Change it in
+the patch door keeps it at or above its type's reservation. Memory is one more conjunct (qits-2362):
+`C unknown or M + Σ_{u≠t} max(0, r[u] − n[u]) × c[u] + c ≤ C`, where `C` is the target's
+`memory_max_bytes` less `qits.system.targets.node-memory-reserve` (2g; null `memory_max_bytes` is no
+memory check), `M` the `spec.limits.memory` charges (`DockerSizes`) of its GRANTED, RUNNING and ENDING
+leases, `c[u]` the charge of the newest lease of type `u` granted there (0 if none), `c` the
+candidate's (0 without a limit; `memorySwap` is never charged), and the reserved term dropped when the
+reservations are ignored as slots (`Σ r > T`) or cannot be met in memory (`Σ_u r[u] × c[u] > C`,
+`SlotAllocator.reservationsExceedMemory`; they still apply as slots). `TargetAllocation` reads those from the rows; `SlotAllocator.Memory.capacity` takes
+the min of every known figure, so a later MemTotal is one more argument. At 6g a lease, ws-proof
+(16 GiB − 2 GiB = 14 GiB) runs any two 6g leases of either type: its reservations (ci 2, workspace 1:
+18 GiB) cannot be met in memory, so they are ignored there and hold only as slots. Change it in
 `TargetAllocatorTest` first: the dossier's worked example is the first table there.
 
 **`login` and `slots` are reported, never a quarantine** (`TargetHealth.REPORT_ONLY`). They fail

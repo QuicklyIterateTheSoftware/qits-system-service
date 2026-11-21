@@ -379,6 +379,238 @@ class TargetAllocatorTest {
             .count());
   }
 
+  // --- memory (qits-2362): one more conjunct ----------------------------------------------------
+
+  private static final long GIB = 1024L * 1024 * 1024;
+
+  private static final long SIX_G = 6 * GIB;
+
+  /** Every type last granted at 6g. */
+  private static Map<SlotType, Long> lastAtSixG() {
+    Map<SlotType, Long> last = new EnumMap<>(SlotType.class);
+    for (SlotType type : SlotType.values()) {
+      last.put(type, SIX_G);
+    }
+    return last;
+  }
+
+  /** ws-proof's slots (T=8, ci 2/ws 1) with {@code used} and a memory picture. */
+  private static TargetSlots wsProofMemory(
+      Map<SlotType, Integer> used, Long capacity, long committed, Map<SlotType, Long> last) {
+    return new TargetSlots(
+        A,
+        "ws-proof",
+        8,
+        counts(2, 1, 0),
+        null,
+        used,
+        true,
+        false,
+        true,
+        new SlotAllocator.Memory(capacity, committed, last));
+  }
+
+  private static Request charged(SlotType type, int secondsAfter, long charge) {
+    return new Request(UUID.randomUUID(), type, 0, T0.plusSeconds(secondsAfter), null, charge);
+  }
+
+  @Test
+  void theReproductionAFifthSixGWorkspaceIsRefused() {
+    // ws-proof as it OOMed: ci 2 and ws 4 running at 6g each (36 GiB) on 16 GiB − 2 GiB. The slots
+    // alone would take a fifth workspace (6 + 1 + 0 ≤ 8); its memory would not.
+    long capacity = SlotAllocator.Memory.capacity(2 * GIB, 16 * GIB);
+    assertEquals(14 * GIB, capacity);
+    TargetSlots target = wsProofMemory(counts(2, 4, 0), capacity, 6 * SIX_G, lastAtSixG());
+    assertTrue(SlotAllocator.slotsFit(target, SlotType.WORKSPACE));
+    assertFalse(SlotAllocator.fits(target, SlotType.WORKSPACE, SIX_G));
+    Decision decision =
+        SlotAllocator.allocate(List.of(target), List.of(charged(SlotType.WORKSPACE, 0, SIX_G)))
+            .get(0);
+    assertFalse(decision.granted());
+    assertEquals("no target has memory for a 6g WORKSPACE lease", decision.detail());
+    Request pinned = new Request(UUID.randomUUID(), SlotType.WORKSPACE, 0, T0, A, SIX_G);
+    assertEquals(
+        "target ws-proof has no memory for a 6g WORKSPACE lease",
+        SlotAllocator.allocate(List.of(target), List.of(pinned)).get(0).detail());
+  }
+
+  @Test
+  void aLeaseFitsWhenTheMemoryHasRoom() {
+    // ci 2 running (12 GiB), 32 GiB capacity, the workspace reservation priced at 6g: 12 + 6 + 6.
+    TargetSlots target = wsProofMemory(counts(2, 0, 0), 32 * GIB, 2 * SIX_G, lastAtSixG());
+    assertTrue(SlotAllocator.fits(target, SlotType.WORKSPACE, SIX_G));
+    assertTrue(SlotAllocator.fits(target, SlotType.CI, SIX_G));
+    assertEquals(
+        A,
+        SlotAllocator.allocate(List.of(target), List.of(charged(SlotType.WORKSPACE, 0, SIX_G)))
+            .get(0)
+            .targetId());
+  }
+
+  @Test
+  void theOtherTypesUnusedReservationsHoldTheirMemory() {
+    // 20 GiB, nothing running: a workspace must leave 2 × 6g for ci's reservation (6 + 12 = 18).
+    TargetSlots empty = wsProofMemory(counts(0, 0, 0), 20 * GIB, 0, lastAtSixG());
+    assertTrue(SlotAllocator.fits(empty, SlotType.WORKSPACE, SIX_G));
+    // One workspace runs: a second needs 6 + 12 + 6 = 24 > 20, though its slots are free.
+    TargetSlots oneWs = wsProofMemory(counts(0, 1, 0), 20 * GIB, SIX_G, lastAtSixG());
+    assertTrue(SlotAllocator.slotsFit(oneWs, SlotType.WORKSPACE));
+    assertFalse(SlotAllocator.fits(oneWs, SlotType.WORKSPACE, SIX_G));
+    // ... while ci, whose own reservation is not held against it, still gets 6 + 0 + 6 = 12.
+    assertTrue(SlotAllocator.fits(oneWs, SlotType.CI, SIX_G));
+    // A type never granted here is priced at 0: no reservation is held in memory for it.
+    TargetSlots neverCi =
+        wsProofMemory(counts(0, 1, 0), 20 * GIB, SIX_G, Map.of(SlotType.WORKSPACE, SIX_G));
+    assertTrue(SlotAllocator.fits(neverCi, SlotType.WORKSPACE, SIX_G));
+  }
+
+  @Test
+  void theReservedMemoryIsIgnoredWithTheReservations() {
+    // Reservations 2+2+1 = 5 against a total of 4 are ignored, and so is their memory.
+    TargetSlots shrunk =
+        new TargetSlots(
+            A,
+            "alpha",
+            4,
+            counts(2, 2, 1),
+            null,
+            counts(0, 0, 0),
+            true,
+            false,
+            true,
+            new SlotAllocator.Memory(7 * GIB, 0, lastAtSixG()));
+    assertTrue(SlotAllocator.fits(shrunk, SlotType.CI, SIX_G));
+    assertFalse(SlotAllocator.fits(shrunk, SlotType.CI, 8 * GIB));
+  }
+
+  @Test
+  void noCapacityReportedIsTheSlotRuleAlone() {
+    TargetSlots unknown = wsProofMemory(counts(2, 4, 0), null, 6 * SIX_G, lastAtSixG());
+    assertTrue(SlotAllocator.fits(unknown, SlotType.WORKSPACE, SIX_G));
+    assertNull(SlotAllocator.Memory.capacity(2 * GIB, (Long) null));
+    // The default memory is UNKNOWN too: every slot-only constructor keeps today's rule.
+    assertEquals(SlotAllocator.Memory.UNKNOWN, worked(0).memory());
+    List<Decision> decisions =
+        SlotAllocator.allocate(
+            List.of(unknown),
+            List.of(charged(SlotType.WORKSPACE, 0, SIX_G), charged(SlotType.WORKSPACE, 1, SIX_G)));
+    assertEquals(List.of(true, true), decisions.stream().map(Decision::granted).toList());
+  }
+
+  @Test
+  void aLeaseWithoutALimitIsChargedNothing() {
+    // Full to the byte: a 6g lease does not fit, one charged 0 does.
+    TargetSlots full = wsProofMemory(counts(2, 0, 0), 2 * SIX_G, 2 * SIX_G, lastAtSixG());
+    assertTrue(SlotAllocator.fits(full, SlotType.WORKSPACE, 0));
+    assertFalse(SlotAllocator.fits(full, SlotType.WORKSPACE, 1));
+    assertEquals(0, DockerSizes.charge("{\"image\":\"x\"}"));
+    assertEquals(0, DockerSizes.charge("{\"image\":\"x\",\"limits\":{\"memorySwap\":\"8g\"}}"));
+    // A lease granted with no limit leaves its type's last charge at 0 for what follows.
+    List<Decision> decisions =
+        SlotAllocator.allocate(
+            List.of(wsProofMemory(counts(0, 0, 0), 6 * GIB, 0, Map.of())),
+            List.of(charged(SlotType.CI, 0, 0), charged(SlotType.WORKSPACE, 1, SIX_G)));
+    assertEquals(List.of(true, true), decisions.stream().map(Decision::granted).toList());
+  }
+
+  @Test
+  void memoryGrantsInOnePassCountAtOnce() {
+    // 14 GiB, nothing ever granted (every reservation priced at 0): two 6g CI fit, and the third
+    // finds the first two's 12 GiB committed, 12 + 6 > 14, although six slots are free.
+    TargetSlots target = wsProofMemory(counts(0, 0, 0), 14 * GIB, 0, Map.of());
+    List<Decision> decisions =
+        SlotAllocator.allocate(
+            List.of(target),
+            List.of(
+                charged(SlotType.CI, 0, SIX_G),
+                charged(SlotType.CI, 1, SIX_G),
+                charged(SlotType.CI, 2, SIX_G)));
+    assertEquals(List.of(true, true, false), decisions.stream().map(Decision::granted).toList());
+    assertEquals("no target has memory for a 6g CI lease", decisions.get(2).detail());
+    // A grant's charge also prices its type's reservation for the rest of the pass: with workspace
+    // reserved 2, the first workspace granted prices the other one at 6g, so ci then finds
+    // 6 + 1 × 6 + 6 = 18 > 14 where, priced at the 0 it began the pass with, 12 would have fit.
+    TargetSlots wsTwo =
+        new TargetSlots(
+            A, "ws-proof", 8, counts(0, 2, 0), null, counts(0, 0, 0), true, false, true,
+            new SlotAllocator.Memory(14 * GIB, 0, Map.of()));
+    List<Decision> mixed =
+        SlotAllocator.allocate(
+            List.of(wsTwo),
+            List.of(
+                charged(SlotType.WORKSPACE, 0, SIX_G),
+                charged(SlotType.CI, 1, SIX_G)));
+    assertEquals(List.of(true, false), mixed.stream().map(Decision::granted).toList());
+  }
+
+  // --- reservations that cannot be met in memory are ignored in memory -------------------------
+
+  /** ws-proof as it reports: 16 GiB − 2 GiB, every type last granted at 6g. */
+  private static TargetSlots wsProofAt14(Map<SlotType, Integer> used, long committed) {
+    long capacity = SlotAllocator.Memory.capacity(2 * GIB, 16 * GIB);
+    return wsProofMemory(used, capacity, committed, lastAtSixG());
+  }
+
+  @Test
+  void anEmptyWsProofTakesASixGWorkspace() {
+    // Σ r × c = 2 × 6 + 1 × 6 = 18 GiB > 14: the reservations are ignored in memory, so 0 + 6 ≤ 14.
+    TargetSlots empty = wsProofAt14(counts(0, 0, 0), 0);
+    assertTrue(SlotAllocator.reservationsExceedMemory(empty));
+    assertTrue(SlotAllocator.fits(empty, SlotType.WORKSPACE, SIX_G));
+    assertTrue(SlotAllocator.fits(empty, SlotType.CI, SIX_G));
+  }
+
+  @Test
+  void wsProofHoldsAnyTwoSixGLeasesAndNoThird() {
+    TargetSlots two = wsProofAt14(counts(1, 1, 0), 2 * SIX_G);
+    for (SlotType type : List.of(SlotType.CI, SlotType.WORKSPACE)) {
+      assertTrue(SlotAllocator.slotsFit(two, type), type.name());
+      Decision decision =
+          SlotAllocator.allocate(List.of(two), List.of(charged(type, 0, SIX_G))).get(0);
+      assertFalse(decision.granted(), type.name());
+      assertEquals("no target has memory for a 6g " + type.name() + " lease", decision.detail());
+    }
+    // And from empty, one pass grants exactly two of four, whatever their types.
+    List<Decision> decisions =
+        SlotAllocator.allocate(
+            List.of(wsProofAt14(counts(0, 0, 0), 0)),
+            List.of(
+                charged(SlotType.WORKSPACE, 0, SIX_G),
+                charged(SlotType.WORKSPACE, 1, SIX_G),
+                charged(SlotType.CI, 2, SIX_G),
+                charged(SlotType.CI, 3, SIX_G)));
+    assertEquals(
+        List.of(true, true, false, false), decisions.stream().map(Decision::granted).toList());
+  }
+
+  @Test
+  void reservationsTheMemoryCanMeetStillHoldIt() {
+    // 20 GiB: Σ r × c = 18 ≤ 20, so a workspace beside one running must leave ci's 12 GiB.
+    TargetSlots oneWs = wsProofMemory(counts(0, 1, 0), 20 * GIB, SIX_G, lastAtSixG());
+    assertFalse(SlotAllocator.reservationsExceedMemory(oneWs));
+    assertFalse(SlotAllocator.fits(oneWs, SlotType.WORKSPACE, SIX_G));
+    // The same target at 14 GiB cannot meet them, and the second workspace fits.
+    TargetSlots oneWsAt14 = wsProofAt14(counts(0, 1, 0), SIX_G);
+    assertTrue(SlotAllocator.fits(oneWsAt14, SlotType.WORKSPACE, SIX_G));
+  }
+
+  @Test
+  void aTargetShortOfMemoryLeavesTheLeaseToOneThatHasIt() {
+    TargetSlots full =
+        new TargetSlots(
+            A, "alpha", 8, counts(0, 0, 0), null, counts(0, 0, 0), true, false, true,
+            new SlotAllocator.Memory(4 * GIB, 0, Map.of()));
+    TargetSlots roomy =
+        new TargetSlots(
+            B, "beta", 2, counts(0, 0, 0), null, counts(0, 0, 0), true, false, true,
+            new SlotAllocator.Memory(8 * GIB, 0, Map.of()));
+    assertEquals(
+        B,
+        SlotAllocator.allocate(List.of(full, roomy), List.of(charged(SlotType.CI, 0, SIX_G)))
+            .get(0)
+            .targetId());
+  }
+
   // --- which slot types a target can ever run (qits-1692: its warm images) ---------------------
 
   @Test
