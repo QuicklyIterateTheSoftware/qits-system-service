@@ -18,6 +18,7 @@ import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import java.util.List;
 import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 
 /**
  * What is on ONE node's docker daemon.
@@ -77,6 +78,8 @@ public class NodeController {
   @GET
   @Path("/{id}/networks")
   @Operation(operationId = "listNodeNetworks", summary = "Networks")
+  @APIResponse(responseCode = "200", description = "OK")
+  @APIResponse(responseCode = "409", description = "NODE_REMOTE: not the node this service runs on")
   public List<NetworkSummary> networks(@PathParam("id") String id) {
     return nodes.networks(id);
   }

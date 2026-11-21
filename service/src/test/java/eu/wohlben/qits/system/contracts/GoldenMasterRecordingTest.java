@@ -299,6 +299,14 @@ class GoldenMasterRecordingTest {
           get("listNodeImages", API + "/nodes/local/images"),
           get("listNodeVolumes", API + "/nodes/local/volumes"),
           get("listNodeNetworks", API + "/nodes/local/networks"),
+          call(
+              ProviderStates.A_NODE_LISTING_NO_NETWORKS,
+              "listNodeNetworks",
+              "GET",
+              API + "/nodes/local/networks",
+              200,
+              null,
+              Map.of()),
           // --- the targets doors (qits-1481) ---
           call(
               ProviderStates.NO_TARGET,
@@ -779,6 +787,7 @@ class GoldenMasterRecordingTest {
         || interaction.state().equals(ProviderStates.NO_SUCH_SWARM_SERVICE)
         || interaction.state().equals(ProviderStates.A_SWARM_NODE_RUNNING_NO_TASKS)
         || interaction.state().equals(ProviderStates.NO_SUCH_SWARM_NODE)
+        || interaction.state().equals(ProviderStates.A_NODE_LISTING_NO_NETWORKS)
         || interaction.state().equals(ProviderStates.A_SWARM_CONFIG_HOLDING_NO_DATA)
         || interaction.state().equals(ProviderStates.A_SWARM_CONFIG_HOLDING_BINARY_DATA)
         || interaction.state().equals(ProviderStates.NO_SUCH_SWARM_CONFIG)) {

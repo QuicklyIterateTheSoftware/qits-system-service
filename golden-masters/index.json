@@ -524,6 +524,27 @@
       ]
     },
     {
+      "name": "a node listing no networks",
+      "slug": "a-node-listing-no-networks",
+      "params": {},
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listNodeNetworks",
+          "method": "GET",
+          "path": "/system/api/nodes/local/networks",
+          "status": 200,
+          "file": "a-node-listing-no-networks/listNodeNetworks.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a quarantined target",
       "slug": "a-quarantined-target",
       "params": {

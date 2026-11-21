@@ -343,8 +343,15 @@ JSON
     ;;
 
   network)
+    # `network ls --format '{{json .}}'`, sorted by name as docker sorts it: the swarm overlay and a
+    # runner's internal lease bridge. A node listing no networks prints nothing and exits 0; a
+    # state that wants one writes this file (ProviderStates.A_NODE_LISTING_NO_NETWORKS).
+    if [ -f "$here/no-networks" ]; then
+      exit 0
+    fi
     cat <<'JSON'
 {"CreatedAt":"2026-08-18 02:13:24 +0000 UTC","Driver":"overlay","ID":"mulnl3uqqi0h","IPv4":"true","IPv6":"false","Internal":"false","Labels":"","Name":"qits-net","Scope":"swarm"}
+{"CreatedAt":"2026-08-15 06:44:01.671795447 +0000 UTC","Driver":"bridge","ID":"c8c43a515890","IPv4":"true","IPv6":"false","Internal":"true","Labels":"qits.system.runner=d2616b57-95a8-4e1b-865f-c10d8225ce5d","Name":"qits-system-runner-leases-d2616b57","Scope":"local"}
 JSON
     ;;
 

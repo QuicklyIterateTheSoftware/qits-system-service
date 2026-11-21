@@ -124,6 +124,15 @@ public class ProviderStates {
   public static final String NO_SUCH_SWARM_NODE = "no such swarm node";
 
   /**
+   * This node's docker daemon listing no network: {@code docker network ls} prints nothing and exits
+   * 0, so the network list is {@code []}. A real daemon always lists at least {@code bridge}, {@code
+   * host} and {@code none}, so this never happens on a live node — it is the defensive empty answer
+   * a consumer must still render (qits-2354). Only the network listing differs; the fake docker
+   * reads a {@code no-networks} file beside it.
+   */
+  public static final String A_NODE_LISTING_NO_NETWORKS = "a node listing no networks";
+
+  /**
    * The same swarm, read for a config whose spec carries no data and no labels: {@code config
    * inspect qits-empty-config} answers it, so its detail carries {@code data: ""}, {@code binary:
    * false} and {@code labels: {}} (qits-2349). Param {@code configId}. The fake docker's {@code
@@ -403,6 +412,7 @@ public class ProviderStates {
     states.put(NO_SUCH_SWARM_SERVICE, () -> new Setup(Map.of("serviceId", UNKNOWN_SERVICE_ID)));
     states.put(A_SWARM_NODE_RUNNING_NO_TASKS, ProviderStates::aSwarmNodeRunningNoTasks);
     states.put(NO_SUCH_SWARM_NODE, () -> new Setup(Map.of("nodeId", UNKNOWN_NODE_ID)));
+    states.put(A_NODE_LISTING_NO_NETWORKS, ProviderStates::aNodeListingNoNetworks);
     states.put(
         A_SWARM_CONFIG_HOLDING_NO_DATA, () -> new Setup(Map.of("configId", EMPTY_CONFIG_ID)));
     states.put(
@@ -444,6 +454,7 @@ public class ProviderStates {
     configsHeld(true);
     secretsHeld(true);
     nodeTasksRunning(true);
+    networksListed(true);
     if (runner != null) {
       runner.answering(null);
       runner.close();
@@ -471,6 +482,7 @@ public class ProviderStates {
     configsHeld(true);
     secretsHeld(true);
     nodeTasksRunning(true);
+    networksListed(true);
     return setup.get();
   }
 
@@ -510,6 +522,11 @@ public class ProviderStates {
 
   private static Setup aSwarmHoldingNoSecrets() {
     secretsHeld(false);
+    return new Setup(Map.of());
+  }
+
+  private static Setup aNodeListingNoNetworks() {
+    networksListed(false);
     return new Setup(Map.of());
   }
 
@@ -559,6 +576,15 @@ public class ProviderStates {
    */
   private static void nodeTasksRunning(boolean running) {
     marker("no-node-tasks", !running);
+  }
+
+  /**
+   * Whether the fake docker's {@code network ls} prints this node's networks, or nothing at all. The
+   * file sits beside the script, which every test in the run shares, so {@link #close} turns them
+   * back on.
+   */
+  private static void networksListed(boolean listed) {
+    marker("no-networks", !listed);
   }
 
   /**
