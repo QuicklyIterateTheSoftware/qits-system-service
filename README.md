@@ -13,7 +13,7 @@ so the client's same-origin calls and its terminal socket dial are unchanged by 
 | Question | Where the answer comes from |
 |---|---|
 | what is this machine | `docker info`, `docker system df` |
-| what is this swarm | `docker node ls/inspect`, `service ls/inspect/ps`, `config ls/inspect`, `secret ls` |
+| what is this swarm | `docker node ls/inspect`, `service ls/inspect/ps`, `config ls/inspect`, `secret ls` (+ `service ls -q`/`inspect --format` for usage) |
 | what is on this node | `docker ps -a`, `container inspect`, `logs --tail`, `image ls`, `volume ls`, `network ls` |
 | a live view of the host | a `glances` container on a pseudo-terminal this service owns |
 | a shell in a container | `docker exec -it <id> <shell>` on the same kind of terminal |
@@ -29,7 +29,10 @@ meant to lose. The one store is the execution targets' (below).
   `qits-system-plan.md` ("Execution targets (qits-1481)"), is the targets module's own rows and the
   control it sends its runners (see "Execution targets").
 - **No secret values.** Swarm does not return them to anybody, including a manager. Config data IS
-  shown, decoded — that is what a config is for.
+  shown, decoded — that is what a config is for. A secret's row names the services that use it
+  (`usedBy`, qits-2350), read from the service specs with a `--format` template printing only each
+  service's name and secret references; `secret inspect` is never run, so its dates are `secret
+  ls`'s humanised text ("2 months ago").
 - **No environment values.** A service's and a container's environment is shown as KEYS only. That
   is where a platform service's injected database password and idp client secret live.
 - **One node.** The node this service runs on. A node-scoped read for any other answers
