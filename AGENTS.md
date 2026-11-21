@@ -73,11 +73,11 @@ the patch door keeps it at or above its type's reservation. Memory is one more c
 memory check), `M` the `spec.limits.memory` charges (`DockerSizes`) of its GRANTED, RUNNING and ENDING
 leases, `c[u]` the charge of the newest lease of type `u` granted there (0 if none), `c` the
 candidate's (0 without a limit; `memorySwap` is never charged), and the reserved term dropped when the
-reservations are. `TargetAllocation` reads those from the rows; `SlotAllocator.Memory.capacity` takes
+reservations are ignored as slots (`Σ r > T`) or cannot be met in memory (`Σ_u r[u] × c[u] > C`,
+`SlotAllocator.reservationsExceedMemory`; they still apply as slots). `TargetAllocation` reads those from the rows; `SlotAllocator.Memory.capacity` takes
 the min of every known figure, so a later MemTotal is one more argument. At 6g a lease, ws-proof
-(16 GiB − 2 GiB = 14 GiB) holds two leases' worth: its CI reservation of 2 leaves no room for a
-workspace, and its workspace reservation of 1 keeps CI to one, until an operator changes the
-reservations. Change it in
+(16 GiB − 2 GiB = 14 GiB) runs any two 6g leases of either type: its reservations (ci 2, workspace 1:
+18 GiB) cannot be met in memory, so they are ignored there and hold only as slots. Change it in
 `TargetAllocatorTest` first: the dossier's worked example is the first table there.
 
 **`login` and `slots` are reported, never a quarantine** (`TargetHealth.REPORT_ONLY`). They fail

@@ -543,6 +543,57 @@ class TargetAllocatorTest {
     assertEquals(List.of(true, false), mixed.stream().map(Decision::granted).toList());
   }
 
+  // --- reservations that cannot be met in memory are ignored in memory -------------------------
+
+  /** ws-proof as it reports: 16 GiB − 2 GiB, every type last granted at 6g. */
+  private static TargetSlots wsProofAt14(Map<SlotType, Integer> used, long committed) {
+    long capacity = SlotAllocator.Memory.capacity(2 * GIB, 16 * GIB);
+    return wsProofMemory(used, capacity, committed, lastAtSixG());
+  }
+
+  @Test
+  void anEmptyWsProofTakesASixGWorkspace() {
+    // Σ r × c = 2 × 6 + 1 × 6 = 18 GiB > 14: the reservations are ignored in memory, so 0 + 6 ≤ 14.
+    TargetSlots empty = wsProofAt14(counts(0, 0, 0), 0);
+    assertTrue(SlotAllocator.reservationsExceedMemory(empty));
+    assertTrue(SlotAllocator.fits(empty, SlotType.WORKSPACE, SIX_G));
+    assertTrue(SlotAllocator.fits(empty, SlotType.CI, SIX_G));
+  }
+
+  @Test
+  void wsProofHoldsAnyTwoSixGLeasesAndNoThird() {
+    TargetSlots two = wsProofAt14(counts(1, 1, 0), 2 * SIX_G);
+    for (SlotType type : List.of(SlotType.CI, SlotType.WORKSPACE)) {
+      assertTrue(SlotAllocator.slotsFit(two, type), type.name());
+      Decision decision =
+          SlotAllocator.allocate(List.of(two), List.of(charged(type, 0, SIX_G))).get(0);
+      assertFalse(decision.granted(), type.name());
+      assertEquals("no target has memory for a 6g " + type.name() + " lease", decision.detail());
+    }
+    // And from empty, one pass grants exactly two of four, whatever their types.
+    List<Decision> decisions =
+        SlotAllocator.allocate(
+            List.of(wsProofAt14(counts(0, 0, 0), 0)),
+            List.of(
+                charged(SlotType.WORKSPACE, 0, SIX_G),
+                charged(SlotType.WORKSPACE, 1, SIX_G),
+                charged(SlotType.CI, 2, SIX_G),
+                charged(SlotType.CI, 3, SIX_G)));
+    assertEquals(
+        List.of(true, true, false, false), decisions.stream().map(Decision::granted).toList());
+  }
+
+  @Test
+  void reservationsTheMemoryCanMeetStillHoldIt() {
+    // 20 GiB: Σ r × c = 18 ≤ 20, so a workspace beside one running must leave ci's 12 GiB.
+    TargetSlots oneWs = wsProofMemory(counts(0, 1, 0), 20 * GIB, SIX_G, lastAtSixG());
+    assertFalse(SlotAllocator.reservationsExceedMemory(oneWs));
+    assertFalse(SlotAllocator.fits(oneWs, SlotType.WORKSPACE, SIX_G));
+    // The same target at 14 GiB cannot meet them, and the second workspace fits.
+    TargetSlots oneWsAt14 = wsProofAt14(counts(0, 1, 0), SIX_G);
+    assertTrue(SlotAllocator.fits(oneWsAt14, SlotType.WORKSPACE, SIX_G));
+  }
+
   @Test
   void aTargetShortOfMemoryLeavesTheLeaseToOneThatHasIt() {
     TargetSlots full =

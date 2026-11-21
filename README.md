@@ -168,14 +168,17 @@ reports its memory (`memoryMaxBytes`, the node's root `memory.max`) has a lease 
 memory limit is charged 0 — every owner sets one today). A lease fits only when the charges of the
 target's GRANTED, RUNNING and ENDING leases, plus what the other types' unused reservations would need
 (each priced at the memory limit of that type's most recently granted lease there), plus its own
-charge stay within the capacity; with the reservations ignored (`Σ r > T`) so is that middle term. A
+charge stay within the capacity. That middle term is ignored when the reservations are ignored as
+slots (`Σ r > T`), and likewise when they cannot be met in memory: when `Σ r[u] × charge(u)`, what
+they would hold with every type at zero use, exceeds the capacity, only the committed charges plus the
+lease's own must fit, and the reservations still apply as slots. A
 target that reports no memory is held to its slots alone. A lease some target's slots would take but
 no target's memory can hold waits with `no target has memory for a 6g WORKSPACE lease`.
 
-The consequence on ws-proof (16 GiB reported, so 14 GiB of capacity) at 6g per lease: it holds two
-leases' worth, not eight. Its CI reservation of 2 holds 12 GiB for CI, so no workspace fits beside it,
-and its workspace reservation of 1 holds 6 GiB for a workspace, so CI runs one lease at a time — until
-an operator changes its reservations to what its memory can carry.
+The consequence on ws-proof (16 GiB reported, so 14 GiB of capacity) at 6g per lease: it runs any two
+6g leases, of either type, not eight. Its reservations (ci 2 and workspace 1, 18 GiB at 6g) cannot be
+met in memory, so they are ignored there and still apply as slots; an operator who wants CI's two
+leases held for it sets reservations its memory can carry.
 
     POST   /system/api/targets                       declare one; answers its install line, once
     GET    /system/api/targets[/{id}[/health]]       slots, reservations, maximums, used, login, ...

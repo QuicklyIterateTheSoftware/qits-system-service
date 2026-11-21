@@ -49,8 +49,11 @@ import java.util.UUID;
  * </pre>
  *
  * — the memory the other types' unused reservations would need stays free for them, priced at what
- * their last lease here asked for. When the reservations are ignored ({@code Σ r > T}) that term is
- * ignored too. A target that reports no memory is held to the slot rule alone. A lease the slots of
+ * their last lease here asked for. That term is ignored when the reservations are ignored in slots
+ * ({@code Σ r > T}), and likewise when they cannot be met in memory: {@code Σ_u r[u] × c[u] > C},
+ * what they would hold with every type at zero use, is more than the target has (ws-proof: ci 2 and
+ * workspace 1 at 6g is 18 GiB against 14). Then only {@code M + c ≤ C} holds, and the reservations
+ * still apply as slots. A target that reports no memory is held to the slot rule alone. A lease the slots of
  * some target would take but whose memory none can hold waits with {@code no target has memory for
  * a 6g WORKSPACE lease}.
  *
@@ -360,7 +363,8 @@ public final class SlotAllocator {
 
   /**
    * The memory conjunct (qits-2362): {@code C} unknown, or {@code M + Σ_{u≠t} max(0, r[u] − n[u]) ×
-   * c[u] + c ≤ C}, the reserved term dropped when the reservations are ignored.
+   * c[u] + c ≤ C}, the reserved term dropped when the reservations are ignored, in slots or in
+   * memory ({@link #reservationsExceedMemory}).
    */
   public static boolean memoryFits(TargetSlots target, SlotType type, long chargeBytes) {
     Memory memory = target.memory();
@@ -368,7 +372,8 @@ public final class SlotAllocator {
       return true;
     }
     long needed = memory.committedBytes() + Math.max(0L, chargeBytes);
-    if (!reservationsExceedTotal(target.total(), target.reservations())) {
+    if (!reservationsExceedTotal(target.total(), target.reservations())
+        && !reservationsExceedMemory(target)) {
       for (SlotType u : SlotType.values()) {
         if (u != type) {
           int reserved = target.reservations().getOrDefault(u, 0);
@@ -378,6 +383,24 @@ public final class SlotAllocator {
       }
     }
     return needed <= memory.capacityBytes();
+  }
+
+  /**
+   * {@code Σ_u r[u] × c[u] > C}: what the reservations would hold in memory with every type at zero
+   * use is more than the target has, so in memory they are ignored — the memory twin of {@link
+   * #reservationsExceedTotal}. They still hold as slots. False when the capacity is unknown.
+   */
+  public static boolean reservationsExceedMemory(TargetSlots target) {
+    Long capacity = target.memory().capacityBytes();
+    if (capacity == null) {
+      return false;
+    }
+    long held = 0;
+    for (SlotType u : SlotType.values()) {
+      long price = target.memory().lastCharge().getOrDefault(u, 0L);
+      held += target.reservations().getOrDefault(u, 0) * price;
+    }
+    return held > capacity;
   }
 
   /** The rule over bare numbers, with no maximums. */
