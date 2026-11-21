@@ -566,6 +566,30 @@
       ]
     },
     {
+      "name": "a node running no containers",
+      "slug": "a-node-running-no-containers",
+      "params": {},
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listNodeContainers",
+          "method": "GET",
+          "path": "/system/api/nodes/local/containers",
+          "query": {
+            "all": "true"
+          },
+          "status": 200,
+          "file": "a-node-running-no-containers/listNodeContainers.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a quarantined target",
       "slug": "a-quarantined-target",
       "params": {
@@ -1527,6 +1551,9 @@
           "operationId": "listNodeContainers",
           "method": "GET",
           "path": "/system/api/nodes/local/containers",
+          "query": {
+            "all": "true"
+          },
           "status": 200,
           "file": "a-single-node-swarm/listNodeContainers.json",
           "frozen": {
@@ -1814,6 +1841,22 @@
       "params": {},
       "dependsOn": [],
       "operations": [
+        {
+          "operationId": "listNodeContainers",
+          "method": "GET",
+          "path": "/system/api/nodes/no-such-node/containers",
+          "query": {
+            "all": "true"
+          },
+          "status": 409,
+          "file": "a-swarm-node-this-service-cannot-reach/listNodeContainers.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
         {
           "operationId": "listNodeImages",
           "method": "GET",

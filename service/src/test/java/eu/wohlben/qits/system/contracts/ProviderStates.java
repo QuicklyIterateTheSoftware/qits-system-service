@@ -124,6 +124,15 @@ public class ProviderStates {
   public static final String NO_SUCH_SWARM_NODE = "no such swarm node";
 
   /**
+   * This node, running no container: {@code docker ps} (and {@code ps -a}) prints nothing and exits
+   * 0, so the container list is {@code []} (qits-2352, for a consumer's empty-containers screen). A
+   * real node always runs at least qits-system itself, so this answer is defensive — it exists for
+   * the consumer to render, not because a live node ever gives it. Only the container listing
+   * differs; the fake docker reads a {@code no-containers} file beside it.
+   */
+  public static final String A_NODE_RUNNING_NO_CONTAINERS = "a node running no containers";
+
+  /**
    * This node's docker daemon listing no network: {@code docker network ls} prints nothing and exits
    * 0, so the network list is {@code []}. A real daemon always lists at least {@code bridge}, {@code
    * host} and {@code none}, so this never happens on a live node — it is the defensive empty answer
@@ -439,6 +448,7 @@ public class ProviderStates {
     states.put(NO_SUCH_SWARM_SERVICE, () -> new Setup(Map.of("serviceId", UNKNOWN_SERVICE_ID)));
     states.put(A_SWARM_NODE_RUNNING_NO_TASKS, ProviderStates::aSwarmNodeRunningNoTasks);
     states.put(NO_SUCH_SWARM_NODE, () -> new Setup(Map.of("nodeId", UNKNOWN_NODE_ID)));
+    states.put(A_NODE_RUNNING_NO_CONTAINERS, ProviderStates::aNodeRunningNoContainers);
     states.put(A_NODE_LISTING_NO_NETWORKS, ProviderStates::aNodeListingNoNetworks);
     states.put(A_NODE_HOLDING_NO_VOLUMES, ProviderStates::aNodeHoldingNoVolumes);
     states.put(A_SWARM_NODE_HOLDING_NO_IMAGES, ProviderStates::aSwarmNodeHoldingNoImages);
@@ -484,6 +494,7 @@ public class ProviderStates {
     configsHeld(true);
     secretsHeld(true);
     nodeTasksRunning(true);
+    containersRunning(true);
     networksListed(true);
     volumesHeld(true);
     imagesHeld(true);
@@ -514,6 +525,7 @@ public class ProviderStates {
     configsHeld(true);
     secretsHeld(true);
     nodeTasksRunning(true);
+    containersRunning(true);
     networksListed(true);
     volumesHeld(true);
     imagesHeld(true);
@@ -579,6 +591,11 @@ public class ProviderStates {
     return new Setup(Map.of("nodeId", NODE_ID));
   }
 
+  private static Setup aNodeRunningNoContainers() {
+    containersRunning(false);
+    return new Setup(Map.of());
+  }
+
   /**
    * Whether the fake docker's {@code service ls} prints its services, or nothing at all. The file
    * sits beside the script, which every test in the run shares, so {@link #close} turns them back
@@ -620,6 +637,15 @@ public class ProviderStates {
    */
   private static void nodeTasksRunning(boolean running) {
     marker("no-node-tasks", !running);
+  }
+
+  /**
+   * Whether the fake docker's {@code ps} prints this node's containers, or nothing at all. The file
+   * sits beside the script, which every test in the run shares, so {@link #close} turns them back
+   * on.
+   */
+  private static void containersRunning(boolean running) {
+    marker("no-containers", !running);
   }
 
   /**

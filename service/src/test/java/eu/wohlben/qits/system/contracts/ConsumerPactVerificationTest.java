@@ -236,6 +236,11 @@ class ConsumerPactVerificationTest {
     return states.params(ProviderStates.NO_SUCH_SWARM_NODE);
   }
 
+  @State(ProviderStates.A_NODE_RUNNING_NO_CONTAINERS)
+  Map<String, String> aNodeRunningNoContainers() {
+    return states.params(ProviderStates.A_NODE_RUNNING_NO_CONTAINERS);
+  }
+
   @State(ProviderStates.A_SWARM_CONFIG_HOLDING_NO_DATA)
   Map<String, String> aSwarmConfigHoldingNoData() {
     return states.params(ProviderStates.A_SWARM_CONFIG_HOLDING_NO_DATA);

@@ -12,5 +12,19 @@
     "ports": "8080/tcp",
     "networks": "qits-net",
     "size": "9.89MB"
+  },
+  {
+    "id": "aa11bb22cc33dd44ee55ff6677889900aabbccddeeff00112233445566778899",
+    "name": "a-stopped-one",
+    "image": "registry.dev.localhost:8080/qits/old:1",
+    "state": "exited",
+    "status": "Exited (137) 3 days ago",
+    "health": "unhealthy",
+    "command": "\"/work/old\"",
+    "createdAt": "2026-08-20 09:00:00 +0200 CEST",
+    "runningFor": "3 days ago",
+    "ports": "",
+    "networks": "qits-net",
+    "size": "0B"
   }
 ]
