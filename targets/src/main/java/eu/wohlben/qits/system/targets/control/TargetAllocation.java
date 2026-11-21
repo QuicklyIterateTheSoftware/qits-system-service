@@ -176,7 +176,8 @@ public class TargetAllocation {
               target.quarantined(),
               target.signedIn(),
               new Memory(
-                  Memory.capacity(reserve, target.memoryMaxBytes),
+                  Memory.capacity(
+                      reserve, target.memoryMaxBytes, target.memoryTotalBytes),
                   committed.getOrDefault(target.id, 0L),
                   lastCharges.get(target.id))));
     }

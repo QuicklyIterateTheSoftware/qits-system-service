@@ -73,6 +73,11 @@ public class TargetViews {
           Long kernelOomKills,
       @Schema(description = "The node's memory limit (its root memory.max); null when none")
           Long memoryMaxBytes,
+      @Schema(
+              description =
+                  "The node's physical memory (/proc/meminfo MemTotal); null when unreadable."
+                      + " Placement sizes the node by the smaller of this and memoryMaxBytes")
+          Long memoryTotalBytes,
       @Schema(description = "When the runner last reported these") Instant reportedAt) {}
 
   @Schema(name = "Target")
@@ -283,6 +288,7 @@ public class TargetViews {
             target.nodeOomKills,
             target.kernelOomKills,
             target.memoryMaxBytes,
+            target.memoryTotalBytes,
             target.memoryReportedAt));
   }
 

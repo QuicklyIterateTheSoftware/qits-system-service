@@ -45,6 +45,7 @@
       "nodeOomKills": null,
       "kernelOomKills": null,
       "memoryMaxBytes": null,
+      "memoryTotalBytes": null,
       "reportedAt": null
     }
   }

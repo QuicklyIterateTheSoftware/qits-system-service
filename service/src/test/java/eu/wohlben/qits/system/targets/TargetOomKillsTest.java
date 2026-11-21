@@ -51,6 +51,9 @@ class TargetOomKillsTest {
 
   private static final long NODE_MAX = 8L * 1024L * MIB;
 
+  /** The node's MemTotal (qits-2362), stored and served beside its memory.max. */
+  private static final long NODE_TOTAL = 16L * 1024L * MIB;
+
   private static final eu.wohlben.qits.systemrunner.protocol.LeaseState RUNNING =
       eu.wohlben.qits.systemrunner.protocol.LeaseState.RUNNING;
 
@@ -197,12 +200,12 @@ class TargetOomKillsTest {
     lease(LeaseState.RUNNING, null);
     lease(LeaseState.EXITED, UUID.randomUUID());
     try (FakeTargetRunner runner = servingRunner()) {
-      runner.inventory(List.of(), List.of(), new NodeMemory(null, 10L, NODE_MAX));
+      runner.inventory(List.of(), List.of(), new NodeMemory(null, 10L, NODE_MAX, null));
       until("the baseline", () -> TargetRows.reloadTarget(target).memoryReportedAt != null);
       Thread.sleep(SETTLE.toMillis());
       assertTrue(nodeEvents().isEmpty(), "a first report is the baseline: " + nodeEvents());
 
-      runner.inventory(List.of(), List.of(), new NodeMemory(null, 13L, NODE_MAX));
+      runner.inventory(List.of(), List.of(), new NodeMemory(null, 13L, NODE_MAX, null));
       List<TargetOomKilled> events =
           bus.await(TargetOomKilled.class, e -> e.targetId().equals(target), 1, SETTLE);
       assertEquals(1, events.size(), events.toString());
@@ -216,19 +219,19 @@ class TargetOomKillsTest {
       assertEquals("TargetOomKilled", killed.name());
 
       // The host rebooted: the counter went down, which is a new baseline and no kill.
-      runner.inventory(List.of(), List.of(), new NodeMemory(null, 2L, NODE_MAX));
+      runner.inventory(List.of(), List.of(), new NodeMemory(null, 2L, NODE_MAX, null));
       until("the reboot", () -> Long.valueOf(2).equals(TargetRows.reloadTarget(target).kernelOomKills));
 
       // A node counter appears (an LXC): its first value is a baseline too, and from then on it is
       // the one compared — the kernel's rising alone is not this node's kill.
-      runner.inventory(List.of(), List.of(), new NodeMemory(5L, 2L, NODE_MAX));
+      runner.inventory(List.of(), List.of(), new NodeMemory(5L, 2L, NODE_MAX, null));
       until("the node baseline", () -> Long.valueOf(5).equals(TargetRows.reloadTarget(target).nodeOomKills));
-      runner.inventory(List.of(), List.of(), new NodeMemory(5L, 9L, NODE_MAX));
+      runner.inventory(List.of(), List.of(), new NodeMemory(5L, 9L, NODE_MAX, null));
       until("the kernel's rise", () -> Long.valueOf(9).equals(TargetRows.reloadTarget(target).kernelOomKills));
       Thread.sleep(SETTLE.toMillis());
       assertEquals(1, nodeEvents().size(), nodeEvents().toString());
 
-      runner.inventory(List.of(), List.of(), new NodeMemory(6L, 9L, NODE_MAX));
+      runner.inventory(List.of(), List.of(), new NodeMemory(6L, 9L, NODE_MAX, NODE_TOTAL));
       events = bus.await(TargetOomKilled.class, e -> e.targetId().equals(target), 2, SETTLE);
       assertEquals(2, events.size(), events.toString());
       assertEquals(1, events.get(1).delta());
@@ -241,7 +244,9 @@ class TargetOomKillsTest {
           .body("memory.nodeOomKills", equalTo(6))
           .body("memory.kernelOomKills", equalTo(9))
           .body("memory.memoryMaxBytes", equalTo(NODE_MAX))
+          .body("memory.memoryTotalBytes", equalTo(NODE_TOTAL))
           .body("memory.reportedAt", notNullValue());
+      assertEquals(Long.valueOf(NODE_TOTAL), TargetRows.reloadTarget(target).memoryTotalBytes);
     }
   }
 
@@ -256,6 +261,7 @@ class TargetOomKillsTest {
           .body("memory.nodeOomKills", nullValue())
           .body("memory.kernelOomKills", nullValue())
           .body("memory.memoryMaxBytes", nullValue())
+          .body("memory.memoryTotalBytes", nullValue())
           .body("memory.reportedAt", nullValue());
 
       runner.inventory(
@@ -268,7 +274,7 @@ class TargetOomKillsTest {
                   64 * MIB,
                   null)),
           List.of(),
-          new NodeMemory(4L, 7L, NODE_MAX));
+          new NodeMemory(4L, 7L, NODE_MAX, NODE_TOTAL));
       until("the facts", () -> TargetRows.reloadTarget(target).memoryReportedAt != null);
       until("the lease's facts", () -> Long.valueOf(1).equals(TargetRows.reload(id).oomKills));
       Target before = TargetRows.reloadTarget(target);
@@ -289,6 +295,7 @@ class TargetOomKillsTest {
       assertEquals(before.nodeOomKills, after.nodeOomKills);
       assertEquals(before.kernelOomKills, after.kernelOomKills);
       assertEquals(before.memoryMaxBytes, after.memoryMaxBytes);
+      assertEquals(Long.valueOf(NODE_TOTAL), after.memoryTotalBytes);
       assertEquals(before.memoryReportedAt, after.memoryReportedAt);
       Lease lease = TargetRows.reload(id);
       assertEquals(Long.valueOf(1), lease.oomKills);

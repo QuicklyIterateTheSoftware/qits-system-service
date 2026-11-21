@@ -523,7 +523,11 @@ public class Targets {
    * Null when the target is gone.
    */
   public MemoryRecorded recordMemory(
-      UUID id, Long nodeOomKills, Long kernelOomKills, Long memoryMaxBytes) {
+      UUID id,
+      Long nodeOomKills,
+      Long kernelOomKills,
+      Long memoryMaxBytes,
+      Long memoryTotalBytes) {
     return QuarkusTransaction.requiringNew()
         .call(
             () -> {
@@ -536,6 +540,7 @@ public class Targets {
               target.nodeOomKills = nodeOomKills;
               target.kernelOomKills = kernelOomKills;
               target.memoryMaxBytes = memoryMaxBytes;
+              target.memoryTotalBytes = memoryTotalBytes;
               target.memoryReportedAt = Instant.now();
               if (before == null || after == null || after <= before) {
                 return new MemoryRecorded(target, 0, List.of());

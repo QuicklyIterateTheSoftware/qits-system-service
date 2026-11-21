@@ -38,9 +38,9 @@ import java.util.UUID;
  * {@code T} is harmless.
  *
  * <p><b>Memory is one more conjunct</b> (qits-2362). A target that reports its memory has a capacity
- * {@code C} — its {@code memory_max_bytes} less {@code qits.system.targets.node-memory-reserve} — and
- * every lease is charged its {@code spec.limits.memory} ({@link DockerSizes#charge}). With {@code
- * M} the charges of the target's GRANTED, RUNNING and ENDING leases of every type, and {@code c[u]}
+ * {@code C} — the smaller of its {@code memory_max_bytes} and {@code memory_total_bytes} less {@code
+ * qits.system.targets.node-memory-reserve} — and every lease is charged its {@code
+ * spec.limits.memory} ({@link DockerSizes#charge}). With {@code M} the charges of the target's GRANTED, RUNNING and ENDING leases of every type, and {@code c[u]}
  * the charge of the most recently granted lease of type {@code u} there (0 if none ever was), a
  * lease of type {@code t} charged {@code c} also needs
  *
@@ -179,8 +179,9 @@ public final class SlotAllocator {
 
     /**
      * The capacity of a node whose figures are {@code figures}: the smallest that is known, less
-     * {@code reserveBytes}, never below 0; null when none is known. Today the one figure is {@code
-     * memory_max_bytes} (the node's root {@code memory.max}); a later MemTotal is one more argument.
+     * {@code reserveBytes}, never below 0; null when none is known. The figures are {@code
+     * memory_max_bytes} (the node's root {@code memory.max}) and {@code memory_total_bytes} (its
+     * {@code /proc/meminfo} MemTotal), so a root without a limit is sized by its MemTotal.
      */
     public static Long capacity(long reserveBytes, Long... figures) {
       Long smallest = null;

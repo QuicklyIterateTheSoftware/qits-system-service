@@ -128,7 +128,15 @@ public class Target extends PanacheEntityBase implements CausedRow {
   @Column(name = "memory_max_bytes")
   public Long memoryMaxBytes;
 
-  /** When those three last arrived; null before a runner reported any. */
+  /**
+   * The node's physical memory as its runner last reported it (qits-2362): {@code /proc/meminfo}
+   * {@code MemTotal}; null when unreadable or before a runner reported it. Placement sizes the node
+   * by the smaller of this and {@link #memoryMaxBytes}, so a root without a limit is still sized.
+   */
+  @Column(name = "memory_total_bytes")
+  public Long memoryTotalBytes;
+
+  /** When those four last arrived; null before a runner reported any. */
   @Column(name = "memory_reported_at")
   public Instant memoryReportedAt;
 

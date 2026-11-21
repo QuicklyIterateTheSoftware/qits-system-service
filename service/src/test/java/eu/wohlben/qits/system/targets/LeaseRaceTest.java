@@ -188,6 +188,45 @@ class LeaseRaceTest {
     }
   }
 
+  /**
+   * qits-2362: a node whose root has no memory limit (localhost, a workstation: {@code max}, so
+   * memoryMaxBytes null) is sized by its MemTotal. 16 GiB less the 2g reserve is 14 GiB: two 6g CI
+   * leases run, a third does not fit.
+   */
+  @Test
+  void aNodeWithoutAMemoryLimitIsSizedByItsMemTotal() throws Exception {
+    bearers.grant("Bearer race", "target-runner-client-race", "qits:target-runner");
+    try (FakeTargetRunner runner = FakeTargetRunner.dial(base, "Bearer race")) {
+      runner.hello(4, "vol");
+      HealthCheck check = runner.await(HealthCheck.class);
+      runner.healthChecked(check.requestId(), true);
+      runner.await(Reinstated.class);
+      runner.await(Ack.class, a -> a.slots() == 4);
+      UUID first = UUID.randomUUID();
+      UUID second = UUID.randomUUID();
+      UUID third = UUID.randomUUID();
+      TargetRows.lease(first, SlotType.CI, "qits-ci", "run-1", LeaseState.RUNNING, target);
+      TargetRows.lease(second, SlotType.CI, "qits-ci", "run-2", LeaseState.RUNNING, target);
+      TargetRows.lease(third, SlotType.CI, "qits-ci", "run-3", LeaseState.QUEUED, null);
+      String sixG =
+          "{\"image\":\"registry.qits.wohlben.eu/qits/ci:1\",\"limits\":{\"memory\":\"6g\"}}";
+      QuarkusTransaction.requiringNew()
+          .run(
+              () -> {
+                Lease.<Lease>findById(first).spec = sixG;
+                Lease.<Lease>findById(second).spec = sixG;
+                Lease.<Lease>findById(third).spec = sixG;
+                Target row = Target.findById(target);
+                row.memoryMaxBytes = null;
+                row.memoryTotalBytes = 16L << 30;
+              });
+      allocation.pass();
+      Lease waiting = TargetRows.reload(third);
+      assertEquals(LeaseState.QUEUED, waiting.state);
+      assertEquals("no target has memory for a 6g CI lease", waiting.detail);
+    }
+  }
+
   @Test
   void aGrantAndAnEndOnTheSameQueuedLeaseNeverGrantAnEndedOne() throws Exception {
     bearers.grant("Bearer race", "target-runner-client-race", "qits:target-runner");

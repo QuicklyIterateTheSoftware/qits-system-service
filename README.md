@@ -162,8 +162,10 @@ ceiling), and `0` is a ceiling (that type never runs there), never a clear. A ma
 type's reservation is 409 `MAXIMUM_BELOW_RESERVATION`; one above the total is harmless.
 
 Memory is one more conjunct (qits-2362), beside the slots and never instead of them. A target that
-reports its memory (`memoryMaxBytes`, the node's root `memory.max`) has a lease capacity of that less
-`qits.system.targets.node-memory-reserve` (default `2g`); every lease is charged its
+reports its memory (`memoryMaxBytes`, the node's root `memory.max`, and `memoryTotalBytes`, its
+`/proc/meminfo` MemTotal) has a lease capacity of the smaller of the two less
+`qits.system.targets.node-memory-reserve` (default `2g`); a figure it does not report is skipped, so
+localhost and the workstation, whose root `memory.max` is `max`, are sized by their MemTotal; every lease is charged its
 `spec.limits.memory` (docker units, binary multiples; `memorySwap` is not charged, and a lease with no
 memory limit is charged 0 — every owner sets one today). A lease fits only when the charges of the
 target's GRANTED, RUNNING and ENDING leases, plus what the other types' unused reservations would need
@@ -283,9 +285,9 @@ leases held for it sets reservations its memory can carry.
   TIMEOUT | NOT_CONNECTED | BAD_REQUEST` (an unknown target is NOT_FOUND with no target id); reading
   the audit is not itself audited.
 - **OOM kills** (qits-1818): an `inventory` carries the node's memory (`nodeOomKills`,
-  `kernelOomKills`, `memoryMaxBytes`) and each lease's (`oomKills`, `oomEvents`, `memoryPeakBytes`,
+  `kernelOomKills`, `memoryMaxBytes`, `memoryTotalBytes` since qits-2362) and each lease's (`oomKills`, `oomEvents`, `memoryPeakBytes`,
   `oomKilled`), all nullable. A target shows them as `memory {nodeOomKills, kernelOomKills,
-  memoryMaxBytes, reportedAt}`, a lease as `oomKills`, `oomScope` (`LEASE` when it hit its own limit,
+  memoryMaxBytes, memoryTotalBytes, reportedAt}`, a lease as `oomKills`, `oomScope` (`LEASE` when it hit its own limit,
   `NODE` otherwise, null without a kill — `Lease.oomScope`), `memoryPeakBytes`, `oomKilled`. A
   lease's counters and peak never move down and a missing value keeps the stored one, so an EXITED
   lease keeps its last sample; an old-shaped inventory changes none of them.
@@ -332,7 +334,7 @@ The targets module's keys are `qits.system.targets.*`, defaulted in
 `slot-images.{ci,workspace,desk}`, `probe-image` (optional: the probe runs the newest WORKSPACE, else
 DESK, lease's image first), `registry-mirrors.{registry-hosts,mirror-hosts,
 upstreams}`, `runner-version-override`, `reconnect-grace=PT2M`, `commission-reconcile-interval=1h`,
-`public-url` (wss base), `estate-interval=PT1M`, `node-memory-reserve=2g` (qits-2362: a target's lease capacity is its reported memory less this), `healthcheck.schedule`, `healthcheck.timeout=PT5M`,
+`public-url` (wss base), `estate-interval=PT1M`, `node-memory-reserve=2g` (qits-2362: a target's lease capacity is min(memoryMaxBytes, memoryTotalBytes) less this), `healthcheck.schedule`, `healthcheck.timeout=PT5M`,
 `dialback.threshold=3` and `dialback.cooloff=PT30M` (qits-1809: that many RUNNING CI leases in a row
 ended `never-dialled-back` quarantine the target, and the gating `dialback` check holds it for the
 cool-off; a GRANTED CI lease its runner reports FAILED, one it could not start at all, counts in the

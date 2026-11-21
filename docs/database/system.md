@@ -61,6 +61,7 @@ erDiagram
     int max_workspace
     long memory_max_bytes
     instant memory_reported_at
+    long memory_total_bytes
     string name "not null"
     long node_oom_kills
     string quarantine_reason
