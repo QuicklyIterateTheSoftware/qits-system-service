@@ -323,6 +323,14 @@ class GoldenMasterRecordingTest {
               200,
               null,
               Map.of()),
+          call(
+              ProviderStates.A_REMOTE_SWARM_NODE,
+              "listNodeNetworks",
+              "GET",
+              API + "/nodes/no-such-node/networks",
+              409,
+              null,
+              Map.of()),
           // --- the targets doors (qits-1481) ---
           call(
               ProviderStates.NO_TARGET,

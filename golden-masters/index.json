@@ -1794,6 +1794,19 @@
       "dependsOn": [],
       "operations": [
         {
+          "operationId": "listNodeNetworks",
+          "method": "GET",
+          "path": "/system/api/nodes/no-such-node/networks",
+          "status": 409,
+          "file": "a-swarm-node-this-service-cannot-reach/listNodeNetworks.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
           "operationId": "listNodeVolumes",
           "method": "GET",
           "path": "/system/api/nodes/no-such-node/volumes",
