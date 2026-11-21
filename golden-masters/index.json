@@ -11,6 +11,34 @@
       "dependsOn": [],
       "operations": [
         {
+          "operationId": "requestTargetHealthCheck",
+          "method": "POST",
+          "path": "/system/api/targets/{targetId}/healthcheck",
+          "status": 202,
+          "file": "a-connected-target/requestTargetHealthCheck.json",
+          "frozen": {
+            "ids": [
+              "$.requestId"
+            ],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "requestTargetLoginCheck",
+          "method": "POST",
+          "path": "/system/api/targets/{targetId}/login-check",
+          "status": 202,
+          "file": "a-connected-target/requestTargetLoginCheck.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
           "operationId": "startTargetSignIn",
           "method": "POST",
           "path": "/system/api/targets/{targetId}/sign-ins",
@@ -292,6 +320,26 @@
       },
       "dependsOn": [],
       "operations": [
+        {
+          "operationId": "listLeases",
+          "method": "GET",
+          "path": "/system/api/leases?targetId=00000000-0000-4000-8000-000000000001",
+          "status": 200,
+          "file": "a-connected-target-with-leases/listLeases.json",
+          "frozen": {
+            "ids": [
+              "$[*].id",
+              "$[*].targetId"
+            ],
+            "instants": [
+              "$[*].requestedAt",
+              "$[*].grantedAt",
+              "$[*].startedAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
         {
           "operationId": "listTargets",
           "method": "GET",
@@ -1869,6 +1917,19 @@
             "strings": [
               "$"
             ],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listTargets",
+          "method": "GET",
+          "path": "/system/api/targets",
+          "status": 200,
+          "file": "no-target/listTargets.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
             "listFilteredTo": null
           }
         }

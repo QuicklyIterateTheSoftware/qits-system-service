@@ -1,0 +1,76 @@
+[
+  {
+    "id": "00000000-0000-4000-8000-000000000003",
+    "slotType": "CI",
+    "ownerApp": "qits-ci",
+    "ownerRef": "run-1",
+    "projectId": null,
+    "workKey": null,
+    "pinTargetId": null,
+    "targetId": "00000000-0000-4000-8000-000000000001",
+    "priority": 0,
+    "state": "RUNNING",
+    "spec": {
+      "env": {
+        "QITS_TOKEN": "<redacted>"
+      },
+      "user": "1001",
+      "image": "registry.qits.wohlben.eu/qits/build-images/ci-slot:2026.1",
+      "limits": {
+        "memory": "4g"
+      }
+    },
+    "specHash": "spec-hash-1",
+    "adopt": null,
+    "exitCode": null,
+    "detail": null,
+    "requestedAt": "2026-01-01T00:00:00Z",
+    "grantedAt": "2026-01-01T00:00:00Z",
+    "startedAt": "2026-01-01T00:00:00Z",
+    "endedAt": null,
+    "oomKills": null,
+    "oomScope": null,
+    "memoryPeakBytes": null,
+    "oomKilled": null,
+    "resolvers": [],
+    "resolversStale": false,
+    "generation": 0
+  },
+  {
+    "id": "00000000-0000-4000-8000-000000000004",
+    "slotType": "WORKSPACE",
+    "ownerApp": "qits-workspaces",
+    "ownerRef": "17",
+    "projectId": null,
+    "workKey": "ws-17",
+    "pinTargetId": null,
+    "targetId": "00000000-0000-4000-8000-000000000001",
+    "priority": 0,
+    "state": "RUNNING",
+    "spec": {
+      "env": {
+        "QITS_TOKEN": "<redacted>"
+      },
+      "user": "1000",
+      "image": "registry.qits.wohlben.eu/qits/workspace:2026.1",
+      "limits": {
+        "memory": "4g"
+      }
+    },
+    "specHash": "spec-hash-1",
+    "adopt": null,
+    "exitCode": null,
+    "detail": null,
+    "requestedAt": "2026-01-01T00:00:00Z",
+    "grantedAt": "2026-01-01T00:00:00Z",
+    "startedAt": "2026-01-01T00:00:00Z",
+    "endedAt": null,
+    "oomKills": null,
+    "oomScope": null,
+    "memoryPeakBytes": null,
+    "oomKilled": null,
+    "resolvers": [],
+    "resolversStale": false,
+    "generation": 0
+  }
+]
