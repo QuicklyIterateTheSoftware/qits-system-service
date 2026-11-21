@@ -51,6 +51,12 @@ public interface TargetsConfig {
 
   Duration estateInterval();
 
+  /**
+   * The memory a target keeps for itself (qits-2362), a docker size: a target's lease capacity is
+   * its reported memory less this.
+   */
+  String nodeMemoryReserve();
+
   Healthcheck healthcheck();
 
   Dialback dialback();

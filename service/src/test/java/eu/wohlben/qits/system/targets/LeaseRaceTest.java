@@ -11,7 +11,9 @@ import eu.wohlben.qits.system.targets.control.Targets;
 import eu.wohlben.qits.system.targets.entity.Lease;
 import eu.wohlben.qits.system.targets.entity.LeaseState;
 import eu.wohlben.qits.system.targets.entity.SlotType;
+import eu.wohlben.qits.system.targets.entity.Target;
 import eu.wohlben.qits.systemrunner.protocol.HealthCheck;
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.common.http.TestHTTPResource;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -145,6 +147,44 @@ class LeaseRaceTest {
               .mapToInt(Integer::intValue)
               .sum();
       assertEquals(2, used, "the ended EXITED lease occupies its slot again");
+    }
+  }
+
+  /**
+   * qits-2362: a lease whose slot is free but whose memory is not stays QUEUED and says why, and is
+   * granted once the target reports enough. 10 GiB less the 2g reserve is 8 GiB; one 6g CI lease
+   * runs, so a second does not fit until the node reports 16 GiB.
+   */
+  @Test
+  void aLeaseTheMemoryCannotHoldStaysQueuedAndSaysWhy() throws Exception {
+    bearers.grant("Bearer race", "target-runner-client-race", "qits:target-runner");
+    try (FakeTargetRunner runner = FakeTargetRunner.dial(base, "Bearer race")) {
+      runner.hello(4, "vol");
+      HealthCheck check = runner.await(HealthCheck.class);
+      runner.healthChecked(check.requestId(), true);
+      runner.await(Reinstated.class);
+      runner.await(Ack.class, a -> a.slots() == 4);
+      UUID runs = UUID.randomUUID();
+      UUID queued = UUID.randomUUID();
+      TargetRows.lease(runs, SlotType.CI, "qits-ci", "run-1", LeaseState.RUNNING, target);
+      TargetRows.lease(queued, SlotType.CI, "qits-ci", "run-2", LeaseState.QUEUED, null);
+      String sixG =
+          "{\"image\":\"registry.qits.wohlben.eu/qits/ci:1\",\"limits\":{\"memory\":\"6g\"}}";
+      QuarkusTransaction.requiringNew()
+          .run(
+              () -> {
+                Lease.<Lease>findById(runs).spec = sixG;
+                Lease.<Lease>findById(queued).spec = sixG;
+                Target.<Target>findById(target).memoryMaxBytes = 10L << 30;
+              });
+      allocation.pass();
+      Lease waiting = TargetRows.reload(queued);
+      assertEquals(LeaseState.QUEUED, waiting.state);
+      assertEquals("no target has memory for a 6g CI lease", waiting.detail);
+      QuarkusTransaction.requiringNew()
+          .run(() -> Target.<Target>findById(target).memoryMaxBytes = 16L << 30);
+      allocation.pass();
+      assertEquals(LeaseState.GRANTED, TargetRows.reload(queued).state);
     }
   }
 

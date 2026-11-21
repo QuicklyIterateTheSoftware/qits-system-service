@@ -1,6 +1,7 @@
 package eu.wohlben.qits.system.targets.control;
 
 import eu.wohlben.qits.system.targets.control.SlotAllocator.Decision;
+import eu.wohlben.qits.system.targets.control.SlotAllocator.Memory;
 import eu.wohlben.qits.system.targets.control.SlotAllocator.Request;
 import eu.wohlben.qits.system.targets.control.SlotAllocator.TargetSlots;
 import eu.wohlben.qits.system.targets.entity.Lease;
@@ -17,6 +18,7 @@ import jakarta.inject.Inject;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -42,6 +44,11 @@ import org.jboss.logging.Logger;
  *
  * <p><b>The work volume pins.</b> A lease whose work key already has a volume is considered on that
  * volume's target only; one whose volume is marked for purging waits until the purge is done.
+ *
+ * <p><b>The memory</b> (qits-2362). Each target's {@link Memory}: its capacity from {@code
+ * memory_max_bytes} less {@code qits.system.targets.node-memory-reserve}, the charges of its
+ * occupying leases, and the charge of the newest grant of each type; each request's charge is its
+ * spec's {@code limits.memory} ({@link DockerSizes#charge}).
  */
 @ApplicationScoped
 public class TargetAllocation {
@@ -56,6 +63,11 @@ public class TargetAllocation {
   @Inject TargetEvents events;
 
   @Inject WorkVolumes workVolumes;
+
+  @Inject TargetsConfig config;
+
+  /** The default {@code node-memory-reserve}, used when the configured one does not parse. */
+  static final long DEFAULT_NODE_MEMORY_RESERVE = 2L * 1024 * 1024 * 1024;
 
   private final ExecutorService worker =
       Executors.newSingleThreadExecutor(
@@ -145,6 +157,9 @@ public class TargetAllocation {
     }
     List<Target> rows = Target.<Target>listAll();
     Map<UUID, Map<SlotType, Integer>> used = Targets.usedInTransaction();
+    Map<UUID, Long> committed = committedInTransaction();
+    Map<UUID, Map<SlotType, Long>> lastCharges = lastChargesInTransaction();
+    long reserve = nodeMemoryReserve();
     List<TargetSlots> slots = new ArrayList<>();
     Map<UUID, Target> byId = new HashMap<>();
     for (Target target : rows) {
@@ -159,7 +174,11 @@ public class TargetAllocation {
               used.getOrDefault(target.id, Map.of()),
               presence.connected(target.id),
               target.quarantined(),
-              target.signedIn()));
+              target.signedIn(),
+              new Memory(
+                  Memory.capacity(reserve, target.memoryMaxBytes),
+                  committed.getOrDefault(target.id, 0L),
+                  lastCharges.get(target.id))));
     }
     Map<UUID, Lease> leases = new HashMap<>();
     Map<UUID, WorkVolume> volumes = new HashMap<>();
@@ -182,7 +201,13 @@ public class TargetAllocation {
         }
       }
       requests.add(
-          new Request(lease.id, lease.slotType, lease.priority, lease.requestedAt, pinned));
+          new Request(
+              lease.id,
+              lease.slotType,
+              lease.priority,
+              lease.requestedAt,
+              pinned,
+              DockerSizes.charge(lease.spec)));
     }
     List<Decision> decisions = SlotAllocator.allocate(slots, requests);
     Set<UUID> granted = new LinkedHashSet<>();
@@ -216,6 +241,60 @@ public class TargetAllocation {
       granted.add(target.id);
     }
     return new Outcome(decisions, changed, granted);
+  }
+
+  /** {@code qits.system.targets.node-memory-reserve} in bytes; 2g when it does not parse. */
+  long nodeMemoryReserve() {
+    var parsed = DockerSizes.parse(config.nodeMemoryReserve());
+    if (parsed.isEmpty()) {
+      LOG.warnf(
+          "qits.system.targets.node-memory-reserve=%s is not a docker size; reserving 2g",
+          config.nodeMemoryReserve());
+      return DEFAULT_NODE_MEMORY_RESERVE;
+    }
+    return parsed.getAsLong();
+  }
+
+  /** The charges of each target's GRANTED, RUNNING and ENDING leases, every type, summed. */
+  static Map<UUID, Long> committedInTransaction() {
+    Map<UUID, Long> committed = new HashMap<>();
+    List<Object[]> rows =
+        Lease.getEntityManager()
+            .createQuery(
+                "select l.targetId, l.spec from Lease l where l.targetId is not null"
+                    + " and l.state in :occupying",
+                Object[].class)
+            .setParameter("occupying", LeaseState.OCCUPYING)
+            .getResultList();
+    for (Object[] row : rows) {
+      committed.merge((UUID) row[0], DockerSizes.charge((String) row[1]), Long::sum);
+    }
+    return committed;
+  }
+
+  /**
+   * The charge of the most recently granted lease of each type on each target, whatever its state
+   * now: what an unused reservation of that type is priced at.
+   */
+  static Map<UUID, Map<SlotType, Long>> lastChargesInTransaction() {
+    Map<UUID, Map<SlotType, Long>> charges = new HashMap<>();
+    List<Object[]> rows =
+        Lease.getEntityManager()
+            .createQuery(
+                "select l.targetId, l.slotType, l.spec, l.grantedAt, l.id from Lease l"
+                    + " where l.targetId is not null and l.grantedAt is not null"
+                    + " and l.grantedAt = (select max(m.grantedAt) from Lease m"
+                    + " where m.targetId = l.targetId and m.slotType = l.slotType)"
+                    + " order by l.grantedAt, l.id",
+                Object[].class)
+            .getResultList();
+    for (Object[] row : rows) {
+      // Ordered, so of two granted in the same instant the larger id is the one kept.
+      charges
+          .computeIfAbsent((UUID) row[0], k -> new EnumMap<>(SlotType.class))
+          .put((SlotType) row[1], DockerSizes.charge((String) row[2]));
+    }
+    return charges;
   }
 
   /**

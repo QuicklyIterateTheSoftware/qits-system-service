@@ -161,6 +161,22 @@ merges like `reservations` — a member left out keeps its value, an explicit `n
 ceiling), and `0` is a ceiling (that type never runs there), never a clear. A maximum below its
 type's reservation is 409 `MAXIMUM_BELOW_RESERVATION`; one above the total is harmless.
 
+Memory is one more conjunct (qits-2362), beside the slots and never instead of them. A target that
+reports its memory (`memoryMaxBytes`, the node's root `memory.max`) has a lease capacity of that less
+`qits.system.targets.node-memory-reserve` (default `2g`); every lease is charged its
+`spec.limits.memory` (docker units, binary multiples; `memorySwap` is not charged, and a lease with no
+memory limit is charged 0 — every owner sets one today). A lease fits only when the charges of the
+target's GRANTED, RUNNING and ENDING leases, plus what the other types' unused reservations would need
+(each priced at the memory limit of that type's most recently granted lease there), plus its own
+charge stay within the capacity; with the reservations ignored (`Σ r > T`) so is that middle term. A
+target that reports no memory is held to its slots alone. A lease some target's slots would take but
+no target's memory can hold waits with `no target has memory for a 6g WORKSPACE lease`.
+
+The consequence on ws-proof (16 GiB reported, so 14 GiB of capacity) at 6g per lease: it holds two
+leases' worth, not eight. Its CI reservation of 2 holds 12 GiB for CI, so no workspace fits beside it,
+and its workspace reservation of 1 holds 6 GiB for a workspace, so CI runs one lease at a time — until
+an operator changes its reservations to what its memory can carry.
+
     POST   /system/api/targets                       declare one; answers its install line, once
     GET    /system/api/targets[/{id}[/health]]       slots, reservations, maximums, used, login, ...
     PATCH  /system/api/targets/{id}                  description, reservations, maximums (409
@@ -313,7 +329,7 @@ The targets module's keys are `qits.system.targets.*`, defaulted in
 `slot-images.{ci,workspace,desk}`, `probe-image` (optional: the probe runs the newest WORKSPACE, else
 DESK, lease's image first), `registry-mirrors.{registry-hosts,mirror-hosts,
 upstreams}`, `runner-version-override`, `reconnect-grace=PT2M`, `commission-reconcile-interval=1h`,
-`public-url` (wss base), `estate-interval=PT1M`, `healthcheck.schedule`, `healthcheck.timeout=PT5M`,
+`public-url` (wss base), `estate-interval=PT1M`, `node-memory-reserve=2g` (qits-2362: a target's lease capacity is its reported memory less this), `healthcheck.schedule`, `healthcheck.timeout=PT5M`,
 `dialback.threshold=3` and `dialback.cooloff=PT30M` (qits-1809: that many RUNNING CI leases in a row
 ended `never-dialled-back` quarantine the target, and the gating `dialback` check holds it for the
 cool-off; a GRANTED CI lease its runner reports FAILED, one it could not start at all, counts in the
