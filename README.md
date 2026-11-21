@@ -303,6 +303,11 @@ deployment as `QITS_SYSTEM_*`. The defaults and the reasoning are in
     terminals.scrollback-bytes=262144     terminals.write-timeout=PT5S
     terminals.owner=${quarkus.application.name}
 
+One more is the service's own, in `service/src/main/resources/application.properties`:
+`terminals.origin-domain=qits.${QITS_DOMAIN}` (qits-2356), the anchor the terminal socket's origin
+check admits besides the request's own host — `https` on the default port, that name or any name
+under it — so the landing app's apex can dial the socket while a foreign page still gets a 403.
+
 The targets module's keys are `qits.system.targets.*`, defaulted in
 `targets/src/main/resources/META-INF/microprofile-config.properties`: `tenants.<app>`,
 `slot-images.{ci,workspace,desk}`, `probe-image` (optional: the probe runs the newest WORKSPACE, else

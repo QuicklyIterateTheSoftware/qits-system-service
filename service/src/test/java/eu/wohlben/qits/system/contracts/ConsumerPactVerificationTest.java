@@ -365,4 +365,9 @@ class ConsumerPactVerificationTest {
   Map<String, String> anOpenExecTerminal() {
     return states.params(ProviderStates.AN_OPEN_EXEC_TERMINAL);
   }
+
+  @State(ProviderStates.A_STOPPED_CONTAINER)
+  Map<String, String> aStoppedContainer() {
+    return states.params(ProviderStates.A_STOPPED_CONTAINER);
+  }
 }

@@ -1670,6 +1670,32 @@
       ]
     },
     {
+      "name": "a stopped container",
+      "slug": "a-stopped-container",
+      "params": {},
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "openTerminal",
+          "method": "POST",
+          "path": "/system/api/terminals",
+          "body": {
+            "kind": "EXEC",
+            "container": "aa11bb22cc33dd44ee55ff6677889900aabbccddeeff00112233445566778899",
+            "shell": "sh"
+          },
+          "status": 409,
+          "file": "a-stopped-container/openTerminal.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a swarm config holding binary data",
       "slug": "a-swarm-config-holding-binary-data",
       "params": {
@@ -2349,6 +2375,21 @@
       "params": {},
       "dependsOn": [],
       "operations": [
+        {
+          "operationId": "getTerminal",
+          "method": "GET",
+          "path": "/system/api/terminals/00000000-0000-4000-8000-000000000003",
+          "status": 404,
+          "file": "no-terminal/getTerminal.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [
+              "$.message"
+            ],
+            "listFilteredTo": null
+          }
+        },
         {
           "operationId": "openTerminal",
           "method": "POST",

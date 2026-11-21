@@ -320,6 +320,29 @@ public class ProviderStates {
    */
   public static final String AN_OPEN_EXEC_TERMINAL = "an open exec terminal";
 
+  /**
+   * No terminal is open, and the node holds a container that is not running: the fake docker's
+   * {@code a-stopped-one}, id {@link #STOPPED_CONTAINER_ID}, which {@code container inspect}
+   * reports {@code Running: false}, so an EXEC open into it answers 409 (qits-2356). A state of its
+   * own rather than another row in {@link #NO_TERMINAL}, because a recording is named {@code
+   * <state>/<operationId>.json} and that state already records the open's 201. No params.
+   */
+  public static final String A_STOPPED_CONTAINER = "a stopped container";
+
+  /** The fake docker's stopped container, {@code a-stopped-one}: its full 64-hex id. */
+  static final String STOPPED_CONTAINER_ID =
+      "aa11bb22cc33dd44ee55ff6677889900aabbccddeeff00112233445566778899";
+
+  /** The fake docker's stopped container's name. */
+  static final String STOPPED_CONTAINER_NAME = "a-stopped-one";
+
+  /**
+   * A terminal id no state opens, so a read of it is a 404 in {@link #NO_TERMINAL} (qits-2356). It
+   * is the id {@link #AN_OPEN_EXEC_TERMINAL}'s terminal freezes to, so a consumer's pact can name
+   * one literal path for both answers.
+   */
+  static final String UNKNOWN_TERMINAL_ID = Freezer.frozenId(3);
+
   /** {@code qits-system-runner-lease-<leaseId>-<id8>}, as the runner's {@code TargetNames} spells it. */
   static final String LEASE_CONTAINER =
       "qits-system-runner-lease-" + Freezer.frozenId(2) + "-00000000";
@@ -482,6 +505,7 @@ public class ProviderStates {
     states.put(A_RELEASED_SLOT_IMAGE, this::aReleasedSlotImage);
     states.put(NO_TERMINAL, this::noTerminal);
     states.put(AN_OPEN_EXEC_TERMINAL, this::anOpenExecTerminal);
+    states.put(A_STOPPED_CONTAINER, this::noTerminal);
   }
 
   /**
