@@ -275,24 +275,28 @@ public class TargetAllocation {
   /**
    * The charge of the most recently granted lease of each type on each target, whatever its state
    * now: what an unused reservation of that type is priced at.
+   *
+   * <p>One {@code distinct on} pass over the lease table, reading only the memory text out of the
+   * spec. The first form, a correlated {@code max(granted_at)} per row, cost a scan of the whole
+   * table per lease: on 17,839 rows it held every allocation pass for about 46 s, and every lease
+   * queued that long behind it (qits-2362, live on 2026-11-21).
    */
+  @SuppressWarnings("unchecked")
   static Map<UUID, Map<SlotType, Long>> lastChargesInTransaction() {
     Map<UUID, Map<SlotType, Long>> charges = new HashMap<>();
     List<Object[]> rows =
         Lease.getEntityManager()
-            .createQuery(
-                "select l.targetId, l.slotType, l.spec, l.grantedAt, l.id from Lease l"
-                    + " where l.targetId is not null and l.grantedAt is not null"
-                    + " and l.grantedAt = (select max(m.grantedAt) from Lease m"
-                    + " where m.targetId = l.targetId and m.slotType = l.slotType)"
-                    + " order by l.grantedAt, l.id",
-                Object[].class)
+            .createNativeQuery(
+                "select distinct on (target_id, slot_type) target_id, slot_type,"
+                    + " spec -> 'limits' ->> 'memory' from lease"
+                    + " where target_id is not null and granted_at is not null"
+                    + " order by target_id, slot_type, granted_at desc, id desc")
             .getResultList();
     for (Object[] row : rows) {
-      // Ordered, so of two granted in the same instant the larger id is the one kept.
+      // Of two granted in the same instant the larger id is the one kept.
       charges
           .computeIfAbsent((UUID) row[0], k -> new EnumMap<>(SlotType.class))
-          .put((SlotType) row[1], DockerSizes.charge((String) row[2]));
+          .put(SlotType.valueOf((String) row[1]), DockerSizes.parse((String) row[2]).orElse(0));
     }
     return charges;
   }
