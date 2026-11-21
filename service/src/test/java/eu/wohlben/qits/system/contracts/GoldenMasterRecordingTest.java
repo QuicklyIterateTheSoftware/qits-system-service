@@ -625,6 +625,26 @@ class GoldenMasterRecordingTest {
               200,
               null,
               Map.of()),
+          // A stopped container cannot be exec'd into (qits-2356): the open answers 409.
+          call(
+              ProviderStates.A_STOPPED_CONTAINER,
+              "openTerminal",
+              "POST",
+              API + "/terminals",
+              409,
+              "{\"kind\":\"EXEC\",\"container\":\""
+                  + ProviderStates.STOPPED_CONTAINER_ID
+                  + "\",\"shell\":\"sh\"}",
+              Map.of()),
+          // A terminal nobody opened (qits-2356): the literal id the open terminal freezes to.
+          call(
+              ProviderStates.NO_TERMINAL,
+              "getTerminal",
+              "GET",
+              API + "/terminals/" + ProviderStates.UNKNOWN_TERMINAL_ID,
+              404,
+              null,
+              Map.of()),
           call(ProviderStates.AN_OPEN_EXEC_TERMINAL, "getTerminal", "GET", TERMINAL, 200, null, Map.of()),
           call(
               ProviderStates.AN_OPEN_EXEC_TERMINAL,
