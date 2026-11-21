@@ -438,13 +438,13 @@ public class ProviderStates {
     return new Setup(Map.of());
   }
 
-  private static Setup aSwarmHoldingNoSecrets() {
-    secretsHeld(false);
+  private static Setup aSwarmHoldingNoConfigs() {
+    configsHeld(false);
     return new Setup(Map.of());
   }
 
-  private static Setup aSwarmHoldingNoConfigs() {
-    configsHeld(false);
+  private static Setup aSwarmHoldingNoSecrets() {
+    secretsHeld(false);
     return new Setup(Map.of());
   }
 
@@ -466,20 +466,20 @@ public class ProviderStates {
   }
 
   /**
-   * Whether the fake docker's {@code secret ls} prints its secrets, or nothing at all. The file sits
-   * beside the script, which every test in the run shares, so {@link #close} turns them back on.
-   */
-  private static void secretsHeld(boolean held) {
-    marker("no-secrets", !held);
-  }
-
-  /**
    * Whether the fake docker's {@code config ls} prints its configs, or nothing at all. The file
    * sits beside the script, which every test in the run shares, so {@link #close} turns them back
    * on.
    */
   private static void configsHeld(boolean held) {
     marker("no-configs", !held);
+  }
+
+  /**
+   * Whether the fake docker's {@code secret ls} prints its secrets, or nothing at all. The file sits
+   * beside the script, which every test in the run shares, so {@link #close} turns them back on.
+   */
+  private static void secretsHeld(boolean held) {
+    marker("no-secrets", !held);
   }
 
   /**
