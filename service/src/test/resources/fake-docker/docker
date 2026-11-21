@@ -124,7 +124,24 @@ JSON
           exit 1
         fi
         cat <<'JSON'
-[{"ID":"iwbwrdui2z0n62kqcjfo1erwh","Version":{"Index":234415},"CreatedAt":"2026-08-08T07:04:02.737121551Z","UpdatedAt":"2026-08-23T12:27:33.948524386Z","Spec":{"Labels":{},"Role":"manager","Availability":"active"},"Description":{"Hostname":"fake-host","Platform":{"Architecture":"x86_64","OS":"linux"},"Resources":{"NanoCPUs":24000000000,"MemoryBytes":33529409536},"Engine":{"EngineVersion":"29.7.2"}},"Status":{"State":"ready","Addr":"192.168.152.4"},"ManagerStatus":{"Leader":true,"Reachability":"reachable","Addr":"192.168.152.4:2377"}}]
+[{"ID":"iwbwrdui2z0n62kqcjfo1erwh","Version":{"Index":234415},"CreatedAt":"2026-08-08T07:04:02.737121551Z","UpdatedAt":"2026-08-23T12:27:33.948524386Z","Spec":{"Labels":{"qits.edge":"true","zone":"fsn1"},"Role":"manager","Availability":"active"},"Description":{"Hostname":"fake-host","Platform":{"Architecture":"x86_64","OS":"linux"},"Resources":{"NanoCPUs":24000000000,"MemoryBytes":33529409536},"Engine":{"EngineVersion":"29.7.2"}},"Status":{"State":"ready","Addr":"192.168.152.4"},"ManagerStatus":{"Leader":true,"Reachability":"reachable","Addr":"192.168.152.4:2377"}}]
+JSON
+        ;;
+      ps)
+        # `node ps --no-trunc --format … <ref>`: the reference is the LAST argument, after the
+        # flags. A node swarm schedules nothing on prints nothing and exits 0; a state that wants
+        # one writes this file (ProviderStates.A_SWARM_NODE_RUNNING_NO_TASKS).
+        for ref in "$@"; do :; done
+        if [ "$ref" != "iwbwrdui2z0n62kqcjfo1erwh" ]; then
+          echo "Error: no such node: $ref" >&2
+          exit 1
+        fi
+        if [ -f "$here/no-node-tasks" ]; then
+          exit 0
+        fi
+        cat <<'JSON'
+{"CurrentState":"Running 4 hours ago","DesiredState":"Running","Error":"","ID":"abx4yo2tk0ls7z5z5t80pweo9","Image":"registry.dev.localhost:8080/qits/qits-artifacts:09920e6","Name":"dev-qits-artifacts.1","Node":"fake-host","Ports":""}
+{"CurrentState":"Failed 5 hours ago","DesiredState":"Shutdown","Error":"task: non-zero exit (1)","ID":"q8m3c1xv7d2kz0pn4wr6ys9tb","Image":"registry.dev.localhost:8080/qits/qits-artifacts:09920e6","Name":"dev-qits-artifacts.1","Node":"fake-host","Ports":""}
 JSON
         ;;
     esac

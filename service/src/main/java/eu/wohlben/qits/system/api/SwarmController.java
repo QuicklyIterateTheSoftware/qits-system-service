@@ -8,6 +8,7 @@ import eu.wohlben.qits.system.reads.SecretSummary;
 import eu.wohlben.qits.system.reads.ServiceDetail;
 import eu.wohlben.qits.system.reads.ServiceSummary;
 import eu.wohlben.qits.system.reads.SwarmReads;
+import eu.wohlben.qits.system.reads.TaskSummary;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
@@ -45,8 +46,29 @@ public class SwarmController {
   @GET
   @Path("/nodes/{id}")
   @Operation(operationId = "getSwarmNode", summary = "Node")
+  @APIResponse(
+      responseCode = "200",
+      description = "OK",
+      content =
+          @Content(
+              mediaType = MediaType.APPLICATION_JSON,
+              schema = @Schema(implementation = NodeDetail.class)))
+  @APIResponse(responseCode = "404", description = "No such node")
   public NodeDetail node(@PathParam("id") String id) {
     return swarm.node(id);
+  }
+
+  /**
+   * What swarm runs on one node — the one per-node question the manager answers for EVERY node,
+   * unlike {@link NodeController}'s reads, which only reach this one.
+   */
+  @GET
+  @Path("/nodes/{id}/tasks")
+  @Operation(operationId = "listSwarmNodeTasks", summary = "Node tasks")
+  @APIResponse(responseCode = "200", description = "OK")
+  @APIResponse(responseCode = "404", description = "No such node")
+  public List<TaskSummary> nodeTasks(@PathParam("id") String id) {
+    return swarm.nodeTasks(id);
   }
 
   @GET

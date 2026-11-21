@@ -2,6 +2,7 @@ package eu.wohlben.qits.system.reads;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,13 +33,15 @@ class SwarmParsersTest {
 
   @Test
   void readsANodeDocument() {
-    NodeDetail node = NodeDetail.from(Fixtures.array("docker-node-inspect.json").get(0));
+    NodeDetail node = NodeDetail.from(Fixtures.array("docker-node-inspect.json").get(0), true);
 
     assertEquals("iwbwrdui2z0n62kqcjfo1erwh", node.id());
     assertEquals("DESKTOP-3630IEI", node.hostname());
     assertEquals("manager", node.role());
-    assertEquals("active", node.availability());
-    assertEquals("ready", node.status());
+    // The document says "active" and "ready"; the detail answers in the list's vocabulary, so a
+    // row and the page it opens print the same word (qits-2347).
+    assertEquals("Active", node.availability());
+    assertEquals("Ready", node.status());
     assertEquals("192.168.152.4", node.address());
     assertEquals("29.7.2", node.engineVersion());
     assertEquals("x86_64", node.architecture());
@@ -48,6 +51,34 @@ class SwarmParsersTest {
     assertTrue(node.memoryBytes() > 0);
     // Rebuilt in the LIST's vocabulary, so a detail page and the row it was opened from agree.
     assertEquals("Leader", node.managerStatus());
+    // The document does not know which node read it; the caller says, and the detail carries it.
+    assertTrue(node.self());
+  }
+
+  @Test
+  void aNodeDocumentSpeaksTheListsVocabularyForEveryState() throws Exception {
+    ObjectMapper mapper = new ObjectMapper();
+    String[][] rows = {
+      {"ready", "active", "Ready", "Active"},
+      {"down", "drain", "Down", "Drain"},
+      {"unknown", "pause", "Unknown", "Pause"},
+    };
+    for (String[] row : rows) {
+      NodeDetail node =
+          NodeDetail.from(
+              mapper.readTree(
+                  "{\"ID\":\"n1\",\"Spec\":{\"Role\":\"worker\",\"Availability\":\""
+                      + row[1]
+                      + "\"},\"Status\":{\"State\":\""
+                      + row[0]
+                      + "\"}}"),
+              false);
+      assertEquals(row[2], node.status());
+      assertEquals(row[3], node.availability());
+      // A worker has no manager status, and a node read from elsewhere is not this one.
+      assertNull(node.managerStatus());
+      assertFalse(node.self());
+    }
   }
 
   @Test

@@ -589,6 +589,8 @@ components:
           type: string
         updatedAt:
           type: string
+        self:
+          type: boolean
     NodeSummary:
       type: object
       properties:
@@ -1733,6 +1735,42 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/NodeDetail"
+        "404":
+          description: No such node
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      tags:
+      - Swarm Controller
+      security:
+      - SecurityScheme:
+        - qits:admin
+        - qits:admin-agent
+        - qits:desk-admin
+        - qits:system
+        - qits:agent
+  /system/api/swarm/nodes/{id}/tasks:
+    get:
+      summary: Node tasks
+      operationId: listSwarmNodeTasks
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TaskSummary"
+        "404":
+          description: No such node
         "401":
           description: Not Authorized
         "403":

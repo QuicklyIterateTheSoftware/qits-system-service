@@ -140,7 +140,15 @@ public class DockerCli {
 
   /** Read {@code ls --format '{{json .}}'} output: one JSON object per line, blank lines skipped. */
   public List<JsonNode> jsonLines(List<String> argv) {
-    String output = run(argv);
+    return parseLines(argv, run(argv));
+  }
+
+  /**
+   * Read already-captured {@code --format '{{json .}}'} output — the line-shaped counterpart of
+   * {@link #parseArray}, for a caller that ran {@link #attempt} first to tell docker's "no such
+   * object" from docker being unreachable.
+   */
+  public List<JsonNode> parseLines(List<String> argv, String output) {
     List<JsonNode> rows = new ArrayList<>();
     for (String line : output.split("\n")) {
       String trimmed = line.trim();

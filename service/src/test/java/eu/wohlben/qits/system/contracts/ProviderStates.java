@@ -94,9 +94,25 @@ public class ProviderStates {
    */
   public static final String NO_SUCH_SWARM_SERVICE = "no such swarm service";
 
+  /**
+   * The same swarm, read for a node swarm schedules nothing on: {@code node inspect} answers it and
+   * {@code node ps} prints no task, so its task list is {@code []} (qits-2347). Param {@code
+   * nodeId}. Only the task listing differs; the fake docker reads a {@code no-node-tasks} file
+   * beside it.
+   */
+  public static final String A_SWARM_NODE_RUNNING_NO_TASKS = "a swarm node running no tasks";
+
+  /**
+   * The same swarm, read for a node it does not have: {@code node inspect} and {@code node ps} exit
+   * 1 with docker's "no such node", which is both doors' 404 (qits-2347). Param {@code nodeId}.
+   */
+  public static final String NO_SUCH_SWARM_NODE = "no such swarm node";
+
   static final String NODE_ID = "iwbwrdui2z0n62kqcjfo1erwh";
 
   static final String SERVICE_ID = "dev-qits-artifacts";
+
+  static final String UNKNOWN_NODE_ID = "no-such-node";
 
   static final String IDLE_SERVICE_ID = "dev-qits-idle";
 
@@ -330,6 +346,8 @@ public class ProviderStates {
     states.put(
         A_SWARM_SERVICE_WITH_NO_TASKS, () -> new Setup(Map.of("serviceId", IDLE_SERVICE_ID)));
     states.put(NO_SUCH_SWARM_SERVICE, () -> new Setup(Map.of("serviceId", UNKNOWN_SERVICE_ID)));
+    states.put(A_SWARM_NODE_RUNNING_NO_TASKS, ProviderStates::aSwarmNodeRunningNoTasks);
+    states.put(NO_SUCH_SWARM_NODE, () -> new Setup(Map.of("nodeId", UNKNOWN_NODE_ID)));
     states.put(NO_TARGET, this::noTarget);
     states.put(A_DECLARED_TARGET, this::aDeclaredTarget);
     states.put(AN_UNREGISTERED_RUNNER, this::anUnregisteredRunner);
@@ -361,6 +379,7 @@ public class ProviderStates {
   public void close() {
     servicesRunning(true);
     nodesListed(true);
+    nodeTasksRunning(true);
     if (runner != null) {
       runner.answering(null);
       runner.close();
@@ -382,9 +401,10 @@ public class ProviderStates {
       throw new IllegalArgumentException(
           "No provider state '" + state + "' — this provider answers for " + states.keySet());
     }
-    // Only the empty-swarm states turn their marker off; every other state starts both on.
+    // Only the empty-swarm states turn their marker off; every other state starts them all on.
     servicesRunning(true);
     nodesListed(true);
+    nodeTasksRunning(true);
     return setup.get();
   }
 
@@ -417,6 +437,11 @@ public class ProviderStates {
     return new Setup(Map.of());
   }
 
+  private static Setup aSwarmNodeRunningNoTasks() {
+    nodeTasksRunning(false);
+    return new Setup(Map.of("nodeId", NODE_ID));
+  }
+
   /**
    * Whether the fake docker's {@code service ls} prints its services, or nothing at all. The file
    * sits beside the script, which every test in the run shares, so {@link #close} turns them back
@@ -432,6 +457,15 @@ public class ProviderStates {
    */
   private static void nodesListed(boolean listed) {
     marker("no-nodes", !listed);
+  }
+
+  /**
+   * Whether the fake docker's {@code node ps} prints the node's tasks, or nothing at all. The file
+   * sits beside the script, which every test in the run shares, so {@link #close} turns them back
+   * on.
+   */
+  private static void nodeTasksRunning(boolean running) {
+    marker("no-node-tasks", !running);
   }
 
   /**
