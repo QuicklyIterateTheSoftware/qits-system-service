@@ -1582,6 +1582,48 @@
       ]
     },
     {
+      "name": "a swarm holding no configs",
+      "slug": "a-swarm-holding-no-configs",
+      "params": {},
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listSwarmConfigs",
+          "method": "GET",
+          "path": "/system/api/swarm/configs",
+          "status": 200,
+          "file": "a-swarm-holding-no-configs/listSwarmConfigs.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a swarm holding no secrets",
+      "slug": "a-swarm-holding-no-secrets",
+      "params": {},
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listSwarmSecrets",
+          "method": "GET",
+          "path": "/system/api/swarm/secrets",
+          "status": 200,
+          "file": "a-swarm-holding-no-secrets/listSwarmSecrets.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a swarm listing no nodes",
       "slug": "a-swarm-listing-no-nodes",
       "params": {},

@@ -175,7 +175,11 @@ socket not mounted, group not added, node is not a manager — all arrive as a n
 clear sentence, and passing that sentence through is worth more than anything this service could
 invent. A missing binary is `ContainerProcess`'s exit -1 with the `IOException`'s message, the same
 503. The two callers that must tell "docker said no" from "docker could not be asked" use
-`attempt` and match on docker's wording; they are `SwarmReads.inspectOne` and `NodeReads`.
+`attempt` and match on docker's wording; they are `SwarmReads.inspectOne` and `NodeReads`. A third
+uses `attempt` to retry rather than to match: `SwarmReads.secrets`' usage pair (`service ls -q`, then
+ONE `service inspect --format` over every id, qits-2350) fails as a whole when a service is removed in
+between, so the pair runs once more before the 503 (a timeout is not retried). Its template prints
+each service's name and secret references only, so no env value reaches even the process output.
 
 **Two checkpoints on every caller string, and neither is trusted alone.** `docker/CallerValues`
 checks first and answers a refusal as this service's 400 (`not a valid <what>: …`); the library's
