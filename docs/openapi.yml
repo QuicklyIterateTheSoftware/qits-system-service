@@ -32,8 +32,10 @@ components:
           type: string
         createdAt:
           type: string
+          format: date-time
         updatedAt:
           type: string
+          format: date-time
         labels:
           type: object
           additionalProperties:
@@ -689,8 +691,10 @@ components:
           type: string
         createdAt:
           type: string
+          format: date-time
         updatedAt:
           type: string
+          format: date-time
         labels:
           type: object
           additionalProperties:
