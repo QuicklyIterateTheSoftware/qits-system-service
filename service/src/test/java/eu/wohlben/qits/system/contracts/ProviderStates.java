@@ -142,6 +142,15 @@ public class ProviderStates {
   public static final String A_NODE_HOLDING_NO_VOLUMES = "a node holding no volumes";
 
   /**
+   * This node's docker holding no image: {@code docker image ls} prints nothing and exits 0, so the
+   * image list is {@code []}. A real daemon here always holds at least this service's own image —
+   * it is running from one — so this is the defensive empty answer a consumer must still render
+   * (qits-2353). Only the image listing differs; the fake docker reads a {@code no-images} file
+   * beside it.
+   */
+  public static final String A_SWARM_NODE_HOLDING_NO_IMAGES = "a swarm node holding no images";
+
+  /**
    * A node-resource door addressed to a swarm node that is not the one this service runs on:
    * {@code NodeReads.requireLocal} refuses any id that is neither {@code local} nor the local
    * node's id, so the door answers 409 {@code NODE_REMOTE} without asking docker anything. No fake-docker setup.
@@ -432,6 +441,7 @@ public class ProviderStates {
     states.put(NO_SUCH_SWARM_NODE, () -> new Setup(Map.of("nodeId", UNKNOWN_NODE_ID)));
     states.put(A_NODE_LISTING_NO_NETWORKS, ProviderStates::aNodeListingNoNetworks);
     states.put(A_NODE_HOLDING_NO_VOLUMES, ProviderStates::aNodeHoldingNoVolumes);
+    states.put(A_SWARM_NODE_HOLDING_NO_IMAGES, ProviderStates::aSwarmNodeHoldingNoImages);
     states.put(A_REMOTE_SWARM_NODE, () -> new Setup(Map.of()));
     states.put(
         A_SWARM_CONFIG_HOLDING_NO_DATA, () -> new Setup(Map.of("configId", EMPTY_CONFIG_ID)));
@@ -476,6 +486,7 @@ public class ProviderStates {
     nodeTasksRunning(true);
     networksListed(true);
     volumesHeld(true);
+    imagesHeld(true);
     if (runner != null) {
       runner.answering(null);
       runner.close();
@@ -505,6 +516,7 @@ public class ProviderStates {
     nodeTasksRunning(true);
     networksListed(true);
     volumesHeld(true);
+    imagesHeld(true);
     return setup.get();
   }
 
@@ -554,6 +566,11 @@ public class ProviderStates {
 
   private static Setup aNodeHoldingNoVolumes() {
     volumesHeld(false);
+    return new Setup(Map.of());
+  }
+
+  private static Setup aSwarmNodeHoldingNoImages() {
+    imagesHeld(false);
     return new Setup(Map.of());
   }
 
@@ -621,6 +638,14 @@ public class ProviderStates {
    */
   private static void volumesHeld(boolean held) {
     marker("no-volumes", !held);
+  }
+
+  /**
+   * Whether the fake docker's {@code image ls} prints its images, or nothing at all. The file sits
+   * beside the script, which every test in the run shares, so {@link #close} turns them back on.
+   */
+  private static void imagesHeld(boolean held) {
+    marker("no-images", !held);
   }
 
   /**

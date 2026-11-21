@@ -64,6 +64,8 @@ public class NodeController {
   @GET
   @Path("/{id}/images")
   @Operation(operationId = "listNodeImages", summary = "Images")
+  @APIResponse(responseCode = "200", description = "OK")
+  @APIResponse(responseCode = "409", description = "NODE_REMOTE: not the node this service runs on")
   public List<ImageSummary> images(@PathParam("id") String id) {
     return nodes.images(id);
   }

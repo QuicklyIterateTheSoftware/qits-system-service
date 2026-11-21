@@ -1752,6 +1752,27 @@
       ]
     },
     {
+      "name": "a swarm node holding no images",
+      "slug": "a-swarm-node-holding-no-images",
+      "params": {},
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listNodeImages",
+          "method": "GET",
+          "path": "/system/api/nodes/local/images",
+          "status": 200,
+          "file": "a-swarm-node-holding-no-images/listNodeImages.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a swarm node running no tasks",
       "slug": "a-swarm-node-running-no-tasks",
       "params": {
@@ -1793,6 +1814,19 @@
       "params": {},
       "dependsOn": [],
       "operations": [
+        {
+          "operationId": "listNodeImages",
+          "method": "GET",
+          "path": "/system/api/nodes/no-such-node/images",
+          "status": 409,
+          "file": "a-swarm-node-this-service-cannot-reach/listNodeImages.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
         {
           "operationId": "listNodeNetworks",
           "method": "GET",

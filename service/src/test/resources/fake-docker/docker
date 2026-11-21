@@ -335,6 +335,11 @@ JSON
     ;;
 
   image)
+    # A node holding no images prints nothing and exits 0; a state that wants one writes this file
+    # (ProviderStates.A_SWARM_NODE_HOLDING_NO_IMAGES).
+    if [ -f "$here/no-images" ]; then
+      exit 0
+    fi
     echo '{"Containers":"3","CreatedAt":"2026-08-18 04:46:43 +0200 CEST","CreatedSince":"5 days ago","Digest":"<none>","ID":"sha256:14beaf669b73","Repository":"registry.dev.localhost:8080/qits/qits-ci","SharedSize":"N/A","Size":"325MB","Tag":"3e501b6","UniqueSize":"N/A"}'
     ;;
 

@@ -1541,6 +1541,8 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/ImageSummary"
+        "409":
+          description: "NODE_REMOTE: not the node this service runs on"
         "401":
           description: Not Authorized
         "403":

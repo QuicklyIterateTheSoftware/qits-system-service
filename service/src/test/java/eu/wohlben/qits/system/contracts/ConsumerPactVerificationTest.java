@@ -221,6 +221,11 @@ class ConsumerPactVerificationTest {
     return states.params(ProviderStates.A_NODE_HOLDING_NO_VOLUMES);
   }
 
+  @State(ProviderStates.A_SWARM_NODE_HOLDING_NO_IMAGES)
+  Map<String, String> aSwarmNodeHoldingNoImages() {
+    return states.params(ProviderStates.A_SWARM_NODE_HOLDING_NO_IMAGES);
+  }
+
   @State(ProviderStates.A_REMOTE_SWARM_NODE)
   Map<String, String> aRemoteSwarmNode() {
     return states.params(ProviderStates.A_REMOTE_SWARM_NODE);
