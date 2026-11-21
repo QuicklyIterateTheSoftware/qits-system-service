@@ -1601,6 +1601,52 @@
       ]
     },
     {
+      "name": "a swarm config holding binary data",
+      "slug": "a-swarm-config-holding-binary-data",
+      "params": {
+        "configId": "qits-binary-config"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getSwarmConfig",
+          "method": "GET",
+          "path": "/system/api/swarm/configs/{configId}",
+          "status": 200,
+          "file": "a-swarm-config-holding-binary-data/getSwarmConfig.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a swarm config holding no data",
+      "slug": "a-swarm-config-holding-no-data",
+      "params": {
+        "configId": "qits-empty-config"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getSwarmConfig",
+          "method": "GET",
+          "path": "/system/api/swarm/configs/{configId}",
+          "status": 200,
+          "file": "a-swarm-config-holding-no-data/getSwarmConfig.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a swarm holding no configs",
       "slug": "a-swarm-holding-no-configs",
       "params": {},
@@ -1953,6 +1999,29 @@
             "instants": [
               "$.purgeRequestedAt"
             ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "no such swarm config",
+      "slug": "no-such-swarm-config",
+      "params": {
+        "configId": "no-such-config"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getSwarmConfig",
+          "method": "GET",
+          "path": "/system/api/swarm/configs/{configId}",
+          "status": 404,
+          "file": "no-such-swarm-config/getSwarmConfig.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
             "strings": [],
             "listFilteredTo": null
           }

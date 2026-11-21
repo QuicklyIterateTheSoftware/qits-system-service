@@ -232,13 +232,31 @@ JSON
         echo '{"CreatedAt":"3 months ago","ID":"ktnbjxoalbkvbvedmg1urrz8h","Labels":"qits.platform.deployments.target=platform","Name":"qits-edge-vhosts","UpdatedAt":"3 months ago"}'
         ;;
       inspect)
-        if [ "$3" != "qits-edge-vhosts" ]; then
-          echo "Error: no such config: $3" >&2
-          exit 1
-        fi
-        cat <<'JSON'
+        # By name or by id, as docker resolves either. The two configs below the listed one are
+        # inspectable but never listed by `ls` above: they exist for the detail door's edge cases
+        # (ProviderStates.A_SWARM_CONFIG_HOLDING_NO_DATA / _BINARY_DATA) — one whose spec carries no
+        # Data and no Labels, and one whose Data is base64 of bytes that are not UTF-8 (0xff).
+        case "$3" in
+          qits-edge-vhosts|ktnbjxoalbkvbvedmg1urrz8h)
+            cat <<'JSON'
 [{"ID":"ktnbjxoalbkvbvedmg1urrz8h","Version":{"Index":4711},"CreatedAt":"2026-08-18T04:31:02.113044212Z","UpdatedAt":"2026-08-18T04:31:02.113044212Z","Spec":{"Name":"qits-edge-vhosts","Labels":{"qits.platform.deployments.target":"platform"},"Data":"cmVnaXN0cnkuZGV2LmxvY2FsaG9zdCAtPiBxaXRzLWFydGlmYWN0cwo="}}]
 JSON
+            ;;
+          qits-empty-config|p3m8w2xq7v5k1d9c4n6b0t2ra)
+            cat <<'JSON'
+[{"ID":"p3m8w2xq7v5k1d9c4n6b0t2ra","Version":{"Index":4802},"CreatedAt":"2026-09-02T11:14:27.508310944Z","UpdatedAt":"2026-09-02T11:14:27.508310944Z","Spec":{"Name":"qits-empty-config"}}]
+JSON
+            ;;
+          qits-binary-config|h7r2c9v4m1x8q5w3k6d0n2bze)
+            cat <<'JSON'
+[{"ID":"h7r2c9v4m1x8q5w3k6d0n2bze","Version":{"Index":4815},"CreatedAt":"2026-09-03T08:41:55.271906118Z","UpdatedAt":"2026-09-03T08:41:55.271906118Z","Spec":{"Name":"qits-binary-config","Labels":{"qits.platform.deployments.target":"platform"},"Data":"/w=="}}]
+JSON
+            ;;
+          *)
+            echo "Error: no such config: $3" >&2
+            exit 1
+            ;;
+        esac
         ;;
     esac
     ;;

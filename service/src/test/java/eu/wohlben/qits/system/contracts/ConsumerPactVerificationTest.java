@@ -216,6 +216,21 @@ class ConsumerPactVerificationTest {
     return states.params(ProviderStates.NO_SUCH_SWARM_NODE);
   }
 
+  @State(ProviderStates.A_SWARM_CONFIG_HOLDING_NO_DATA)
+  Map<String, String> aSwarmConfigHoldingNoData() {
+    return states.params(ProviderStates.A_SWARM_CONFIG_HOLDING_NO_DATA);
+  }
+
+  @State(ProviderStates.A_SWARM_CONFIG_HOLDING_BINARY_DATA)
+  Map<String, String> aSwarmConfigHoldingBinaryData() {
+    return states.params(ProviderStates.A_SWARM_CONFIG_HOLDING_BINARY_DATA);
+  }
+
+  @State(ProviderStates.NO_SUCH_SWARM_CONFIG)
+  Map<String, String> noSuchSwarmConfig() {
+    return states.params(ProviderStates.NO_SUCH_SWARM_CONFIG);
+  }
+
   @State(ProviderStates.NO_TARGET)
   Map<String, String> noTarget() {
     return states.params(ProviderStates.NO_TARGET);

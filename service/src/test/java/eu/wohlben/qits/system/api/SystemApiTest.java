@@ -187,6 +187,55 @@ class SystemApiTest {
   }
 
   @Test
+  void aConfigIsInspectedByItsIdAsWellAsItsName() {
+    given()
+        .when()
+        .get("/system/api/swarm/configs/ktnbjxoalbkvbvedmg1urrz8h")
+        .then()
+        .statusCode(200)
+        .body("id", Matchers.equalTo("ktnbjxoalbkvbvedmg1urrz8h"))
+        .body("name", Matchers.equalTo("qits-edge-vhosts"))
+        .body("data", Matchers.equalTo("registry.dev.localhost -> qits-artifacts\n"));
+  }
+
+  @Test
+  void aConfigHoldingNoDataAnswersEmptyTextAndNoLabels() {
+    // Empty, never null: a client renders an empty document, not the word "null".
+    given()
+        .when()
+        .get("/system/api/swarm/configs/qits-empty-config")
+        .then()
+        .statusCode(200)
+        .body("name", Matchers.equalTo("qits-empty-config"))
+        .body("data", Matchers.equalTo(""))
+        .body("binary", Matchers.equalTo(false))
+        .body("labels", Matchers.anEmptyMap());
+  }
+
+  @Test
+  void aConfigHoldingBytesThatAreNotTextIsBinaryWithNoData() {
+    given()
+        .when()
+        .get("/system/api/swarm/configs/qits-binary-config")
+        .then()
+        .statusCode(200)
+        .body("name", Matchers.equalTo("qits-binary-config"))
+        .body("data", Matchers.equalTo(""))
+        .body("binary", Matchers.equalTo(true));
+  }
+
+  @Test
+  void anUnknownConfigIsA404WithAMessage() {
+    given()
+        .when()
+        .get("/system/api/swarm/configs/no-such-config")
+        .then()
+        .statusCode(404)
+        .contentType(ContentType.JSON)
+        .body("message", Matchers.containsString("no such config"));
+  }
+
+  @Test
   void anUnknownSwarmObjectIsA404WithAMessage() {
     // Docker exits non-zero for both "no such node" and "cannot connect"; only the first may be a
     // 404, and the wording is what tells them apart.

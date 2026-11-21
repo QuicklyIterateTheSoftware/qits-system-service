@@ -1683,6 +1683,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ConfigDetail"
+        "404":
+          description: No such config
         "401":
           description: Not Authorized
         "403":

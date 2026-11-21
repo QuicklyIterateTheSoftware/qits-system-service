@@ -123,6 +123,29 @@ public class ProviderStates {
    */
   public static final String NO_SUCH_SWARM_NODE = "no such swarm node";
 
+  /**
+   * The same swarm, read for a config whose spec carries no data and no labels: {@code config
+   * inspect qits-empty-config} answers it, so its detail carries {@code data: ""}, {@code binary:
+   * false} and {@code labels: {}} (qits-2349). Param {@code configId}. The fake docker's {@code
+   * config ls} does not list it, so the list recordings stay the other states'.
+   */
+  public static final String A_SWARM_CONFIG_HOLDING_NO_DATA = "a swarm config holding no data";
+
+  /**
+   * The same swarm, read for a config whose bytes are not UTF-8: {@code config inspect
+   * qits-binary-config} answers data that does not decode as text, so its detail carries {@code
+   * data: ""} and {@code binary: true} (qits-2349). Param {@code configId}. The fake docker's
+   * {@code config ls} does not list it.
+   */
+  public static final String A_SWARM_CONFIG_HOLDING_BINARY_DATA =
+      "a swarm config holding binary data";
+
+  /**
+   * The same swarm, read for a config it does not hold: {@code config inspect} exits 1 with
+   * docker's "no such config", which is the door's 404 (qits-2349). Param {@code configId}.
+   */
+  public static final String NO_SUCH_SWARM_CONFIG = "no such swarm config";
+
   static final String NODE_ID = "iwbwrdui2z0n62kqcjfo1erwh";
 
   static final String SERVICE_ID = "dev-qits-artifacts";
@@ -134,6 +157,12 @@ public class ProviderStates {
   static final String UNKNOWN_SERVICE_ID = "no-such-service";
 
   static final String CONFIG_ID = "qits-edge-vhosts";
+
+  static final String EMPTY_CONFIG_ID = "qits-empty-config";
+
+  static final String BINARY_CONFIG_ID = "qits-binary-config";
+
+  static final String UNKNOWN_CONFIG_ID = "no-such-config";
 
   static final String CONTAINER_ID = "dev-qits-ci.1.k4g0nn1ld7o272jl7fciatg6m";
 
@@ -374,6 +403,12 @@ public class ProviderStates {
     states.put(NO_SUCH_SWARM_SERVICE, () -> new Setup(Map.of("serviceId", UNKNOWN_SERVICE_ID)));
     states.put(A_SWARM_NODE_RUNNING_NO_TASKS, ProviderStates::aSwarmNodeRunningNoTasks);
     states.put(NO_SUCH_SWARM_NODE, () -> new Setup(Map.of("nodeId", UNKNOWN_NODE_ID)));
+    states.put(
+        A_SWARM_CONFIG_HOLDING_NO_DATA, () -> new Setup(Map.of("configId", EMPTY_CONFIG_ID)));
+    states.put(
+        A_SWARM_CONFIG_HOLDING_BINARY_DATA,
+        () -> new Setup(Map.of("configId", BINARY_CONFIG_ID)));
+    states.put(NO_SUCH_SWARM_CONFIG, () -> new Setup(Map.of("configId", UNKNOWN_CONFIG_ID)));
     states.put(NO_TARGET, this::noTarget);
     states.put(A_DECLARED_TARGET, this::aDeclaredTarget);
     states.put(A_QUARANTINED_TARGET, this::aQuarantinedTarget);
