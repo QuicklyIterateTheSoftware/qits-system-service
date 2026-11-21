@@ -1110,6 +1110,8 @@ components:
           type: object
           additionalProperties:
             type: string
+        unused:
+          type: boolean
     WarmImage:
       type: object
       properties:
@@ -1581,6 +1583,8 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/NetworkSummary"
+        "409":
+          description: "NODE_REMOTE: not the node this service runs on"
         "401":
           description: Not Authorized
         "403":
@@ -1613,6 +1617,8 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/VolumeSummary"
+        "409":
+          description: "NODE_REMOTE: not the node this service runs on"
         "401":
           description: Not Authorized
         "403":
