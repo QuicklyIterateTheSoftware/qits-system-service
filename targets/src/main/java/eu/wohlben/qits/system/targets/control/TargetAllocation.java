@@ -208,7 +208,8 @@ public class TargetAllocation {
               lease.priority,
               lease.requestedAt,
               pinned,
-              DockerSizes.charge(lease.spec)));
+              DockerSizes.charge(lease.spec),
+              lease.avoidTargetId));
     }
     List<Decision> decisions = SlotAllocator.allocate(slots, requests);
     Set<UUID> granted = new LinkedHashSet<>();

@@ -91,7 +91,9 @@ public class LeaseController {
       @Schema(description = "LeaseSpec{image, env, user, limits}", required = true) JsonNode spec,
       @Schema(description = "Consider this target only") UUID pinTargetId,
       @Schema(description = "{container, volume} of a retired runner's work to take over")
-          Map<String, String> adopt) {}
+          Map<String, String> adopt,
+      @Schema(description = "Prefer any other target; this one only when no other can take the lease")
+          UUID avoidTargetId) {}
 
   @Schema(name = "ReplaceLeaseSpecRequest")
   public record ReplaceSpecRequest(@Schema(required = true) JsonNode spec) {}
@@ -127,7 +129,8 @@ public class LeaseController {
                 request.priority() == null ? 0 : request.priority(),
                 request.spec(),
                 request.pinTargetId(),
-                request.adopt()));
+                request.adopt(),
+                request.avoidTargetId()));
     return Response.status(Response.Status.CREATED).entity(TargetViews.view(lease)).build();
   }
 
@@ -242,8 +245,9 @@ public class LeaseController {
       @Parameter(
               description =
                   "Why; it lands in the lease's detail, and an operator's in the audit too. An"
-                      + " owner's never-dialled-back on a RUNNING CI lease counts toward its"
-                      + " target's dial-back quarantine (qits-1809)")
+                      + " owner's never-dialled-back on a RUNNING CI lease, or on an EXITED one"
+                      + " that ran, counts toward its target's dial-back quarantine (qits-1809,"
+                      + " qits-2382)")
           @QueryParam("reason")
           String reason) {
     if (reason != null && reason.length() > REASON_MAX) {

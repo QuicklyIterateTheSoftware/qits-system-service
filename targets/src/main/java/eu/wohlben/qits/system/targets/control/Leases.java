@@ -67,7 +67,10 @@ public class Leases {
 
   @Inject TargetPresence presence;
 
-  /** What an owner asks for. {@code spec} is checked by {@link LeaseSpecs#require}. */
+  /**
+   * What an owner asks for. {@code spec} is checked by {@link LeaseSpecs#require}; {@code
+   * avoidTargetId} is a soft preference the allocator honours for an unpinned lease (qits-2382).
+   */
   public record NewLease(
       SlotType slotType,
       String ownerRef,
@@ -76,7 +79,8 @@ public class Leases {
       int priority,
       JsonNode spec,
       UUID pinTargetId,
-      Map<String, String> adopt) {}
+      Map<String, String> adopt,
+      UUID avoidTargetId) {}
 
   /** A listing's filter; null members filter nothing. {@code ownerApp} null is every owner. */
   public record Filter(LeaseState state, SlotType slotType, UUID targetId, String ownerApp) {}
@@ -130,6 +134,7 @@ public class Leases {
                     lease.projectId = request.projectId();
                     lease.workKey = request.workKey();
                     lease.pinTargetId = request.pinTargetId();
+                    lease.avoidTargetId = request.avoidTargetId();
                     lease.priority = request.priority();
                     lease.state = LeaseState.QUEUED;
                     lease.spec = LeaseSpecs.text(spec);
