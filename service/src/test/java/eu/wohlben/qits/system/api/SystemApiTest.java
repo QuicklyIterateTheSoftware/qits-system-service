@@ -78,7 +78,12 @@ class SystemApiTest {
         .get("/system/api/swarm/configs")
         .then()
         .statusCode(200)
-        .body("[0].name", Matchers.equalTo("qits-edge-vhosts"));
+        .body("[0].name", Matchers.equalTo("qits-edge-vhosts"))
+        // config inspect's instant, not the list formatter's age (qits-2487).
+        .body("[0].createdAt", Matchers.equalTo("2026-08-18T04:31:02.113044212Z"))
+        .body("[0].labels.'qits.platform.deployments.target'", Matchers.equalTo("platform"))
+        // A list carries no content: that is the detail door's.
+        .body("[0].data", Matchers.nullValue());
 
     given()
         .when()
@@ -90,8 +95,8 @@ class SystemApiTest {
 
   @Test
   void aSecretNamesTheServicesThatUseItAndCarriesNoValue() {
-    // In docker's order (by name), with docker's own humanised dates: `secret ls` prints no
-    // timestamp, and this service never runs `secret inspect` to get one.
+    // In docker's order (by name), with the instants `secret inspect` prints (qits-2487): the
+    // `secret ls` formatter would only have said "2 months ago".
     String body =
         given()
             .when()
@@ -102,13 +107,15 @@ class SystemApiTest {
             .body("[0].id", Matchers.equalTo("x4kq7v2m9p1c8d0w5n3b6e2rt"))
             .body("[0].name", Matchers.equalTo("qits-dns-hetzner-token-2d945672e91b"))
             .body("[0].driver", Matchers.equalTo(""))
-            .body("[0].createdAt", Matchers.equalTo("2 months ago"))
-            .body("[0].updatedAt", Matchers.equalTo("2 months ago"))
+            .body("[0].createdAt", Matchers.equalTo("2026-09-21T10:12:44.118302751Z"))
+            .body("[0].updatedAt", Matchers.equalTo("2026-09-21T10:12:44.118302751Z"))
             .body("[0].labels.'qits.platform.deployments.target'", Matchers.equalTo("platform"))
             // No service spec references it: an orphan, and an empty list says so.
             .body("[0].usedBy", Matchers.empty())
             .body("[1].id", Matchers.equalTo("jvbcnrfhrbn8u9c9c0nfg2rrj"))
             .body("[1].name", Matchers.equalTo("qits-platform-idp-signing-key"))
+            .body("[1].createdAt", Matchers.equalTo("2026-08-18T04:31:09.552009133Z"))
+            // `{{json .Spec.Labels}}` printed null: an empty map, never a null.
             .body("[1].labels", Matchers.anEmptyMap())
             // Read from the service specs: dev-qits-artifacts mounts it, dev-qits-ci mounts none.
             .body("[1].usedBy", Matchers.contains("dev-qits-artifacts"))

@@ -90,6 +90,17 @@ public class HostOverviewIT {
   static final String SECRET_USAGE = "service inspect l2izhr0o4tjq qz3slj0owlxd";
 
   /**
+   * The secrets list's row call (qits-2487): one {@code secret inspect} over every id {@code secret
+   * ls} printed, by name — the row template (id, name, driver, dates, labels) dropped from the label
+   * like the usage one. It is the only way to the instants: {@code ls} prints them as an age.
+   */
+  static final String SECRET_ROWS =
+      "secret inspect x4kq7v2m9p1c8d0w5n3b6e2rt jvbcnrfhrbn8u9c9c0nfg2rrj";
+
+  /** The configs list's row call, the same shape: one {@code config inspect} over the listed ids. */
+  static final String CONFIG_ROWS = "config inspect ktnbjxoalbkvbvedmg1urrz8h";
+
+  /**
    * The canonical 64-hex id the stand-in daemon prints for {@link StoryTarget#CONTAINER} — the id
    * an operator sees, and the only string this service will ever put in an exec argv.
    */
@@ -246,8 +257,9 @@ public class HostOverviewIT {
       a service's tasks with the error the failed one carried, and the two object kinds that
       look alike and are not. A config's data IS decoded into the answer — a config exists to be
       read, and an operator debugging an edge vhost file needs to see it. A secret's never is:
-      swarm does not return a secret's value to anybody, including a manager, and this service
-      does not ask. What a secret list does say is which services use each one, and that is read
+      swarm does not return a secret's value to anybody, including a manager, so the one secret
+      inspect behind the list prints each secret's name, dates and labels and nothing that could
+      be a value. What a secret list does say is which services use each one, and that is read
       from the services' specs — their names and secret references, nothing else of them. A
       service's environment goes the same way a container's does, as keys.
       """)
@@ -329,7 +341,8 @@ public class HostOverviewIT {
         // secret references and nothing else of a spec — so not their env values either.
         .body("find { it.name == 'qits-platform-idp-signing-key' }.usedBy", contains("dev-qits-artifacts"))
         // There is no `data` field on a secret at all — not empty, absent. Nothing in this
-        // service's vocabulary could fill one: `docker secret inspect` is not among the argvs it builds.
+        // service's vocabulary could fill one: its `secret inspect` prints a row template, and a
+        // secret's document holds no value for any template to print.
         .body("[0].data", nullValue())
         .body(not(containsString(StoryTarget.SCRUBBED_SECRET)));
     story
@@ -341,15 +354,26 @@ public class HostOverviewIT {
 
     List<String> calls = StoryDocker.callsSince(before);
     assertTrue(
-        calls.contains(StoryDocker.label("secret ls", "0")),
-        "the secrets answer did not come from `docker secret ls`: " + calls);
+        calls.contains(StoryDocker.label("secret ls", "0"))
+            && calls.contains(StoryDocker.label(SECRET_ROWS, "0")),
+        "the secrets answer did not come from `secret ls` and one `secret inspect`: " + calls);
     assertTrue(
         calls.contains(StoryDocker.label("service ls -q", "0"))
             && calls.contains(StoryDocker.label(SECRET_USAGE, "0")),
         "the secrets' usage did not come from the service specs: " + calls);
+    // The secret inspect is the row template's and nothing else: one `--format`, no whole document.
+    List<String> secretRows = StoryDocker.argvOf(SECRET_ROWS);
     assertTrue(
-        calls.stream().noneMatch(call -> call.startsWith("secret inspect")),
-        "nothing here may inspect a secret: " + calls);
+        secretRows.size() > 3 && "--format".equals(secretRows.get(2)),
+        "the secrets were inspected without the row template: " + secretRows);
+    assertTrue(
+        calls.stream().filter(call -> call.startsWith("secret inspect")).count() == 1,
+        "the secrets were inspected more than once: " + calls);
+    // And a config LIST asks for no content: `.Spec.Data` is the detail door's.
+    List<String> configRows = StoryDocker.argvOf(CONFIG_ROWS);
+    assertTrue(
+        configRows.size() > 3 && !String.join(" ", configRows).contains("Data"),
+        "the config list asked for content: " + configRows);
 
     network.declare(NetworkEdge.SOCKET, StoryDocker.DOCKER, StoryDocker.DAEMON, StoryDocker.SOCKET_LABEL);
   }
@@ -427,8 +451,10 @@ public class HostOverviewIT {
     docker(SWARM_SLUG, "service inspect " + StoryTarget.SWARM_SERVICE, "0");
     docker(SWARM_SLUG, "service ps " + StoryTarget.SWARM_SERVICE, "0");
     docker(SWARM_SLUG, "config ls", "0");
+    docker(SWARM_SLUG, CONFIG_ROWS, "0");
     docker(SWARM_SLUG, "config inspect " + StoryTarget.SWARM_CONFIG, "0");
     docker(SWARM_SLUG, "secret ls", "0");
+    docker(SWARM_SLUG, SECRET_ROWS, "0");
     docker(SWARM_SLUG, "service ls -q", "0");
     docker(SWARM_SLUG, SECRET_USAGE, "0");
 
@@ -440,10 +466,11 @@ public class HostOverviewIT {
         StoryDocker.DAEMON,
         StoryDocker.SOCKET_LABEL);
 
-    // THE STORY'S TITLE, ASSERTED AS A SHAPE. Seven reads, eleven calls, one socket — and NO `secret
-    // inspect` among them, which is the one edge whose absence is the whole second half of the
-    // title. A count is what makes that absence checkable rather than merely unmentioned.
-    ReportAssertions.assertEdgeCount(CATEGORY_SLUG, SWARM_SLUG, 19);
+    // THE STORY'S TITLE, ASSERTED AS A SHAPE. Seven reads, thirteen calls, one socket — and the one
+    // `secret inspect` among them is the row template's over the listed ids (asserted on its argv
+    // above), which prints no value because a secret's document holds none. A count is what makes
+    // any further call checkable rather than merely unmentioned.
+    ReportAssertions.assertEdgeCount(CATEGORY_SLUG, SWARM_SLUG, 21);
     ReportAssertions.assertOnlyEdgesFrom(
         CATEGORY_SLUG,
         SWARM_SLUG,

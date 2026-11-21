@@ -9,10 +9,15 @@ that returns nulls.
 `.jsonl` is what `--format '{{json .}}'` prints: one JSON object per LINE, not an array.
 `.json` is what `inspect` prints: an array of documents.
 
-Two files are HAND-WRITTEN rather than captured, and say so here rather than pretending otherwise:
-`docker-config-ls.jsonl` / `docker-config-inspect.json` / `docker-secret-ls.jsonl`. The capture host
-holds no swarm configs or secrets, so these follow docker's documented shapes (the `Spec.Data`
-base64 in a config inspect, the `Driver` column a secret list carries and a config list does not).
+The two `-rows.jsonl` files are one JSON object per line too, but an INSPECT's, not an `ls`'s:
+what `config inspect` / `secret inspect --format` prints through `SwarmReads.CONFIG_ROW` /
+`SECRET_ROW` over the ids `ls` named (qits-2487) — RFC 3339 instants where the `ls` formatter only
+prints an age, and labels as a real map (`null` for none).
+
+Three files are HAND-WRITTEN rather than captured, and say so here rather than pretending otherwise:
+`docker-config-rows.jsonl` / `docker-config-inspect.json` / `docker-secret-rows.jsonl`. The capture
+host holds no swarm configs or secrets, so these follow docker's documented shapes (the `Spec.Data`
+base64 in a config inspect, the `Spec.Driver` a secret's spec may carry and a config's does not).
 Replace them with a real capture the first time this runs against a platform that has some.
 
 One part of a captured file is hand-added, for the same reason: the captured

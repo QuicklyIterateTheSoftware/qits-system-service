@@ -171,10 +171,14 @@ class SwarmParsersTest {
   @Test
   void readsConfigsAndDecodesTheirData() {
     List<ConfigSummary> configs =
-        Fixtures.lines("docker-config-ls.jsonl").stream().map(ConfigSummary::from).toList();
+        Fixtures.lines("docker-config-rows.jsonl").stream().map(ConfigSummary::from).toList();
     assertEquals(2, configs.size());
     assertEquals("qits-edge-vhosts", configs.get(0).name());
+    // Inspect's instant, as text: the `ls` formatter would have printed an age (qits-2487).
+    assertEquals("2026-08-18T04:31:02.113044212Z", configs.get(0).createdAt());
+    assertEquals("2026-08-18T04:31:02.113044212Z", configs.get(0).updatedAt());
     assertEquals("platform", configs.get(0).labels().get("qits.platform.deployments.target"));
+    // `{{json .Spec.Labels}}` prints null for a config with none.
     assertTrue(configs.get(1).labels().isEmpty(), "an unlabelled config has no labels, not a null");
 
     ConfigDetail detail = ConfigDetail.from(Fixtures.array("docker-config-inspect.json").get(0));
@@ -187,10 +191,15 @@ class SwarmParsersTest {
   @Test
   void readsSecretsAsMetadataOnly() {
     List<SecretSummary> secrets =
-        Fixtures.lines("docker-secret-ls.jsonl").stream().map(SecretSummary::from).toList();
+        Fixtures.lines("docker-secret-rows.jsonl").stream().map(SecretSummary::from).toList();
 
     assertEquals(1, secrets.size());
     assertEquals("qits-platform-idp-signing-key", secrets.get(0).name());
+    assertEquals("", secrets.get(0).driver());
+    assertEquals("2026-08-18T04:31:09.552009133Z", secrets.get(0).createdAt());
+    assertEquals("2026-08-18T04:31:09.552009133Z", secrets.get(0).updatedAt());
+    assertEquals(
+        java.util.Map.of("qits.platform.deployments.target", "platform"), secrets.get(0).labels());
     // There is no `data` component on this record to fill. Not a policy this service enforces:
     // swarm returns no secret value to anybody, so there is nothing here that could leak one.
     assertFalse(
@@ -202,7 +211,7 @@ class SwarmParsersTest {
   @Test
   void aSecretIsUsedByTheServicesWhoseSpecReferencesIt() throws Exception {
     var mapper = new ObjectMapper();
-    var secret = Fixtures.lines("docker-secret-ls.jsonl").get(0);
+    var secret = Fixtures.lines("docker-secret-rows.jsonl").get(0);
     // The usage template's lines: name and secret references, nothing else of a spec. One service
     // references by id, one by name alone, one an older secret of the same name (another id), one
     // nothing at all.
@@ -229,6 +238,26 @@ class SwarmParsersTest {
 
     assertEquals(List.of(), SecretSummary.from(secret).usedBy());
     assertEquals(List.of(), SecretSummary.from(secret, List.of(services.get(3))).usedBy());
+  }
+
+  @Test
+  void theConfigRowNeverAsksForAConfigsData() {
+    // A list shows no content, so the list read's inspect must not put any in its process output:
+    // `.Spec.Data` is the detail door's (qits-2487).
+    assertFalse(SwarmReads.CONFIG_ROW.contains("Data"), SwarmReads.CONFIG_ROW);
+    assertFalse(SwarmReads.SECRET_ROW.contains("Data"), SwarmReads.SECRET_ROW);
+  }
+
+  @Test
+  void theRowTemplatesPrintTheKeysTheParsersRead() {
+    // The fixtures above are the templates' output; this keeps the two from drifting apart.
+    for (String key : List.of("ID", "Name", "CreatedAt", "UpdatedAt", "Labels")) {
+      assertTrue(SwarmReads.CONFIG_ROW.contains("\"" + key + "\":"), key);
+      assertTrue(SwarmReads.SECRET_ROW.contains("\"" + key + "\":"), key);
+    }
+    assertTrue(SwarmReads.SECRET_ROW.contains("\"Driver\":"));
+    assertTrue(SwarmReads.CONFIG_ROW.contains("{{json .CreatedAt}}"));
+    assertTrue(SwarmReads.SECRET_ROW.contains("{{json .Spec.Labels}}"));
   }
 
   @Test

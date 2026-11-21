@@ -218,62 +218,99 @@ JSON
     esac
     ;;
 
-  config)
+  config|secret)
+    kind=$1
     case "$2" in
       ls)
-        # A swarm holding no configs prints nothing and exits 0, which is what docker does. A
-        # state that wants one writes this file (ProviderStates.A_SWARM_HOLDING_NO_CONFIGS).
-        if [ -f "$here/no-configs" ]; then
+        # `config ls`/`secret ls --format '{{.ID}}'`: the ids alone, sorted by name as docker sorts
+        # its list — the list reads' first call (qits-2487), which then inspects every id for its
+        # row. Nothing else asks either `ls` for anything, so no other format is printed. A swarm
+        # holding none prints nothing and exits 0, which is what docker does; a state that wants
+        # that writes this file (ProviderStates.A_SWARM_HOLDING_NO_CONFIGS / _NO_SECRETS).
+        if [ -f "$here/no-${kind}s" ]; then
           exit 0
         fi
-        # docker's config ls formatter writes the dates as an age, units.HumanDuration(now -
-        # CreatedAt) + " ago" (docker/cli cli/command/config/formatter.go), never a timestamp:
-        # the ISO dates are config inspect's. A fixed age keeps the recordings stable.
-        echo '{"CreatedAt":"3 months ago","ID":"ktnbjxoalbkvbvedmg1urrz8h","Labels":"qits.platform.deployments.target=platform","Name":"qits-edge-vhosts","UpdatedAt":"3 months ago"}'
+        if [ "$kind" = config ]; then
+          echo 'ktnbjxoalbkvbvedmg1urrz8h'
+        else
+          # qits-dns-hetzner-token-… before qits-platform-idp-signing-key: by name, not by id.
+          printf 'x4kq7v2m9p1c8d0w5n3b6e2rt\njvbcnrfhrbn8u9c9c0nfg2rrj\n'
+        fi
         ;;
       inspect)
-        # By name or by id, as docker resolves either. The two configs below the listed one are
-        # inspectable but never listed by `ls` above: they exist for the detail door's edge cases
-        # (ProviderStates.A_SWARM_CONFIG_HOLDING_NO_DATA / _BINARY_DATA) — one whose spec carries no
-        # Data and no Labels, and one whose Data is base64 of bytes that are not UTF-8 (0xff).
-        case "$3" in
-          qits-edge-vhosts|ktnbjxoalbkvbvedmg1urrz8h)
-            cat <<'JSON'
-[{"ID":"ktnbjxoalbkvbvedmg1urrz8h","Version":{"Index":4711},"CreatedAt":"2026-08-18T04:31:02.113044212Z","UpdatedAt":"2026-08-18T04:31:02.113044212Z","Spec":{"Name":"qits-edge-vhosts","Labels":{"qits.platform.deployments.target":"platform"},"Data":"cmVnaXN0cnkuZGV2LmxvY2FsaG9zdCAtPiBxaXRzLWFydGlmYWN0cwo="}}]
-JSON
-            ;;
-          qits-empty-config|p3m8w2xq7v5k1d9c4n6b0t2ra)
-            cat <<'JSON'
-[{"ID":"p3m8w2xq7v5k1d9c4n6b0t2ra","Version":{"Index":4802},"CreatedAt":"2026-09-02T11:14:27.508310944Z","UpdatedAt":"2026-09-02T11:14:27.508310944Z","Spec":{"Name":"qits-empty-config"}}]
-JSON
-            ;;
-          qits-binary-config|h7r2c9v4m1x8q5w3k6d0n2bze)
-            cat <<'JSON'
-[{"ID":"h7r2c9v4m1x8q5w3k6d0n2bze","Version":{"Index":4815},"CreatedAt":"2026-09-03T08:41:55.271906118Z","UpdatedAt":"2026-09-03T08:41:55.271906118Z","Spec":{"Name":"qits-binary-config","Labels":{"qits.platform.deployments.target":"platform"},"Data":"/w=="}}]
-JSON
-            ;;
-          *)
-            echo "Error: no such config: $3" >&2
+        # `<kind> inspect [--format <template>] <ref>...`, by name or by id as docker resolves
+        # either. This fake runs no Go template: a format naming `.Spec.Labels` is the list reads'
+        # row template (SwarmReads.CONFIG_ROW / SECRET_ROW), answered with a canned row per ref in
+        # its shape — RFC 3339 instants, labels as a real map, null when there are none. No format
+        # is the detail door's whole document, a JSON array. An unknown ref fails the whole call in
+        # docker's words, exit 1, which is also the race a list read retries once: a state that
+        # wants it writes `inspect-race-<kind>` holding how many inspects to fail before answering.
+        shift 2
+        format=""
+        if [ "${1:-}" = "--format" ]; then
+          format=$2
+          shift 2
+        fi
+        race="$here/inspect-race-$kind"
+        if [ -f "$race" ]; then
+          left=$(cat "$race")
+          if [ "${left:-0}" -gt 0 ]; then
+            echo $((left - 1)) > "$race"
+            echo "Error: no such $kind: $1" >&2
             exit 1
+          fi
+        fi
+        rows=""
+        documents=""
+        for ref in "$@"; do
+          row=""
+          document=""
+          case "$kind:$ref" in
+            config:qits-edge-vhosts|config:ktnbjxoalbkvbvedmg1urrz8h)
+              row='{"ID":"ktnbjxoalbkvbvedmg1urrz8h","Name":"qits-edge-vhosts","CreatedAt":"2026-08-18T04:31:02.113044212Z","UpdatedAt":"2026-08-18T04:31:02.113044212Z","Labels":{"qits.platform.deployments.target":"platform"}}'
+              document='{"ID":"ktnbjxoalbkvbvedmg1urrz8h","Version":{"Index":4711},"CreatedAt":"2026-08-18T04:31:02.113044212Z","UpdatedAt":"2026-08-18T04:31:02.113044212Z","Spec":{"Name":"qits-edge-vhosts","Labels":{"qits.platform.deployments.target":"platform"},"Data":"cmVnaXN0cnkuZGV2LmxvY2FsaG9zdCAtPiBxaXRzLWFydGlmYWN0cwo="}}'
+              ;;
+            # The two configs below are inspectable but never listed by `ls` above: they exist for
+            # the detail door's edge cases (ProviderStates.A_SWARM_CONFIG_HOLDING_NO_DATA /
+            # _BINARY_DATA) — one whose spec carries no Data and no Labels, and one whose Data is
+            # base64 of bytes that are not UTF-8 (0xff).
+            config:qits-empty-config|config:p3m8w2xq7v5k1d9c4n6b0t2ra)
+              row='{"ID":"p3m8w2xq7v5k1d9c4n6b0t2ra","Name":"qits-empty-config","CreatedAt":"2026-09-02T11:14:27.508310944Z","UpdatedAt":"2026-09-02T11:14:27.508310944Z","Labels":null}'
+              document='{"ID":"p3m8w2xq7v5k1d9c4n6b0t2ra","Version":{"Index":4802},"CreatedAt":"2026-09-02T11:14:27.508310944Z","UpdatedAt":"2026-09-02T11:14:27.508310944Z","Spec":{"Name":"qits-empty-config"}}'
+              ;;
+            config:qits-binary-config|config:h7r2c9v4m1x8q5w3k6d0n2bze)
+              row='{"ID":"h7r2c9v4m1x8q5w3k6d0n2bze","Name":"qits-binary-config","CreatedAt":"2026-09-03T08:41:55.271906118Z","UpdatedAt":"2026-09-03T08:41:55.271906118Z","Labels":{"qits.platform.deployments.target":"platform"}}'
+              document='{"ID":"h7r2c9v4m1x8q5w3k6d0n2bze","Version":{"Index":4815},"CreatedAt":"2026-09-03T08:41:55.271906118Z","UpdatedAt":"2026-09-03T08:41:55.271906118Z","Spec":{"Name":"qits-binary-config","Labels":{"qits.platform.deployments.target":"platform"},"Data":"/w=="}}'
+              ;;
+            # One secret a service uses, one none does. A secret's document has no Data to print:
+            # swarm returns a secret's value to nobody.
+            secret:qits-dns-hetzner-token-2d945672e91b|secret:x4kq7v2m9p1c8d0w5n3b6e2rt)
+              row='{"ID":"x4kq7v2m9p1c8d0w5n3b6e2rt","Name":"qits-dns-hetzner-token-2d945672e91b","Driver":"","CreatedAt":"2026-09-21T10:12:44.118302751Z","UpdatedAt":"2026-09-21T10:12:44.118302751Z","Labels":{"qits.platform.deployments.target":"platform"}}'
+              document='{"ID":"x4kq7v2m9p1c8d0w5n3b6e2rt","Version":{"Index":5120},"CreatedAt":"2026-09-21T10:12:44.118302751Z","UpdatedAt":"2026-09-21T10:12:44.118302751Z","Spec":{"Name":"qits-dns-hetzner-token-2d945672e91b","Labels":{"qits.platform.deployments.target":"platform"}}}'
+              ;;
+            secret:qits-platform-idp-signing-key|secret:jvbcnrfhrbn8u9c9c0nfg2rrj)
+              row='{"ID":"jvbcnrfhrbn8u9c9c0nfg2rrj","Name":"qits-platform-idp-signing-key","Driver":"","CreatedAt":"2026-08-18T04:31:09.552009133Z","UpdatedAt":"2026-08-18T04:31:09.552009133Z","Labels":null}'
+              document='{"ID":"jvbcnrfhrbn8u9c9c0nfg2rrj","Version":{"Index":4713},"CreatedAt":"2026-08-18T04:31:09.552009133Z","UpdatedAt":"2026-08-18T04:31:09.552009133Z","Spec":{"Name":"qits-platform-idp-signing-key","Labels":{}}}'
+              ;;
+            *)
+              echo "Error: no such $kind: $ref" >&2
+              exit 1
+              ;;
+          esac
+          rows="$rows$row
+"
+          documents="${documents:+$documents,}$document"
+        done
+        case "$format" in
+          "") printf '[%s]\n' "$documents" ;;
+          *.Spec.Labels*) printf '%s' "$rows" ;;
+          *)
+            echo "fake docker: no canned answer for $kind inspect --format $format" >&2
+            exit 2
             ;;
         esac
         ;;
     esac
-    ;;
-
-  secret)
-    # `secret ls --format '{{json .}}'` as docker prints it: sorted by name, CreatedAt/UpdatedAt
-    # HUMANISED ("2 months ago" — the live door answers exactly that, never a timestamp), Labels as
-    # the CLI's `k=v,…` column. One secret a service uses, one none does. A swarm holding no
-    # secrets prints nothing and exits 0; a state that wants one writes this file
-    # (ProviderStates.A_SWARM_HOLDING_NO_SECRETS).
-    if [ -f "$here/no-secrets" ]; then
-      exit 0
-    fi
-    cat <<'JSON'
-{"CreatedAt":"2 months ago","Driver":"","ID":"x4kq7v2m9p1c8d0w5n3b6e2rt","Labels":"qits.platform.deployments.target=platform","Name":"qits-dns-hetzner-token-2d945672e91b","UpdatedAt":"2 months ago"}
-{"CreatedAt":"3 months ago","Driver":"","ID":"jvbcnrfhrbn8u9c9c0nfg2rrj","Labels":"","Name":"qits-platform-idp-signing-key","UpdatedAt":"3 months ago"}
-JSON
     ;;
 
   ps)

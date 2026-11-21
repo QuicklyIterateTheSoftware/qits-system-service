@@ -1,2 +1,2 @@
-{"CreatedAt":"2026-08-18 04:31:02.113044212 +0000 UTC","ID":"ktnbjxoalbkvbvedmg1urrz8h","Labels":"qits.platform.deployments.target=platform","Name":"qits-edge-vhosts","UpdatedAt":"2026-08-18 04:31:02.113044212 +0000 UTC"}
-{"CreatedAt":"2026-08-18 04:31:04.882111003 +0000 UTC","ID":"m9pt1u0h2rq4uzejwgfsl6c9y","Labels":"","Name":"qits-dns-zones","UpdatedAt":"2026-08-18 04:31:04.882111003 +0000 UTC"}
+{"ID":"ktnbjxoalbkvbvedmg1urrz8h","Name":"qits-edge-vhosts","CreatedAt":"2026-08-18T04:31:02.113044212Z","UpdatedAt":"2026-08-18T04:31:02.113044212Z","Labels":{"qits.platform.deployments.target":"platform"}}
+{"ID":"m9pt1u0h2rq4uzejwgfsl6c9y","Name":"qits-dns-zones","CreatedAt":"2026-08-18T04:31:04.882111003Z","UpdatedAt":"2026-08-18T04:31:04.882111003Z","Labels":null}
