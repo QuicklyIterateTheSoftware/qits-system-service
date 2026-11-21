@@ -264,7 +264,8 @@ public class HostOverviewIT {
         .statusCode(200)
         .body("role", equalTo("manager"))
         .body("managerStatus", equalTo("Leader"))
-        .body("address", equalTo("192.168.152.4"));
+        .body("address", equalTo("192.168.152.4"))
+        .body("self", equalTo(true));
     story
         .note("the swarm's nodes, and this one in detail — a manager knows the whole cluster")
         .as("nodes-read");
@@ -413,6 +414,9 @@ public class HostOverviewIT {
 
     docker(SWARM_SLUG, "node ls", "0");
     docker(SWARM_SLUG, "node inspect " + StoryTarget.NODE_ID, "0");
+    // A node's detail says whether it is the one this service runs on (qits-2347), and only the
+    // local daemon's own `info` knows that id.
+    docker(SWARM_SLUG, "info", "0");
     docker(SWARM_SLUG, "service ls", "0");
     docker(SWARM_SLUG, "service inspect " + StoryTarget.SWARM_SERVICE, "0");
     docker(SWARM_SLUG, "service ps " + StoryTarget.SWARM_SERVICE, "0");
@@ -430,10 +434,10 @@ public class HostOverviewIT {
         StoryDocker.DAEMON,
         StoryDocker.SOCKET_LABEL);
 
-    // THE STORY'S TITLE, ASSERTED AS A SHAPE. Seven reads, ten calls, one socket — and NO `secret
+    // THE STORY'S TITLE, ASSERTED AS A SHAPE. Seven reads, eleven calls, one socket — and NO `secret
     // inspect` among them, which is the one edge whose absence is the whole second half of the
     // title. A count is what makes that absence checkable rather than merely unmentioned.
-    ReportAssertions.assertEdgeCount(CATEGORY_SLUG, SWARM_SLUG, 18);
+    ReportAssertions.assertEdgeCount(CATEGORY_SLUG, SWARM_SLUG, 19);
     ReportAssertions.assertOnlyEdgesFrom(
         CATEGORY_SLUG,
         SWARM_SLUG,
