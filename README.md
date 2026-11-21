@@ -13,7 +13,7 @@ so the client's same-origin calls and its terminal socket dial are unchanged by 
 | Question | Where the answer comes from |
 |---|---|
 | what is this machine | `docker info`, `docker system df` |
-| what is this swarm | `docker node ls/inspect`, `service ls/inspect/ps`, `config ls/inspect`, `secret ls` (+ `service ls -q`/`inspect --format` for usage) |
+| what is this swarm | `docker node ls/inspect`, `service ls/inspect/ps`, `config ls/inspect`, `secret ls`/`inspect --format` (+ `service ls -q`/`inspect --format` for usage) |
 | what is on this node | `docker ps -a`, `container inspect`, `logs --tail`, `image ls`, `volume ls`, `network ls` |
 | a live view of the host | a `glances` container on a pseudo-terminal this service owns |
 | a shell in a container | `docker exec -it <id> <shell>` on the same kind of terminal |
@@ -31,8 +31,10 @@ meant to lose. The one store is the execution targets' (below).
 - **No secret values.** Swarm does not return them to anybody, including a manager. Config data IS
   shown, decoded — that is what a config is for. A secret's row names the services that use it
   (`usedBy`, qits-2350), read from the service specs with a `--format` template printing only each
-  service's name and secret references; `secret inspect` is never run, so its dates are `secret
-  ls`'s humanised text ("2 months ago").
+  service's name and secret references. The secret and config list rows are one `secret inspect` /
+  `config inspect --format` over the ids `ls` printed (qits-2487), so their `createdAt`/`updatedAt`
+  are RFC 3339 instants rather than the `ls` formatter's "2 months ago"; a secret's document holds
+  no value to print, and the config row template never asks for a config's data.
 - **No environment values.** A service's and a container's environment is shown as KEYS only. That
   is where a platform service's injected database password and idp client secret live.
 - **One node.** The node this service runs on. A node-scoped read for any other answers
@@ -95,15 +97,18 @@ Everything about the parsers follows from this, so it is worth knowing before re
   complete, machine-shaped (`State.StartedAt` as RFC-3339).
 
 Both are used deliberately: a list wants the humanised columns, a detail wants the real fields. A
-parser written against the wrong one gets nulls and nothing notices. The suite's fixtures under
+parser written against the wrong one gets nulls and nothing notices. The swarm configs and secrets
+lists are the exception (qits-2487): their only dates are timestamps the `ls` formatter prints as an
+age, so they ask `ls` for the ids alone and print each row with an `inspect --format` template — one
+JSON object per line again, but the daemon's fields. The suite's fixtures under
 `system/src/test/resources/fixtures` are real captures of both.
 
 Two consequences worth knowing:
 
 - **Labels from a list column are lossy.** They arrive comma-joined and a value may contain a comma
-  (a real one: `maintainer=Red Hat, Inc.`). Container labels therefore come from `inspect` only; the
-  platform's own objects — configs, secrets, volumes, networks — are parsed from the column, because
-  the platform's label values carry no commas.
+  (a real one: `maintainer=Red Hat, Inc.`). Container labels therefore come from `inspect` only, as
+  do configs' and secrets' (their rows are inspect's); the platform's volumes and networks are parsed
+  from the column, because the platform's label values carry no commas.
 - **Sizes are rendered text**, and the CLI offers no way to get the numbers. `HumanSize` reads them
   back (decimal, the way go-units renders them) so the client can draw a bar; the original string
   travels beside the number.

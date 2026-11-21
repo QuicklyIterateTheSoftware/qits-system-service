@@ -8,7 +8,9 @@ import eu.wohlben.qits.system.docker.DockerCli;
 import eu.wohlben.qits.system.error.NotFoundException;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import java.util.Comparator;
 import java.util.List;
+import java.util.function.Function;
 
 /**
  * The swarm: nodes, services, configs and secrets, read from the manager this service runs on.
@@ -46,6 +48,37 @@ public class SwarmReads {
    */
   static final String SECRET_USAGE =
       "{\"name\":{{json .Spec.Name}},\"secrets\":{{json .Spec.TaskTemplate.ContainerSpec.Secrets}}}";
+
+  /** What a list read asks {@code secret ls} and {@code config ls} for: the ids alone, one a line. */
+  static final String ID_ONLY = "{{.ID}}";
+
+  /**
+   * What the secrets read asks {@code secret inspect} for: each secret's list row, one JSON object
+   * per line — id, name, driver, the two dates and the labels (qits-2487). {@code ls} cannot give
+   * the dates: its formatter humanises them ({@code "2 months ago"}) whatever the template, and only
+   * an inspect carries the instants. A secret's document holds no value to print, so the template
+   * keeps the output to the row rather than keeping anything back.
+   */
+  static final String SECRET_ROW =
+      "{\"ID\":{{json .ID}},\"Name\":{{json .Spec.Name}},"
+          + "\"Driver\":{{if .Spec.Driver}}{{json .Spec.Driver.Name}}{{else}}\"\"{{end}},"
+          + "\"CreatedAt\":{{json .CreatedAt}},\"UpdatedAt\":{{json .UpdatedAt}},"
+          + "\"Labels\":{{json .Spec.Labels}}}";
+
+  /**
+   * What the configs read asks {@code config inspect} for: each config's list row, one JSON object
+   * per line (qits-2487). Never {@code .Spec.Data}: a list shows no content, so no config's content
+   * reaches the process output of one — the detail door is where a config is read.
+   */
+  static final String CONFIG_ROW =
+      "{\"ID\":{{json .ID}},\"Name\":{{json .Spec.Name}},"
+          + "\"CreatedAt\":{{json .CreatedAt}},\"UpdatedAt\":{{json .UpdatedAt}},"
+          + "\"Labels\":{{json .Spec.Labels}}}";
+
+  /** Docker's own list order, which an inspect over the ids need not keep: by name. */
+  private static final Comparator<JsonNode> BY_NAME =
+      Comparator.comparing(
+          row -> Json.text(row, "Name"), Comparator.nullsLast(Comparator.naturalOrder()));
 
   @Inject DockerCli docker;
 
@@ -107,8 +140,17 @@ public class SwarmReads {
     return ServiceDetail.from(node, tasks);
   }
 
+  /**
+   * Every config, by name — {@code config ls} for the ids, then, only when it listed any, ONE {@code
+   * config inspect} over all of them with {@link #CONFIG_ROW}, for the instants {@code ls} only
+   * prints as an age (qits-2487). A config removed in between is the secrets' race, retried the
+   * same way ({@link #rows}).
+   */
   public List<ConfigSummary> configs() {
-    return docker.jsonLines(SwarmArgv.configLs(docker.binary(), DockerCli.JSON_LINES)).stream()
+    return rows(
+            SwarmArgv.configLs(docker.binary(), ID_ONLY),
+            ids -> SwarmArgv.configInspect(docker.binary(), ids, CONFIG_ROW))
+        .stream()
         .map(ConfigSummary::from)
         .toList();
   }
@@ -120,14 +162,19 @@ public class SwarmReads {
   }
 
   /**
-   * Every secret, with the services that use it (qits-2350) — at most three calls, and none of them
-   * a {@code secret inspect}: {@code secret ls}, then, only when it listed any, {@code service ls
-   * -q} and, only when that listed any, ONE {@code service inspect} over all of them with {@link
-   * #SECRET_USAGE}. A secret holds no list of its users; the service specs are where usage lives.
+   * Every secret by name, with the services that use it (qits-2350) — at most four calls: {@code
+   * secret ls} for the ids, then, only when it listed any, ONE {@code secret inspect} over all of
+   * them with {@link #SECRET_ROW} for the instants {@code ls} only prints as an age (qits-2487),
+   * then the usage pair — {@code service ls -q} and, only when that listed any, ONE {@code service
+   * inspect} over all of them with {@link #SECRET_USAGE}. A secret holds no list of its users; the
+   * service specs are where usage lives. {@code secret inspect} prints no value: swarm returns a
+   * secret's data to nobody, so its document has none to print.
    */
   public List<SecretSummary> secrets() {
     List<JsonNode> secrets =
-        docker.jsonLines(SwarmArgv.secretLs(docker.binary(), DockerCli.JSON_LINES));
+        rows(
+            SwarmArgv.secretLs(docker.binary(), ID_ONLY),
+            ids -> SwarmArgv.secretInspect(docker.binary(), ids, SECRET_ROW));
     if (secrets.isEmpty()) {
       return List.of();
     }
@@ -142,6 +189,47 @@ public class SwarmReads {
   }
 
   /**
+   * The list rows of one object kind, by name: an {@code ls} printing the ids, then ONE {@code
+   * inspect} over all of them printing a row each — {@code List.of()} and no inspect when the
+   * {@code ls} listed none. An object removed between the two makes docker exit non-zero for the
+   * whole inspect; that race is worth one more pair, and a second failure is the 503 of any other
+   * (a timeout is not retried).
+   */
+  private List<JsonNode> rows(List<String> ls, Function<List<String>, List<String>> inspect) {
+    List<JsonNode> rows = rowsOnce(ls, inspect, false);
+    if (rows == null) {
+      rows = rowsOnce(ls, inspect, true);
+    }
+    return rows.stream().sorted(BY_NAME).toList();
+  }
+
+  /** One {@code ls} + {@code inspect} pair; null when it failed and {@code last} is false. */
+  private List<JsonNode> rowsOnce(
+      List<String> ls, Function<List<String>, List<String>> inspect, boolean last) {
+    ContainerProcess.Result listed = docker.attempt(ls);
+    if (!DockerCli.ok(listed)) {
+      return failed(ls, listed, last);
+    }
+    List<String> ids = ids(listed);
+    if (ids.isEmpty()) {
+      return List.of();
+    }
+    List<String> argv = inspect.apply(ids);
+    ContainerProcess.Result inspected = docker.attempt(argv);
+    if (!DockerCli.ok(inspected)) {
+      return failed(argv, inspected, last);
+    }
+    return docker.parseLines(argv, inspected.output());
+  }
+
+  /** The ids an {@code ls} printed one a line, blanks dropped. */
+  private static List<String> ids(ContainerProcess.Result listed) {
+    return listed.output() == null
+        ? List.of()
+        : listed.output().lines().map(String::trim).filter(id -> !id.isEmpty()).toList();
+  }
+
+  /**
    * One {@code service ls -q} + {@code service inspect} pair: every service's name and secret
    * references, one JSON object per line. Null when the pair failed and {@code last} is false — the
    * caller's cue to try once more; a timeout is not retried, it would only cost the deadline again.
@@ -152,10 +240,7 @@ public class SwarmReads {
     if (!DockerCli.ok(listed)) {
       return failed(ls, listed, last);
     }
-    List<String> ids =
-        listed.output() == null
-            ? List.of()
-            : listed.output().lines().map(String::trim).filter(id -> !id.isEmpty()).toList();
+    List<String> ids = ids(listed);
     if (ids.isEmpty()) {
       return List.of();
     }

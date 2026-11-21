@@ -118,8 +118,9 @@ public final class Json {
   /**
    * The CLI's comma-joined label column, split back into a map.
    *
-   * <p><b>Only for objects whose labels the platform itself sets</b> — configs, secrets, volumes,
-   * networks. It is deliberately NOT used for containers: the join is lossy, because a value may
+   * <p><b>Only for objects whose labels the platform itself sets</b> — volumes and networks (a
+   * config's and a secret's list rows come from their inspect documents, which carry a real map,
+   * qits-2487). It is deliberately NOT used for containers: the join is lossy, because a value may
    * contain a comma, and a container's labels come from arbitrary images. (A real one from this
    * host: {@code maintainer=Red Hat, Inc.} splits into two entries, the second of which is not a
    * label at all.) A container's labels come from {@code inspect}, which returns a real map.

@@ -188,11 +188,16 @@ socket not mounted, group not added, node is not a manager — all arrive as a n
 clear sentence, and passing that sentence through is worth more than anything this service could
 invent. A missing binary is `ContainerProcess`'s exit -1 with the `IOException`'s message, the same
 503. The two callers that must tell "docker said no" from "docker could not be asked" use
-`attempt` and match on docker's wording; they are `SwarmReads.inspectOne` and `NodeReads`. A third
-uses `attempt` to retry rather than to match: `SwarmReads.secrets`' usage pair (`service ls -q`, then
-ONE `service inspect --format` over every id, qits-2350) fails as a whole when a service is removed in
-between, so the pair runs once more before the 503 (a timeout is not retried). Its template prints
-each service's name and secret references only, so no env value reaches even the process output.
+`attempt` and match on docker's wording; they are `SwarmReads.inspectOne` and `NodeReads`. The
+others use `attempt` to retry rather than to match, each an `ls` for ids and then ONE `inspect
+--format` over all of them, which fails as a whole when an object is removed in between, so the pair
+runs once more before the 503 (a timeout is not retried): `SwarmReads.secrets`' usage pair (`service
+ls -q`, then `service inspect`, qits-2350), whose template prints each service's name and secret
+references only, so no env value reaches even the process output; and the secrets and configs list
+rows (`secret ls`/`config ls --format '{{.ID}}'`, then `secret inspect`/`config inspect` with
+`SECRET_ROW`/`CONFIG_ROW`, qits-2487), because the `ls` formatter prints a date only as an age
+(`"2 months ago"`) and an inspect is where the RFC 3339 instants are. `CONFIG_ROW` never names
+`.Spec.Data`, and a secret's document has no value to print.
 
 **Two checkpoints on every caller string, and neither is trusted alone.** `docker/CallerValues`
 checks first and answers a refusal as this service's 400 (`not a valid <what>: …`); the library's
@@ -213,8 +218,8 @@ fail.
 ## Parsers
 
 **Fixtures are real captures, and a new field needs a new capture.** `system/src/test/resources/
-fixtures/README.md` says which files are captured and which two are hand-written because this host
-has no swarm configs. A parser written from docker's API documentation rather than from its CLI
+fixtures/README.md` says which files are captured and which are hand-written because this host
+has no swarm configs or secrets. A parser written from docker's API documentation rather than from its CLI
 output reads field names that are not there.
 
 **Every field is optional.** Docker renames and drops columns between releases, and one absent
