@@ -140,8 +140,18 @@ public class DockerCli {
 
   /** Read {@code ls --format '{{json .}}'} output: one JSON object per line, blank lines skipped. */
   public List<JsonNode> jsonLines(List<String> argv) {
-    String output = run(argv);
+    return parseLines(argv, run(argv));
+  }
+
+  /**
+   * Read an already-captured one-object-per-line output — for a caller that ran {@link #attempt}
+   * first because a failure is something it handles itself rather than a 503 at once.
+   */
+  public List<JsonNode> parseLines(List<String> argv, String output) {
     List<JsonNode> rows = new ArrayList<>();
+    if (output == null) {
+      return rows;
+    }
     for (String line : output.split("\n")) {
       String trimmed = line.trim();
       if (trimmed.isEmpty()) {

@@ -1,6 +1,7 @@
 package eu.wohlben.qits.system.stories.host;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.greaterThan;
@@ -80,6 +81,13 @@ public class HostOverviewIT {
   static final String SWARM = "An operator reads the swarm, and never a secret in it";
 
   static final String SWARM_SLUG = Slugs.slug(SWARM);
+
+  /**
+   * The secrets read's usage call, as a diagram summarises it: one {@code service inspect} over every
+   * id {@code service ls -q} printed — the template that keeps it to names and secret references is
+   * dropped from the label, its braces being mermaid syntax.
+   */
+  static final String SECRET_USAGE = "service inspect l2izhr0o4tjq qz3slj0owlxd";
 
   /**
    * The canonical 64-hex id the stand-in daemon prints for {@link StoryTarget#CONTAINER} — the id
@@ -234,7 +242,9 @@ public class HostOverviewIT {
       look alike and are not. A config's data IS decoded into the answer — a config exists to be
       read, and an operator debugging an edge vhost file needs to see it. A secret's never is:
       swarm does not return a secret's value to anybody, including a manager, and this service
-      does not ask. A service's environment goes the same way a container's does, as keys.
+      does not ask. What a secret list does say is which services use each one, and that is read
+      from the services' specs — their names and secret references, nothing else of them. A
+      service's environment goes the same way a container's does, as keys.
       """)
   @UserflowRunsAfter(TokenValidationBootstrapIT.class)
   @Order(2)
@@ -306,23 +316,31 @@ public class HostOverviewIT {
         .get(StoryTarget.API + "/swarm/secrets")
         .then()
         .statusCode(200)
-        .body("[0].name", equalTo("qits-platform-idp-signing-key"))
+        .body("name", hasItem("qits-platform-idp-signing-key"))
         // The names, the labels and the timestamps of every secret — and no value on any of them,
-        // because there is no docker call that would return one.
+        // because there is no docker call that would return one. Which services use one is read
+        // from the SERVICE SPECS (qits-2350), with a template that prints their names and their
+        // secret references and nothing else of a spec — so not their env values either.
+        .body("find { it.name == 'qits-platform-idp-signing-key' }.usedBy", contains("dev-qits-artifacts"))
         // There is no `data` field on a secret at all — not empty, absent. Nothing in this
         // service's vocabulary could fill one: `docker secret inspect` is not among the argvs it builds.
         .body("[0].data", nullValue())
         .body(not(containsString(StoryTarget.SCRUBBED_SECRET)));
     story
         .note(
-            "and the secrets are a LIST OF NAMES. Swarm returns a secret's value to nobody, this"
-                + " service asks for none, and there is no route here that could answer one")
+            "and the secrets are a LIST OF NAMES, each with the services whose spec uses it. Swarm"
+                + " returns a secret's value to nobody, this service asks for none, and there is no"
+                + " route here that could answer one")
         .as("secrets-are-names-only");
 
     List<String> calls = StoryDocker.callsSince(before);
     assertTrue(
         calls.contains(StoryDocker.label("secret ls", "0")),
         "the secrets answer did not come from `docker secret ls`: " + calls);
+    assertTrue(
+        calls.contains(StoryDocker.label("service ls -q", "0"))
+            && calls.contains(StoryDocker.label(SECRET_USAGE, "0")),
+        "the secrets' usage did not come from the service specs: " + calls);
     assertTrue(
         calls.stream().noneMatch(call -> call.startsWith("secret inspect")),
         "nothing here may inspect a secret: " + calls);
@@ -401,6 +419,8 @@ public class HostOverviewIT {
     docker(SWARM_SLUG, "config ls", "0");
     docker(SWARM_SLUG, "config inspect " + StoryTarget.SWARM_CONFIG, "0");
     docker(SWARM_SLUG, "secret ls", "0");
+    docker(SWARM_SLUG, "service ls -q", "0");
+    docker(SWARM_SLUG, SECRET_USAGE, "0");
 
     ReportAssertions.assertDeclaredEdge(
         CATEGORY_SLUG,
@@ -410,10 +430,10 @@ public class HostOverviewIT {
         StoryDocker.DAEMON,
         StoryDocker.SOCKET_LABEL);
 
-    // THE STORY'S TITLE, ASSERTED AS A SHAPE. Seven reads, eight calls, one socket — and NO `secret
+    // THE STORY'S TITLE, ASSERTED AS A SHAPE. Seven reads, ten calls, one socket — and NO `secret
     // inspect` among them, which is the one edge whose absence is the whole second half of the
     // title. A count is what makes that absence checkable rather than merely unmentioned.
-    ReportAssertions.assertEdgeCount(CATEGORY_SLUG, SWARM_SLUG, 16);
+    ReportAssertions.assertEdgeCount(CATEGORY_SLUG, SWARM_SLUG, 18);
     ReportAssertions.assertOnlyEdgesFrom(
         CATEGORY_SLUG,
         SWARM_SLUG,

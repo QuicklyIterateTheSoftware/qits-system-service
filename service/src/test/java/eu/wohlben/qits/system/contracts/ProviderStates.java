@@ -81,6 +81,21 @@ public class ProviderStates {
   public static final String A_SWARM_LISTING_NO_NODES = "a swarm listing no nodes";
 
   /**
+   * The same swarm with no config in it: {@code docker config ls} prints nothing and exits 0, so
+   * the config list is {@code []} (qits-2348, for a consumer's empty-configs screen). Only the
+   * config listing differs; the fake docker reads a {@code no-configs} file beside it.
+   */
+  public static final String A_SWARM_HOLDING_NO_CONFIGS = "a swarm holding no configs";
+
+  /**
+   * The same swarm holding no secret: {@code docker secret ls} prints nothing and exits 0, so the
+   * secret list is {@code []} and no service is read for usage (qits-2350, for a consumer's empty
+   * secrets screen). Only the secret listing differs; the fake docker reads a {@code no-secrets}
+   * file beside it.
+   */
+  public static final String A_SWARM_HOLDING_NO_SECRETS = "a swarm holding no secrets";
+
+  /**
    * The same swarm, read for a service scaled to zero that mounts nothing: {@code service inspect
    * dev-qits-idle} answers it and {@code service ps} prints no task, so its detail carries {@code
    * tasks: []} and {@code mounts: []} (qits-2345). Param {@code serviceId}. The fake docker's
@@ -327,6 +342,8 @@ public class ProviderStates {
     states.put(A_SINGLE_NODE_SWARM, ProviderStates::aSingleNodeSwarm);
     states.put(A_SWARM_RUNNING_NO_SERVICES, ProviderStates::aSwarmRunningNoServices);
     states.put(A_SWARM_LISTING_NO_NODES, ProviderStates::aSwarmListingNoNodes);
+    states.put(A_SWARM_HOLDING_NO_CONFIGS, ProviderStates::aSwarmHoldingNoConfigs);
+    states.put(A_SWARM_HOLDING_NO_SECRETS, ProviderStates::aSwarmHoldingNoSecrets);
     states.put(
         A_SWARM_SERVICE_WITH_NO_TASKS, () -> new Setup(Map.of("serviceId", IDLE_SERVICE_ID)));
     states.put(NO_SUCH_SWARM_SERVICE, () -> new Setup(Map.of("serviceId", UNKNOWN_SERVICE_ID)));
@@ -361,6 +378,8 @@ public class ProviderStates {
   public void close() {
     servicesRunning(true);
     nodesListed(true);
+    configsHeld(true);
+    secretsHeld(true);
     if (runner != null) {
       runner.answering(null);
       runner.close();
@@ -382,9 +401,11 @@ public class ProviderStates {
       throw new IllegalArgumentException(
           "No provider state '" + state + "' — this provider answers for " + states.keySet());
     }
-    // Only the empty-swarm states turn their marker off; every other state starts both on.
+    // Only the empty-swarm states turn their marker off; every other state starts them all on.
     servicesRunning(true);
     nodesListed(true);
+    configsHeld(true);
+    secretsHeld(true);
     return setup.get();
   }
 
@@ -417,6 +438,16 @@ public class ProviderStates {
     return new Setup(Map.of());
   }
 
+  private static Setup aSwarmHoldingNoConfigs() {
+    configsHeld(false);
+    return new Setup(Map.of());
+  }
+
+  private static Setup aSwarmHoldingNoSecrets() {
+    secretsHeld(false);
+    return new Setup(Map.of());
+  }
+
   /**
    * Whether the fake docker's {@code service ls} prints its services, or nothing at all. The file
    * sits beside the script, which every test in the run shares, so {@link #close} turns them back
@@ -432,6 +463,23 @@ public class ProviderStates {
    */
   private static void nodesListed(boolean listed) {
     marker("no-nodes", !listed);
+  }
+
+  /**
+   * Whether the fake docker's {@code config ls} prints its configs, or nothing at all. The file
+   * sits beside the script, which every test in the run shares, so {@link #close} turns them back
+   * on.
+   */
+  private static void configsHeld(boolean held) {
+    marker("no-configs", !held);
+  }
+
+  /**
+   * Whether the fake docker's {@code secret ls} prints its secrets, or nothing at all. The file sits
+   * beside the script, which every test in the run shares, so {@link #close} turns them back on.
+   */
+  private static void secretsHeld(boolean held) {
+    marker("no-secrets", !held);
   }
 
   /**
