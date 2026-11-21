@@ -71,6 +71,8 @@ public class NodeController {
   @GET
   @Path("/{id}/volumes")
   @Operation(operationId = "listNodeVolumes", summary = "Volumes")
+  @APIResponse(responseCode = "200", description = "OK")
+  @APIResponse(responseCode = "409", description = "NODE_REMOTE: not the node this service runs on")
   public List<VolumeSummary> volumes(@PathParam("id") String id) {
     return nodes.volumes(id);
   }

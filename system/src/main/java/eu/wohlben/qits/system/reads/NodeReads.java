@@ -12,6 +12,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
@@ -128,8 +130,15 @@ public class NodeReads {
 
   public List<VolumeSummary> volumes(String nodeId) {
     requireLocal(nodeId);
+    Set<String> dangling =
+        docker
+            .run(DockerArgv.volumeLsDangling(docker.binary()))
+            .lines()
+            .map(String::trim)
+            .filter(line -> !line.isEmpty())
+            .collect(Collectors.toUnmodifiableSet());
     return docker.jsonLines(DockerArgv.volumeLs(docker.binary(), DockerCli.JSON_LINES)).stream()
-        .map(VolumeSummary::from)
+        .map(row -> VolumeSummary.from(row, dangling))
         .toList();
   }
 

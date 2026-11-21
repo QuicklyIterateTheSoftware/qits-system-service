@@ -339,7 +339,28 @@ JSON
     ;;
 
   volume)
-    echo '{"Availability":"N/A","Driver":"local","Group":"N/A","Labels":"","Links":"N/A","Mountpoint":"/var/lib/docker/volumes/qits-shared-m2/_data","Name":"qits-shared-m2","Scope":"local","Size":"N/A","Status":"N/A"}'
+    # `volume ls --format '{{json .}}'` as docker prints it, and `volume ls -q --filter
+    # dangling=true` beside it: the names no container, running or stopped, references. One named
+    # volume in use, the runner's work volume between leases (dangling, but still the runner's —
+    # its labels say so), and an anonymous one nothing holds. A node holding no volumes prints
+    # nothing and exits 0; a state that wants one writes this file
+    # (ProviderStates.A_NODE_HOLDING_NO_VOLUMES).
+    if [ -f "$here/no-volumes" ]; then
+      exit 0
+    fi
+    case "$*" in
+      *dangling=true*)
+        echo 'qits-system-runner-work-ws-10207-d2616b57'
+        echo '3f49f7508f534e3614ffc3bdd2c240800f208996d8ce4deb0f2dd9dd5e5e4dc0'
+        ;;
+      *)
+        cat <<'JSON'
+{"Availability":"N/A","Driver":"local","Group":"N/A","Labels":"","Links":"N/A","Mountpoint":"/var/lib/docker/volumes/qits-shared-m2/_data","Name":"qits-shared-m2","Scope":"local","Size":"N/A","Status":"N/A"}
+{"Availability":"N/A","Driver":"local","Group":"N/A","Labels":"qits.system.runner=d2616b57-95a8-4e1b-865f-c10d8225ce5d,qits.system.runner.work-key=ws-10207","Links":"N/A","Mountpoint":"/var/lib/docker/volumes/qits-system-runner-work-ws-10207-d2616b57/_data","Name":"qits-system-runner-work-ws-10207-d2616b57","Scope":"local","Size":"N/A","Status":"N/A"}
+{"Availability":"N/A","Driver":"local","Group":"N/A","Labels":"com.docker.volume.anonymous=","Links":"N/A","Mountpoint":"/var/lib/docker/volumes/3f49f7508f534e3614ffc3bdd2c240800f208996d8ce4deb0f2dd9dd5e5e4dc0/_data","Name":"3f49f7508f534e3614ffc3bdd2c240800f208996d8ce4deb0f2dd9dd5e5e4dc0","Scope":"local","Size":"N/A","Status":"N/A"}
+JSON
+        ;;
+    esac
     ;;
 
   network)

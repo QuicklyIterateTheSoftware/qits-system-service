@@ -2,9 +2,13 @@ package eu.wohlben.qits.system.reads;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /** The node-local parsers, against real `ps`, `inspect`, `image ls`, `volume ls` and `network ls`. */
@@ -24,6 +28,28 @@ class NodeParsersTest {
     assertEquals("healthy", first.health());
     assertEquals("qits-net", first.networks());
     assertEquals("8080/tcp", first.ports());
+  }
+
+  @Test
+  void aVolumeIsUnusedExactlyWhenDockerListsItDangling() {
+    List<JsonNode> rows = Fixtures.lines("docker-volume-ls.jsonl");
+    Set<String> dangling =
+        Set.of(
+            "7eb7a92a58853d4c11ed30173f5227912a1dd1e6ee69bfe924bc2ba6f6ff31fa",
+            "a-volume-the-list-does-not-hold");
+
+    List<VolumeSummary> volumes =
+        rows.stream().map(row -> VolumeSummary.from(row, dangling)).toList();
+
+    assertEquals(4, volumes.size());
+    assertFalse(volumes.get(0).unused());
+    assertTrue(volumes.get(1).unused());
+    assertFalse(volumes.get(2).unused());
+    assertFalse(volumes.get(3).unused());
+    // The labels still say whose it is — here docker's own marker for an anonymous volume.
+    assertEquals(Map.of("com.docker.volume.anonymous", ""), volumes.get(1).labels());
+    // Never filled by the list; kept for the wire shape.
+    assertNull(volumes.get(1).createdAt());
   }
 
   @Test
@@ -83,7 +109,8 @@ class NodeParsersTest {
     assertEquals(325_000_000L, image.sizeBytes());
     assertEquals("3", image.containers());
 
-    VolumeSummary volume = VolumeSummary.from(Fixtures.lines("docker-volume-ls.jsonl").get(0));
+    VolumeSummary volume =
+        VolumeSummary.from(Fixtures.lines("docker-volume-ls.jsonl").get(0), Set.of());
     assertEquals("local", volume.driver());
     assertTrue(volume.mountpoint().startsWith("/var/lib/docker/volumes/"));
 
