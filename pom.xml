@@ -81,7 +81,7 @@
              it rather than through a hand-assembled argv, the owner's ruling of 2026-11-13.
              Published by qits-containers-javalib; jboss-logging is its only runtime dependency, no
              Quarkus and no CDI, so it is native-image neutral. -->
-        <qits.containers-driver.version>2026.1117.172545</qits.containers-driver.version>
+        <qits.containers-driver.version>2026.1121.13137</qits.containers-driver.version>
         <!-- The user-story framework (test scope): TokenValidationBootstrapIT is a userflow, so a
              `mvn verify -DskipITs=false "-Dit.test=TokenValidationBootstrapIT"` also regenerates
              service/target/userstories/ — the story's documentation, network diagram included.
