@@ -104,6 +104,14 @@ public class SwarmController {
   @GET
   @Path("/configs/{id}")
   @Operation(operationId = "getSwarmConfig", summary = "Config")
+  @APIResponse(
+      responseCode = "200",
+      description = "OK",
+      content =
+          @Content(
+              mediaType = MediaType.APPLICATION_JSON,
+              schema = @Schema(implementation = ConfigDetail.class)))
+  @APIResponse(responseCode = "404", description = "No such config")
   public ConfigDetail config(@PathParam("id") String id) {
     return swarm.config(id);
   }

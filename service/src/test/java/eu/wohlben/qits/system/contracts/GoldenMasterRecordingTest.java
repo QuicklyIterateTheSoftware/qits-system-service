@@ -260,6 +260,30 @@ class GoldenMasterRecordingTest {
               null,
               Map.of()),
           get("getSwarmConfig", API + "/swarm/configs/" + ProviderStates.CONFIG_ID),
+          call(
+              ProviderStates.A_SWARM_CONFIG_HOLDING_NO_DATA,
+              "getSwarmConfig",
+              "GET",
+              API + "/swarm/configs/{configId}",
+              200,
+              null,
+              Map.of()),
+          call(
+              ProviderStates.A_SWARM_CONFIG_HOLDING_BINARY_DATA,
+              "getSwarmConfig",
+              "GET",
+              API + "/swarm/configs/{configId}",
+              200,
+              null,
+              Map.of()),
+          call(
+              ProviderStates.NO_SUCH_SWARM_CONFIG,
+              "getSwarmConfig",
+              "GET",
+              API + "/swarm/configs/{configId}",
+              404,
+              null,
+              Map.of()),
           get("listSwarmSecrets", API + "/swarm/secrets"),
           call(
               ProviderStates.A_SWARM_HOLDING_NO_SECRETS,
@@ -754,7 +778,10 @@ class GoldenMasterRecordingTest {
         || interaction.state().equals(ProviderStates.A_SWARM_SERVICE_WITH_NO_TASKS)
         || interaction.state().equals(ProviderStates.NO_SUCH_SWARM_SERVICE)
         || interaction.state().equals(ProviderStates.A_SWARM_NODE_RUNNING_NO_TASKS)
-        || interaction.state().equals(ProviderStates.NO_SUCH_SWARM_NODE)) {
+        || interaction.state().equals(ProviderStates.NO_SUCH_SWARM_NODE)
+        || interaction.state().equals(ProviderStates.A_SWARM_CONFIG_HOLDING_NO_DATA)
+        || interaction.state().equals(ProviderStates.A_SWARM_CONFIG_HOLDING_BINARY_DATA)
+        || interaction.state().equals(ProviderStates.NO_SUCH_SWARM_CONFIG)) {
       // The swarm reads are the fake docker's captures, the same every run: nothing to freeze.
       return new Recorded(body, params, new Freezer());
     }
