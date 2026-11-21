@@ -176,7 +176,15 @@ JSON
   config)
     case "$2" in
       ls)
-        echo '{"CreatedAt":"2026-08-18 04:31:02 +0000 UTC","ID":"ktnbjxoalbkvbvedmg1urrz8h","Labels":"qits.platform.deployments.target=platform","Name":"qits-edge-vhosts","UpdatedAt":"2026-08-18 04:31:02 +0000 UTC"}'
+        # A swarm holding no configs prints nothing and exits 0, which is what docker does. A
+        # state that wants one writes this file (ProviderStates.A_SWARM_HOLDING_NO_CONFIGS).
+        if [ -f "$here/no-configs" ]; then
+          exit 0
+        fi
+        # docker's config ls formatter writes the dates as an age, units.HumanDuration(now -
+        # CreatedAt) + " ago" (docker/cli cli/command/config/formatter.go), never a timestamp:
+        # the ISO dates are config inspect's. A fixed age keeps the recordings stable.
+        echo '{"CreatedAt":"3 months ago","ID":"ktnbjxoalbkvbvedmg1urrz8h","Labels":"qits.platform.deployments.target=platform","Name":"qits-edge-vhosts","UpdatedAt":"3 months ago"}'
         ;;
       inspect)
         if [ "$3" != "qits-edge-vhosts" ]; then
