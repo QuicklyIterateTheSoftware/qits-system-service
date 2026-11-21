@@ -1431,6 +1431,8 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/ContainerSummary"
+        "409":
+          description: "NODE_REMOTE: not the node qits-system runs on"
         "401":
           description: Not Authorized
         "403":
@@ -1466,6 +1468,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ContainerDetail"
+        "404":
+          description: no such container
+        "409":
+          description: "NODE_REMOTE: not the node qits-system runs on"
         "401":
           description: Not Authorized
         "403":
@@ -1507,6 +1513,10 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/LogChunk"
+        "404":
+          description: no such container
+        "409":
+          description: "NODE_REMOTE: not the node qits-system runs on"
         "401":
           description: Not Authorized
         "403":

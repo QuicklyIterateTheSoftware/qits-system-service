@@ -124,6 +124,23 @@ public class ProviderStates {
   public static final String NO_SUCH_SWARM_NODE = "no such swarm node";
 
   /**
+   * This node, running no container: {@code docker ps} (and {@code ps -a}) prints nothing and exits
+   * 0, so the container list is {@code []} (qits-2352, for a consumer's empty-containers screen). A
+   * real node always runs at least qits-system itself, so this answer is defensive — it exists for
+   * the consumer to render, not because a live node ever gives it. Only the container listing
+   * differs; the fake docker reads a {@code no-containers} file beside it.
+   */
+  public static final String A_NODE_RUNNING_NO_CONTAINERS = "a node running no containers";
+
+  /**
+   * A swarm node by an id that is not this service's own: every node-scoped read refuses it with
+   * 409 {@code NODE_REMOTE} before it ever reaches docker ({@link NodeReads#requireLocal}), so this
+   * state needs no fake-docker setup at all (qits-2352). Sibling tickets qits-2353, qits-2354 and
+   * qits-2355 add their own rows against the same state.
+   */
+  public static final String A_REMOTE_SWARM_NODE = "a swarm node this service cannot reach";
+
+  /**
    * The same swarm, read for a config whose spec carries no data and no labels: {@code config
    * inspect qits-empty-config} answers it, so its detail carries {@code data: ""}, {@code binary:
    * false} and {@code labels: {}} (qits-2349). Param {@code configId}. The fake docker's {@code
@@ -403,6 +420,8 @@ public class ProviderStates {
     states.put(NO_SUCH_SWARM_SERVICE, () -> new Setup(Map.of("serviceId", UNKNOWN_SERVICE_ID)));
     states.put(A_SWARM_NODE_RUNNING_NO_TASKS, ProviderStates::aSwarmNodeRunningNoTasks);
     states.put(NO_SUCH_SWARM_NODE, () -> new Setup(Map.of("nodeId", UNKNOWN_NODE_ID)));
+    states.put(A_NODE_RUNNING_NO_CONTAINERS, ProviderStates::aNodeRunningNoContainers);
+    states.put(A_REMOTE_SWARM_NODE, () -> new Setup(Map.of()));
     states.put(
         A_SWARM_CONFIG_HOLDING_NO_DATA, () -> new Setup(Map.of("configId", EMPTY_CONFIG_ID)));
     states.put(
@@ -444,6 +463,7 @@ public class ProviderStates {
     configsHeld(true);
     secretsHeld(true);
     nodeTasksRunning(true);
+    containersRunning(true);
     if (runner != null) {
       runner.answering(null);
       runner.close();
@@ -471,6 +491,7 @@ public class ProviderStates {
     configsHeld(true);
     secretsHeld(true);
     nodeTasksRunning(true);
+    containersRunning(true);
     return setup.get();
   }
 
@@ -518,6 +539,11 @@ public class ProviderStates {
     return new Setup(Map.of("nodeId", NODE_ID));
   }
 
+  private static Setup aNodeRunningNoContainers() {
+    containersRunning(false);
+    return new Setup(Map.of());
+  }
+
   /**
    * Whether the fake docker's {@code service ls} prints its services, or nothing at all. The file
    * sits beside the script, which every test in the run shares, so {@link #close} turns them back
@@ -559,6 +585,15 @@ public class ProviderStates {
    */
   private static void nodeTasksRunning(boolean running) {
     marker("no-node-tasks", !running);
+  }
+
+  /**
+   * Whether the fake docker's {@code ps} prints this node's containers, or nothing at all. The file
+   * sits beside the script, which every test in the run shares, so {@link #close} turns them back
+   * on.
+   */
+  private static void containersRunning(boolean running) {
+    marker("no-containers", !running);
   }
 
   /**

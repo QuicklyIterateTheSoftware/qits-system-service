@@ -293,7 +293,23 @@ class GoldenMasterRecordingTest {
               200,
               null,
               Map.of()),
-          get("listNodeContainers", API + "/nodes/local/containers"),
+          get("listNodeContainers", API + "/nodes/local/containers?all=true"),
+          call(
+              ProviderStates.A_NODE_RUNNING_NO_CONTAINERS,
+              "listNodeContainers",
+              "GET",
+              API + "/nodes/local/containers?all=true",
+              200,
+              null,
+              Map.of()),
+          call(
+              ProviderStates.A_REMOTE_SWARM_NODE,
+              "listNodeContainers",
+              "GET",
+              API + "/nodes/no-such-node/containers?all=true",
+              409,
+              null,
+              Map.of()),
           get("getNodeContainer", CONTAINER),
           get("getContainerLogs", CONTAINER + "/logs?tail=200"),
           get("listNodeImages", API + "/nodes/local/images"),
@@ -781,7 +797,9 @@ class GoldenMasterRecordingTest {
         || interaction.state().equals(ProviderStates.NO_SUCH_SWARM_NODE)
         || interaction.state().equals(ProviderStates.A_SWARM_CONFIG_HOLDING_NO_DATA)
         || interaction.state().equals(ProviderStates.A_SWARM_CONFIG_HOLDING_BINARY_DATA)
-        || interaction.state().equals(ProviderStates.NO_SUCH_SWARM_CONFIG)) {
+        || interaction.state().equals(ProviderStates.NO_SUCH_SWARM_CONFIG)
+        || interaction.state().equals(ProviderStates.A_NODE_RUNNING_NO_CONTAINERS)
+        || interaction.state().equals(ProviderStates.A_REMOTE_SWARM_NODE)) {
       // The swarm reads are the fake docker's captures, the same every run: nothing to freeze.
       return new Recorded(body, params, new Freezer());
     }
