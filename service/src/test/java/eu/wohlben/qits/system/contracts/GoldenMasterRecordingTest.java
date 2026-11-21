@@ -246,8 +246,24 @@ class GoldenMasterRecordingTest {
               null,
               Map.of()),
           get("listSwarmConfigs", API + "/swarm/configs"),
+          call(
+              ProviderStates.A_SWARM_HOLDING_NO_CONFIGS,
+              "listSwarmConfigs",
+              "GET",
+              API + "/swarm/configs",
+              200,
+              null,
+              Map.of()),
           get("getSwarmConfig", API + "/swarm/configs/" + ProviderStates.CONFIG_ID),
           get("listSwarmSecrets", API + "/swarm/secrets"),
+          call(
+              ProviderStates.A_SWARM_HOLDING_NO_SECRETS,
+              "listSwarmSecrets",
+              "GET",
+              API + "/swarm/secrets",
+              200,
+              null,
+              Map.of()),
           get("listNodeContainers", API + "/nodes/local/containers"),
           get("getNodeContainer", CONTAINER),
           get("getContainerLogs", CONTAINER + "/logs?tail=200"),
@@ -687,6 +703,8 @@ class GoldenMasterRecordingTest {
     if (interaction.state().equals(STATE)
         || interaction.state().equals(ProviderStates.A_SWARM_RUNNING_NO_SERVICES)
         || interaction.state().equals(ProviderStates.A_SWARM_LISTING_NO_NODES)
+        || interaction.state().equals(ProviderStates.A_SWARM_HOLDING_NO_CONFIGS)
+        || interaction.state().equals(ProviderStates.A_SWARM_HOLDING_NO_SECRETS)
         || interaction.state().equals(ProviderStates.A_SWARM_SERVICE_WITH_NO_TASKS)
         || interaction.state().equals(ProviderStates.NO_SUCH_SWARM_SERVICE)
         || interaction.state().equals(ProviderStates.A_SWARM_NODE_RUNNING_NO_TASKS)

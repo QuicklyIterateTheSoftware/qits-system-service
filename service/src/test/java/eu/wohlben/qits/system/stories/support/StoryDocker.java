@@ -339,11 +339,23 @@ public final class StoryDocker {
     };
   }
 
-  /** The reference an object verb takes, or nothing: only {@code inspect} and {@code ps} take one. */
+  /**
+   * The reference an object verb takes, or nothing: only {@code inspect} and {@code ps} take one.
+   * Two shapes say more (qits-2350, the secrets read's usage pair): {@code service ls -q} keeps its
+   * {@code -q}, which is what tells it from the service list, and an {@code inspect --format F a b}
+   * names every reference after the template — never the template, whose braces are mermaid
+   * syntax.
+   */
   private static String swarmReference(List<String> argv) {
     String verb = second(argv);
+    if ("ls".equals(verb) && argv.contains("-q")) {
+      return " -q";
+    }
     if (!("inspect".equals(verb) || "ps".equals(verb)) || argv.size() < 3) {
       return "";
+    }
+    if ("inspect".equals(verb) && "--format".equals(argv.get(2))) {
+      return templatedTail(argv, 4);
     }
     return " " + template(argv.get(2));
   }

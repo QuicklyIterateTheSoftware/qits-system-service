@@ -85,7 +85,40 @@ class SystemApiTest {
         .get("/system/api/swarm/secrets")
         .then()
         .statusCode(200)
-        .body("[0].name", Matchers.equalTo("qits-platform-idp-signing-key"));
+        .body("$", Matchers.hasSize(2));
+  }
+
+  @Test
+  void aSecretNamesTheServicesThatUseItAndCarriesNoValue() {
+    // In docker's order (by name), with docker's own humanised dates: `secret ls` prints no
+    // timestamp, and this service never runs `secret inspect` to get one.
+    String body =
+        given()
+            .when()
+            .get("/system/api/swarm/secrets")
+            .then()
+            .statusCode(200)
+            .body("$", Matchers.hasSize(2))
+            .body("[0].id", Matchers.equalTo("x4kq7v2m9p1c8d0w5n3b6e2rt"))
+            .body("[0].name", Matchers.equalTo("qits-dns-hetzner-token-2d945672e91b"))
+            .body("[0].driver", Matchers.equalTo(""))
+            .body("[0].createdAt", Matchers.equalTo("2 months ago"))
+            .body("[0].updatedAt", Matchers.equalTo("2 months ago"))
+            .body("[0].labels.'qits.platform.deployments.target'", Matchers.equalTo("platform"))
+            // No service spec references it: an orphan, and an empty list says so.
+            .body("[0].usedBy", Matchers.empty())
+            .body("[1].id", Matchers.equalTo("jvbcnrfhrbn8u9c9c0nfg2rrj"))
+            .body("[1].name", Matchers.equalTo("qits-platform-idp-signing-key"))
+            .body("[1].labels", Matchers.anEmptyMap())
+            // Read from the service specs: dev-qits-artifacts mounts it, dev-qits-ci mounts none.
+            .body("[1].usedBy", Matchers.contains("dev-qits-artifacts"))
+            .body("[1].data", Matchers.nullValue())
+            .extract()
+            .asString();
+
+    // The usage read asks each service for its name and its secret references only, so the fake
+    // service's env value — shaped like a secret — cannot be in anything this answers.
+    assertFalse(body.contains("not-a-real-secret"), "an environment VALUE reached the wire: " + body);
   }
 
   @Test

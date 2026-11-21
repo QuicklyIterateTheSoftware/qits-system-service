@@ -155,12 +155,40 @@ JSON
         if [ -f "$here/no-services" ]; then
           exit 0
         fi
+        # `service ls -q`: the ids alone, truncated as docker truncates them (the secrets read).
+        if [ "${3:-}" = "-q" ]; then
+          printf 'l2izhr0o4tjq\nqz3slj0owlxd\n'
+          exit 0
+        fi
         cat <<'JSON'
 {"ID":"l2izhr0o4tjq","Image":"registry.dev.localhost:8080/qits/qits-artifacts:09920e6","Mode":"replicated","Name":"dev-qits-artifacts","Ports":"","Replicas":"1/1"}
 {"ID":"qz3slj0owlxd","Image":"registry.dev.localhost:8080/qits/qits-ci:3e501b6","Mode":"replicated","Name":"dev-qits-ci","Ports":"","Replicas":"1/1"}
 JSON
         ;;
       inspect)
+        # `service inspect --format <usage template> <id>...`: the secrets read's one call over
+        # every service, printing one line per service with its name and its secret references —
+        # and nothing else of the spec, so no env value is printed. The format is the only one this
+        # service sends with several references; docker answers an unknown one with an error and a
+        # non-zero exit, as below.
+        if [ "${3:-}" = "--format" ]; then
+          shift 4
+          for ref in "$@"; do
+            case "$ref" in
+              l2izhr0o4tjq|l2izhr0o4tjq34f7arurhgmm8|dev-qits-artifacts)
+                echo '{"name":"dev-qits-artifacts","secrets":[{"File":{"Name":"qits-platform-idp-signing-key","UID":"0","GID":"0","Mode":292},"SecretID":"jvbcnrfhrbn8u9c9c0nfg2rrj","SecretName":"qits-platform-idp-signing-key"}]}'
+                ;;
+              qz3slj0owlxd|dev-qits-ci)
+                echo '{"name":"dev-qits-ci","secrets":null}'
+                ;;
+              *)
+                echo "Error: no such service: $ref" >&2
+                exit 1
+                ;;
+            esac
+          done
+          exit 0
+        fi
         # dev-qits-idle is scaled to zero and mounts nothing: it answers inspect and ps but is not
         # in `ls`, so the service list (and every recording of it) stays the two above.
         if [ "$3" = "dev-qits-idle" ]; then
@@ -193,7 +221,15 @@ JSON
   config)
     case "$2" in
       ls)
-        echo '{"CreatedAt":"2026-08-18 04:31:02 +0000 UTC","ID":"ktnbjxoalbkvbvedmg1urrz8h","Labels":"qits.platform.deployments.target=platform","Name":"qits-edge-vhosts","UpdatedAt":"2026-08-18 04:31:02 +0000 UTC"}'
+        # A swarm holding no configs prints nothing and exits 0, which is what docker does. A
+        # state that wants one writes this file (ProviderStates.A_SWARM_HOLDING_NO_CONFIGS).
+        if [ -f "$here/no-configs" ]; then
+          exit 0
+        fi
+        # docker's config ls formatter writes the dates as an age, units.HumanDuration(now -
+        # CreatedAt) + " ago" (docker/cli cli/command/config/formatter.go), never a timestamp:
+        # the ISO dates are config inspect's. A fixed age keeps the recordings stable.
+        echo '{"CreatedAt":"3 months ago","ID":"ktnbjxoalbkvbvedmg1urrz8h","Labels":"qits.platform.deployments.target=platform","Name":"qits-edge-vhosts","UpdatedAt":"3 months ago"}'
         ;;
       inspect)
         if [ "$3" != "qits-edge-vhosts" ]; then
@@ -208,7 +244,18 @@ JSON
     ;;
 
   secret)
-    echo '{"CreatedAt":"2026-08-18 04:31:09 +0000 UTC","Driver":"","ID":"jvbcnrfhrbn8u9c9c0nfg2rrj","Labels":"","Name":"qits-platform-idp-signing-key","UpdatedAt":"2026-08-18 04:31:09 +0000 UTC"}'
+    # `secret ls --format '{{json .}}'` as docker prints it: sorted by name, CreatedAt/UpdatedAt
+    # HUMANISED ("2 months ago" — the live door answers exactly that, never a timestamp), Labels as
+    # the CLI's `k=v,…` column. One secret a service uses, one none does. A swarm holding no
+    # secrets prints nothing and exits 0; a state that wants one writes this file
+    # (ProviderStates.A_SWARM_HOLDING_NO_SECRETS).
+    if [ -f "$here/no-secrets" ]; then
+      exit 0
+    fi
+    cat <<'JSON'
+{"CreatedAt":"2 months ago","Driver":"","ID":"x4kq7v2m9p1c8d0w5n3b6e2rt","Labels":"qits.platform.deployments.target=platform","Name":"qits-dns-hetzner-token-2d945672e91b","UpdatedAt":"2 months ago"}
+{"CreatedAt":"3 months ago","Driver":"","ID":"jvbcnrfhrbn8u9c9c0nfg2rrj","Labels":"","Name":"qits-platform-idp-signing-key","UpdatedAt":"3 months ago"}
+JSON
     ;;
 
   ps)

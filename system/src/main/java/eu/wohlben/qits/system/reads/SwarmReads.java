@@ -1,6 +1,7 @@
 package eu.wohlben.qits.system.reads;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import eu.wohlben.qits.containers.driver.docker.ContainerProcess;
 import eu.wohlben.qits.containers.driver.docker.SwarmArgv;
 import eu.wohlben.qits.system.docker.CallerValues;
 import eu.wohlben.qits.system.docker.DockerCli;
@@ -35,6 +36,16 @@ public class SwarmReads {
   private static final String SERVICE = "service";
 
   private static final String CONFIG = "config";
+
+  /**
+   * What the secrets read asks of each service: its name and its secret references ({@code
+   * SecretID}, {@code SecretName}, {@code File}), one JSON object per line — and NOTHING ELSE of the
+   * spec. A plain {@code service inspect} carries the environment, which is where a deployment's
+   * injected password lives; this template keeps every env value out of the process output, not
+   * only out of the answer. A service mounting no secret prints {@code "secrets":null}.
+   */
+  static final String SECRET_USAGE =
+      "{\"name\":{{json .Spec.Name}},\"secrets\":{{json .Spec.TaskTemplate.ContainerSpec.Secrets}}}";
 
   @Inject DockerCli docker;
 
@@ -108,10 +119,59 @@ public class SwarmReads {
         inspectOne(SwarmArgv.configInspect(docker.binary(), ref), CONFIG, ref));
   }
 
+  /**
+   * Every secret, with the services that use it (qits-2350) — at most three calls, and none of them
+   * a {@code secret inspect}: {@code secret ls}, then, only when it listed any, {@code service ls
+   * -q} and, only when that listed any, ONE {@code service inspect} over all of them with {@link
+   * #SECRET_USAGE}. A secret holds no list of its users; the service specs are where usage lives.
+   */
   public List<SecretSummary> secrets() {
-    return docker.jsonLines(SwarmArgv.secretLs(docker.binary(), DockerCli.JSON_LINES)).stream()
-        .map(SecretSummary::from)
-        .toList();
+    List<JsonNode> secrets =
+        docker.jsonLines(SwarmArgv.secretLs(docker.binary(), DockerCli.JSON_LINES));
+    if (secrets.isEmpty()) {
+      return List.of();
+    }
+    // A service removed between the `ls` and the `inspect` makes docker exit non-zero for the
+    // whole inspect. That race is worth one more pair; a second failure is the 503 of any other.
+    List<JsonNode> usage = secretUsage(false);
+    if (usage == null) {
+      usage = secretUsage(true);
+    }
+    List<JsonNode> services = usage;
+    return secrets.stream().map(secret -> SecretSummary.from(secret, services)).toList();
+  }
+
+  /**
+   * One {@code service ls -q} + {@code service inspect} pair: every service's name and secret
+   * references, one JSON object per line. Null when the pair failed and {@code last} is false — the
+   * caller's cue to try once more; a timeout is not retried, it would only cost the deadline again.
+   */
+  private List<JsonNode> secretUsage(boolean last) {
+    List<String> ls = SwarmArgv.serviceLsQuiet(docker.binary(), List.of());
+    ContainerProcess.Result listed = docker.attempt(ls);
+    if (!DockerCli.ok(listed)) {
+      return failed(ls, listed, last);
+    }
+    List<String> ids =
+        listed.output() == null
+            ? List.of()
+            : listed.output().lines().map(String::trim).filter(id -> !id.isEmpty()).toList();
+    if (ids.isEmpty()) {
+      return List.of();
+    }
+    List<String> inspect = SwarmArgv.serviceInspect(docker.binary(), ids, SECRET_USAGE);
+    ContainerProcess.Result inspected = docker.attempt(inspect);
+    if (!DockerCli.ok(inspected)) {
+      return failed(inspect, inspected, last);
+    }
+    return docker.parseLines(inspect, inspected.output());
+  }
+
+  private List<JsonNode> failed(List<String> argv, ContainerProcess.Result result, boolean last) {
+    if (last || result.timedOut()) {
+      throw docker.unavailable(argv, result);
+    }
+    return null;
   }
 
   /**

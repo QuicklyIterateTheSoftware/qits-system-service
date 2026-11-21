@@ -144,12 +144,14 @@ public class DockerCli {
   }
 
   /**
-   * Read already-captured {@code --format '{{json .}}'} output — the line-shaped counterpart of
-   * {@link #parseArray}, for a caller that ran {@link #attempt} first to tell docker's "no such
-   * object" from docker being unreachable.
+   * Read an already-captured one-object-per-line output — for a caller that ran {@link #attempt}
+   * first because a failure is something it handles itself rather than a 503 at once.
    */
   public List<JsonNode> parseLines(List<String> argv, String output) {
     List<JsonNode> rows = new ArrayList<>();
+    if (output == null) {
+      return rows;
+    }
     for (String line : output.split("\n")) {
       String trimmed = line.trim();
       if (trimmed.isEmpty()) {

@@ -688,6 +688,10 @@ components:
           type: object
           additionalProperties:
             type: string
+        usedBy:
+          type: array
+          items:
+            type: string
     ServiceDetail:
       type: object
       properties:
