@@ -161,7 +161,7 @@
              qits jar, so qits-maintenance bumps it when the consumer releases a changed pact (its
              PomParser reads pins regardless of scope, and records this property as the line to
              edit). Named like every pact pin on the estate: the artifactId without its `qits-`. -->
-        <qits.landing-app-pacts-qits-system-service.version>2026.1121.131936</qits.landing-app-pacts-qits-system-service.version>
+        <qits.landing-app-pacts-qits-system-service.version>2026.1121.163543</qits.landing-app-pacts-qits-system-service.version>
         <qits.maintenance-service-pacts-qits-system-service.version>2026.1031.131646</qits.maintenance-service-pacts-qits-system-service.version>
         <qits.projects-service-pacts-qits-system-service.version>2026.1112.21947</qits.projects-service-pacts-qits-system-service.version>
         <qits.workspaces-service-pacts-qits-system-service.version>2026.1115.230904</qits.workspaces-service-pacts-qits-system-service.version>
