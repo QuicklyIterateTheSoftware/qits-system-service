@@ -186,6 +186,39 @@ class GoldenMasterRecordingTest {
               null,
               Map.of()),
           get("getSwarmNode", API + "/swarm/nodes/" + ProviderStates.NODE_ID),
+          get("listSwarmNodeTasks", API + "/swarm/nodes/" + ProviderStates.NODE_ID + "/tasks"),
+          call(
+              ProviderStates.A_SWARM_NODE_RUNNING_NO_TASKS,
+              "getSwarmNode",
+              "GET",
+              API + "/swarm/nodes/{nodeId}",
+              200,
+              null,
+              Map.of()),
+          call(
+              ProviderStates.A_SWARM_NODE_RUNNING_NO_TASKS,
+              "listSwarmNodeTasks",
+              "GET",
+              API + "/swarm/nodes/{nodeId}/tasks",
+              200,
+              null,
+              Map.of()),
+          call(
+              ProviderStates.NO_SUCH_SWARM_NODE,
+              "getSwarmNode",
+              "GET",
+              API + "/swarm/nodes/{nodeId}",
+              404,
+              null,
+              Map.of()),
+          call(
+              ProviderStates.NO_SUCH_SWARM_NODE,
+              "listSwarmNodeTasks",
+              "GET",
+              API + "/swarm/nodes/{nodeId}/tasks",
+              404,
+              null,
+              Map.of()),
           get("listSwarmServices", API + "/swarm/services"),
           call(
               ProviderStates.A_SWARM_RUNNING_NO_SERVICES,
@@ -708,7 +741,9 @@ class GoldenMasterRecordingTest {
         || interaction.state().equals(ProviderStates.A_SWARM_HOLDING_NO_CONFIGS)
         || interaction.state().equals(ProviderStates.A_SWARM_HOLDING_NO_SECRETS)
         || interaction.state().equals(ProviderStates.A_SWARM_SERVICE_WITH_NO_TASKS)
-        || interaction.state().equals(ProviderStates.NO_SUCH_SWARM_SERVICE)) {
+        || interaction.state().equals(ProviderStates.NO_SUCH_SWARM_SERVICE)
+        || interaction.state().equals(ProviderStates.A_SWARM_NODE_RUNNING_NO_TASKS)
+        || interaction.state().equals(ProviderStates.NO_SUCH_SWARM_NODE)) {
       // The swarm reads are the fake docker's captures, the same every run: nothing to freeze.
       return new Recorded(body, params, new Freezer());
     }

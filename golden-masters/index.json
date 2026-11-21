@@ -1541,6 +1541,19 @@
           }
         },
         {
+          "operationId": "listSwarmNodeTasks",
+          "method": "GET",
+          "path": "/system/api/swarm/nodes/iwbwrdui2z0n62kqcjfo1erwh/tasks",
+          "status": 200,
+          "file": "a-single-node-swarm/listSwarmNodeTasks.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
           "operationId": "listSwarmNodes",
           "method": "GET",
           "path": "/system/api/swarm/nodes",
@@ -1635,6 +1648,42 @@
           "path": "/system/api/swarm/nodes",
           "status": 200,
           "file": "a-swarm-listing-no-nodes/listSwarmNodes.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a swarm node running no tasks",
+      "slug": "a-swarm-node-running-no-tasks",
+      "params": {
+        "nodeId": "iwbwrdui2z0n62kqcjfo1erwh"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getSwarmNode",
+          "method": "GET",
+          "path": "/system/api/swarm/nodes/{nodeId}",
+          "status": 200,
+          "file": "a-swarm-node-running-no-tasks/getSwarmNode.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listSwarmNodeTasks",
+          "method": "GET",
+          "path": "/system/api/swarm/nodes/{nodeId}/tasks",
+          "status": 200,
+          "file": "a-swarm-node-running-no-tasks/listSwarmNodeTasks.json",
           "frozen": {
             "ids": [],
             "instants": [],
@@ -1898,6 +1947,42 @@
             "instants": [
               "$.purgeRequestedAt"
             ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "no such swarm node",
+      "slug": "no-such-swarm-node",
+      "params": {
+        "nodeId": "no-such-node"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "getSwarmNode",
+          "method": "GET",
+          "path": "/system/api/swarm/nodes/{nodeId}",
+          "status": 404,
+          "file": "no-such-swarm-node/getSwarmNode.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listSwarmNodeTasks",
+          "method": "GET",
+          "path": "/system/api/swarm/nodes/{nodeId}/tasks",
+          "status": 404,
+          "file": "no-such-swarm-node/listSwarmNodeTasks.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
             "strings": [],
             "listFilteredTo": null
           }

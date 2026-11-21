@@ -200,6 +200,50 @@ class SystemApiTest {
   }
 
   @Test
+  void aNodeDetailSpeaksTheListsVocabularyAndKnowsItIsThisNode() {
+    // The document says "ready"/"active"; the detail answers what the list row it was opened from
+    // says, and carries the same self (qits-2347).
+    given()
+        .when()
+        .get("/system/api/swarm/nodes/" + NODE)
+        .then()
+        .statusCode(200)
+        .body("status", Matchers.equalTo("Ready"))
+        .body("availability", Matchers.equalTo("Active"))
+        .body("managerStatus", Matchers.equalTo("Leader"))
+        .body("self", Matchers.equalTo(true))
+        .body("labels.zone", Matchers.equalTo("fsn1"));
+  }
+
+  @Test
+  void aNodesTasksAreItsHistoryToo() {
+    given()
+        .when()
+        .get("/system/api/swarm/nodes/" + NODE + "/tasks")
+        .then()
+        .statusCode(200)
+        .body("$", Matchers.hasSize(2))
+        .body("[0].name", Matchers.equalTo("dev-qits-artifacts.1"))
+        .body("[0].slot", Matchers.equalTo(1))
+        .body("[0].state", Matchers.startsWith("Running"))
+        // Shut-down history stays, error and all: it is why anybody looks.
+        .body("[1].desiredState", Matchers.equalTo("Shutdown"))
+        .body("[1].error", Matchers.equalTo("task: non-zero exit (1)"));
+  }
+
+  @Test
+  void anUnknownNodesTasksAreA404NotA503() {
+    // One call, no inspect first: docker's own "no such node" from `node ps` is the 404.
+    given()
+        .when()
+        .get("/system/api/swarm/nodes/somebody-elses-node/tasks")
+        .then()
+        .statusCode(404)
+        .contentType(ContentType.JSON)
+        .body("message", Matchers.equalTo("no such node: somebody-elses-node"));
+  }
+
+  @Test
   void theNodeReadsAnswerForThisNodeAndForTheAlias() {
     for (String node : new String[] {NODE, "local"}) {
       given()

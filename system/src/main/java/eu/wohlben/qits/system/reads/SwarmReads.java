@@ -49,15 +49,37 @@ public class SwarmReads {
 
   @Inject DockerCli docker;
 
+  @Inject HostReads hosts;
+
   public List<NodeSummary> nodes() {
     return docker.jsonLines(SwarmArgv.nodeLs(docker.binary(), DockerCli.JSON_LINES)).stream()
         .map(NodeSummary::from)
         .toList();
   }
 
+  /**
+   * A node's document, with {@code self} decided the way {@code NodeReads.requireLocal} decides it:
+   * by the id the local daemon's {@code info} reports, which is the only source that knows.
+   */
   public NodeDetail node(String ref) {
     CallerValues.requireSwarmRef(NODE, ref);
-    return NodeDetail.from(inspectOne(SwarmArgv.nodeInspect(docker.binary(), ref), NODE, ref));
+    JsonNode node = inspectOne(SwarmArgv.nodeInspect(docker.binary(), ref), NODE, ref);
+    String local = hosts.localNodeId();
+    return NodeDetail.from(node, local != null && local.equals(Json.text(node, "ID")));
+  }
+
+  /**
+   * What swarm has scheduled on one node, newest first per slot as docker prints it, shut-down
+   * history included. {@code --no-trunc} for the same reason as a service's tasks: the error
+   * column is the point. One call: an unknown node is docker's own "no such node", mapped like an
+   * inspect's, rather than an inspect forked first to ask.
+   */
+  public List<TaskSummary> nodeTasks(String ref) {
+    CallerValues.requireSwarmRef(NODE, ref);
+    List<String> argv = SwarmArgv.nodePs(docker.binary(), ref, true, DockerCli.JSON_LINES);
+    return docker.parseLines(argv, answered(argv, NODE, ref)).stream()
+        .map(TaskSummary::from)
+        .toList();
   }
 
   public List<ServiceSummary> services() {
@@ -157,6 +179,20 @@ public class SwarmReads {
    * the 503 {@code DockerCli} already builds.
    */
   private JsonNode inspectOne(List<String> argv, String what, String ref) {
+    // Parse what that call already printed. Calling jsonArray here would fork docker a second time
+    // for the same document — and the two answers could differ.
+    List<JsonNode> rows = docker.parseArray(argv, answered(argv, what, ref));
+    if (rows.isEmpty()) {
+      throw new NotFoundException("no such " + what + ": " + ref);
+    }
+    return rows.get(0);
+  }
+
+  /**
+   * Run one call on one reference and hand back what it printed, turning docker's own "no such X"
+   * into a 404 and every other failure into the 503 {@code DockerCli} already builds.
+   */
+  private String answered(List<String> argv, String what, String ref) {
     var result = docker.attempt(argv);
     if (!DockerCli.ok(result)) {
       String said = result.output() == null ? "" : result.output().toLowerCase(java.util.Locale.ROOT);
@@ -166,12 +202,6 @@ public class SwarmReads {
       }
       throw docker.unavailable(argv, result);
     }
-    // Parse what that call already printed. Calling jsonArray here would fork docker a second time
-    // for the same document — and the two answers could differ.
-    List<JsonNode> rows = docker.parseArray(argv, result.output());
-    if (rows.isEmpty()) {
-      throw new NotFoundException("no such " + what + ": " + ref);
-    }
-    return rows.get(0);
+    return result.output();
   }
 }
