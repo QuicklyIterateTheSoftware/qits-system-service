@@ -8,5 +8,17 @@
     "ipv6": false,
     "createdAt": "2026-08-18 02:13:24 +0000 UTC",
     "labels": {}
+  },
+  {
+    "id": "c8c43a515890",
+    "name": "qits-system-runner-leases-d2616b57",
+    "driver": "bridge",
+    "scope": "local",
+    "internal": true,
+    "ipv6": false,
+    "createdAt": "2026-08-15 06:44:01.671795447 +0000 UTC",
+    "labels": {
+      "qits.system.runner": "d2616b57-95a8-4e1b-865f-c10d8225ce5d"
+    }
   }
 ]

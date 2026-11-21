@@ -524,6 +524,72 @@
       ]
     },
     {
+      "name": "a node holding no volumes",
+      "slug": "a-node-holding-no-volumes",
+      "params": {},
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listNodeVolumes",
+          "method": "GET",
+          "path": "/system/api/nodes/local/volumes",
+          "status": 200,
+          "file": "a-node-holding-no-volumes/listNodeVolumes.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a node listing no networks",
+      "slug": "a-node-listing-no-networks",
+      "params": {},
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listNodeNetworks",
+          "method": "GET",
+          "path": "/system/api/nodes/local/networks",
+          "status": 200,
+          "file": "a-node-listing-no-networks/listNodeNetworks.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a node running no containers",
+      "slug": "a-node-running-no-containers",
+      "params": {},
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listNodeContainers",
+          "method": "GET",
+          "path": "/system/api/nodes/local/containers",
+          "query": {
+            "all": "true"
+          },
+          "status": 200,
+          "file": "a-node-running-no-containers/listNodeContainers.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a quarantined target",
       "slug": "a-quarantined-target",
       "params": {
@@ -1485,6 +1551,9 @@
           "operationId": "listNodeContainers",
           "method": "GET",
           "path": "/system/api/nodes/local/containers",
+          "query": {
+            "all": "true"
+          },
           "status": 200,
           "file": "a-single-node-swarm/listNodeContainers.json",
           "frozen": {
@@ -1710,6 +1779,27 @@
       ]
     },
     {
+      "name": "a swarm node holding no images",
+      "slug": "a-swarm-node-holding-no-images",
+      "params": {},
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listNodeImages",
+          "method": "GET",
+          "path": "/system/api/nodes/local/images",
+          "status": 200,
+          "file": "a-swarm-node-holding-no-images/listNodeImages.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a swarm node running no tasks",
       "slug": "a-swarm-node-running-no-tasks",
       "params": {
@@ -1736,6 +1826,69 @@
           "path": "/system/api/swarm/nodes/{nodeId}/tasks",
           "status": 200,
           "file": "a-swarm-node-running-no-tasks/listSwarmNodeTasks.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a swarm node this service cannot reach",
+      "slug": "a-swarm-node-this-service-cannot-reach",
+      "params": {},
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listNodeContainers",
+          "method": "GET",
+          "path": "/system/api/nodes/no-such-node/containers",
+          "query": {
+            "all": "true"
+          },
+          "status": 409,
+          "file": "a-swarm-node-this-service-cannot-reach/listNodeContainers.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listNodeImages",
+          "method": "GET",
+          "path": "/system/api/nodes/no-such-node/images",
+          "status": 409,
+          "file": "a-swarm-node-this-service-cannot-reach/listNodeImages.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listNodeNetworks",
+          "method": "GET",
+          "path": "/system/api/nodes/no-such-node/networks",
+          "status": 409,
+          "file": "a-swarm-node-this-service-cannot-reach/listNodeNetworks.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listNodeVolumes",
+          "method": "GET",
+          "path": "/system/api/nodes/no-such-node/volumes",
+          "status": 409,
+          "file": "a-swarm-node-this-service-cannot-reach/listNodeVolumes.json",
           "frozen": {
             "ids": [],
             "instants": [],

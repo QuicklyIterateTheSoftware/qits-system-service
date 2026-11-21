@@ -293,12 +293,76 @@ class GoldenMasterRecordingTest {
               200,
               null,
               Map.of()),
-          get("listNodeContainers", API + "/nodes/local/containers"),
+          get("listNodeContainers", API + "/nodes/local/containers?all=true"),
+          call(
+              ProviderStates.A_NODE_RUNNING_NO_CONTAINERS,
+              "listNodeContainers",
+              "GET",
+              API + "/nodes/local/containers?all=true",
+              200,
+              null,
+              Map.of()),
+          call(
+              ProviderStates.A_REMOTE_SWARM_NODE,
+              "listNodeContainers",
+              "GET",
+              API + "/nodes/no-such-node/containers?all=true",
+              409,
+              null,
+              Map.of()),
           get("getNodeContainer", CONTAINER),
           get("getContainerLogs", CONTAINER + "/logs?tail=200"),
           get("listNodeImages", API + "/nodes/local/images"),
+          call(
+              ProviderStates.A_SWARM_NODE_HOLDING_NO_IMAGES,
+              "listNodeImages",
+              "GET",
+              API + "/nodes/local/images",
+              200,
+              null,
+              Map.of()),
+          call(
+              ProviderStates.A_REMOTE_SWARM_NODE,
+              "listNodeImages",
+              "GET",
+              API + "/nodes/no-such-node/images",
+              409,
+              null,
+              Map.of()),
           get("listNodeVolumes", API + "/nodes/local/volumes"),
+          call(
+              ProviderStates.A_NODE_HOLDING_NO_VOLUMES,
+              "listNodeVolumes",
+              "GET",
+              API + "/nodes/local/volumes",
+              200,
+              null,
+              Map.of()),
+          call(
+              ProviderStates.A_REMOTE_SWARM_NODE,
+              "listNodeVolumes",
+              "GET",
+              API + "/nodes/no-such-node/volumes",
+              409,
+              null,
+              Map.of()),
           get("listNodeNetworks", API + "/nodes/local/networks"),
+          call(
+              ProviderStates.A_NODE_LISTING_NO_NETWORKS,
+              "listNodeNetworks",
+              "GET",
+              API + "/nodes/local/networks",
+              200,
+              null,
+              Map.of()),
+          call(
+              ProviderStates.A_REMOTE_SWARM_NODE,
+              "listNodeNetworks",
+              "GET",
+              API + "/nodes/no-such-node/networks",
+              409,
+              null,
+              Map.of()),
           // --- the targets doors (qits-1481) ---
           call(
               ProviderStates.NO_TARGET,
@@ -779,9 +843,14 @@ class GoldenMasterRecordingTest {
         || interaction.state().equals(ProviderStates.NO_SUCH_SWARM_SERVICE)
         || interaction.state().equals(ProviderStates.A_SWARM_NODE_RUNNING_NO_TASKS)
         || interaction.state().equals(ProviderStates.NO_SUCH_SWARM_NODE)
+        || interaction.state().equals(ProviderStates.A_NODE_LISTING_NO_NETWORKS)
         || interaction.state().equals(ProviderStates.A_SWARM_CONFIG_HOLDING_NO_DATA)
         || interaction.state().equals(ProviderStates.A_SWARM_CONFIG_HOLDING_BINARY_DATA)
-        || interaction.state().equals(ProviderStates.NO_SUCH_SWARM_CONFIG)) {
+        || interaction.state().equals(ProviderStates.NO_SUCH_SWARM_CONFIG)
+        || interaction.state().equals(ProviderStates.A_NODE_RUNNING_NO_CONTAINERS)
+        || interaction.state().equals(ProviderStates.A_NODE_HOLDING_NO_VOLUMES)
+        || interaction.state().equals(ProviderStates.A_SWARM_NODE_HOLDING_NO_IMAGES)
+        || interaction.state().equals(ProviderStates.A_REMOTE_SWARM_NODE)) {
       // The swarm reads are the fake docker's captures, the same every run: nothing to freeze.
       return new Recorded(body, params, new Freezer());
     }

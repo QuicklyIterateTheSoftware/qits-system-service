@@ -18,6 +18,7 @@ import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import java.util.List;
 import org.eclipse.microprofile.openapi.annotations.Operation;
+import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 
 /**
  * What is on ONE node's docker daemon.
@@ -38,6 +39,8 @@ public class NodeController {
   @GET
   @Path("/{id}/containers")
   @Operation(operationId = "listNodeContainers", summary = "Containers")
+  @APIResponse(responseCode = "200", description = "OK")
+  @APIResponse(responseCode = "409", description = "NODE_REMOTE: not the node qits-system runs on")
   public List<ContainerSummary> containers(
       @PathParam("id") String id, @QueryParam("all") @DefaultValue("false") boolean all) {
     return nodes.containers(id, all);
@@ -46,6 +49,9 @@ public class NodeController {
   @GET
   @Path("/{id}/containers/{cid}")
   @Operation(operationId = "getNodeContainer", summary = "Container")
+  @APIResponse(responseCode = "200", description = "OK")
+  @APIResponse(responseCode = "404", description = "no such container")
+  @APIResponse(responseCode = "409", description = "NODE_REMOTE: not the node qits-system runs on")
   public ContainerDetail container(@PathParam("id") String id, @PathParam("cid") String cid) {
     return nodes.container(id, cid);
   }
@@ -53,6 +59,9 @@ public class NodeController {
   @GET
   @Path("/{id}/containers/{cid}/logs")
   @Operation(operationId = "getContainerLogs", summary = "Logs")
+  @APIResponse(responseCode = "200", description = "OK")
+  @APIResponse(responseCode = "404", description = "no such container")
+  @APIResponse(responseCode = "409", description = "NODE_REMOTE: not the node qits-system runs on")
   public LogChunk logs(
       @PathParam("id") String id,
       @PathParam("cid") String cid,
@@ -63,6 +72,8 @@ public class NodeController {
   @GET
   @Path("/{id}/images")
   @Operation(operationId = "listNodeImages", summary = "Images")
+  @APIResponse(responseCode = "200", description = "OK")
+  @APIResponse(responseCode = "409", description = "NODE_REMOTE: not the node this service runs on")
   public List<ImageSummary> images(@PathParam("id") String id) {
     return nodes.images(id);
   }
@@ -70,6 +81,8 @@ public class NodeController {
   @GET
   @Path("/{id}/volumes")
   @Operation(operationId = "listNodeVolumes", summary = "Volumes")
+  @APIResponse(responseCode = "200", description = "OK")
+  @APIResponse(responseCode = "409", description = "NODE_REMOTE: not the node this service runs on")
   public List<VolumeSummary> volumes(@PathParam("id") String id) {
     return nodes.volumes(id);
   }
@@ -77,6 +90,8 @@ public class NodeController {
   @GET
   @Path("/{id}/networks")
   @Operation(operationId = "listNodeNetworks", summary = "Networks")
+  @APIResponse(responseCode = "200", description = "OK")
+  @APIResponse(responseCode = "409", description = "NODE_REMOTE: not the node this service runs on")
   public List<NetworkSummary> networks(@PathParam("id") String id) {
     return nodes.networks(id);
   }

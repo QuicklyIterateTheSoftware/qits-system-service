@@ -285,14 +285,22 @@ JSON
         fi
         ;;
       *)
+        # A swarm node running no containers prints nothing and exits 0, which is what docker
+        # does. A state that wants one writes this file (ProviderStates.A_NODE_RUNNING_NO_CONTAINERS)
+        # — not the `-aq` sub-branch above, which the boot sweep uses and which keeps its own marker.
+        if [ -f "$here/no-containers" ]; then
+          exit 0
+        fi
         cat <<JSON
 {"Command":"\"/work/qits-ci\"","CreatedAt":"2026-08-23 14:28:51 +0200 CEST","HealthStatus":"healthy","ID":"$KNOWN_ID","Image":"registry.dev.localhost:8080/qits/qits-ci:3e501b6","Labels":"maintainer=Red Hat, Inc.","LocalVolumes":"0","Mounts":"","Names":"dev-qits-ci.1.k4g0nn1ld7o272jl7fciatg6m","Networks":"qits-net","Ports":"8080/tcp","RunningFor":"4 hours ago","Size":"9.89MB","State":"running","Status":"Up 4 hours (healthy)"}
 JSON
-        # `-a` is what asks for the dead ones too.
+        # `-a` is what asks for the dead ones too. Its HealthStatus is NOT blank: live docker keeps
+        # the last health result of a dead container, so a stopped container that was healthy while
+        # it ran answers "unhealthy" once its healthcheck stops being run, not "".
         case "$*" in
           *" -a "*|*" -a")
             cat <<JSON
-{"Command":"\"/work/old\"","CreatedAt":"2026-08-20 09:00:00 +0200 CEST","HealthStatus":"","ID":"$STOPPED_ID","Image":"registry.dev.localhost:8080/qits/old:1","Labels":"","LocalVolumes":"0","Mounts":"","Names":"a-stopped-one","Networks":"qits-net","Ports":"","RunningFor":"3 days ago","Size":"0B","State":"exited","Status":"Exited (137) 3 days ago"}
+{"Command":"\"/work/old\"","CreatedAt":"2026-08-20 09:00:00 +0200 CEST","HealthStatus":"unhealthy","ID":"$STOPPED_ID","Image":"registry.dev.localhost:8080/qits/old:1","Labels":"","LocalVolumes":"0","Mounts":"","Names":"a-stopped-one","Networks":"qits-net","Ports":"","RunningFor":"3 days ago","Size":"0B","State":"exited","Status":"Exited (137) 3 days ago"}
 JSON
             ;;
         esac
@@ -335,16 +343,49 @@ JSON
     ;;
 
   image)
+    # A node holding no images prints nothing and exits 0; a state that wants one writes this file
+    # (ProviderStates.A_SWARM_NODE_HOLDING_NO_IMAGES).
+    if [ -f "$here/no-images" ]; then
+      exit 0
+    fi
     echo '{"Containers":"3","CreatedAt":"2026-08-18 04:46:43 +0200 CEST","CreatedSince":"5 days ago","Digest":"<none>","ID":"sha256:14beaf669b73","Repository":"registry.dev.localhost:8080/qits/qits-ci","SharedSize":"N/A","Size":"325MB","Tag":"3e501b6","UniqueSize":"N/A"}'
     ;;
 
   volume)
-    echo '{"Availability":"N/A","Driver":"local","Group":"N/A","Labels":"","Links":"N/A","Mountpoint":"/var/lib/docker/volumes/qits-shared-m2/_data","Name":"qits-shared-m2","Scope":"local","Size":"N/A","Status":"N/A"}'
+    # `volume ls --format '{{json .}}'` as docker prints it, and `volume ls -q --filter
+    # dangling=true` beside it: the names no container, running or stopped, references. One named
+    # volume in use, the runner's work volume between leases (dangling, but still the runner's —
+    # its labels say so), and an anonymous one nothing holds. A node holding no volumes prints
+    # nothing and exits 0; a state that wants one writes this file
+    # (ProviderStates.A_NODE_HOLDING_NO_VOLUMES).
+    if [ -f "$here/no-volumes" ]; then
+      exit 0
+    fi
+    case "$*" in
+      *dangling=true*)
+        echo 'qits-system-runner-work-ws-10207-d2616b57'
+        echo '3f49f7508f534e3614ffc3bdd2c240800f208996d8ce4deb0f2dd9dd5e5e4dc0'
+        ;;
+      *)
+        cat <<'JSON'
+{"Availability":"N/A","Driver":"local","Group":"N/A","Labels":"","Links":"N/A","Mountpoint":"/var/lib/docker/volumes/qits-shared-m2/_data","Name":"qits-shared-m2","Scope":"local","Size":"N/A","Status":"N/A"}
+{"Availability":"N/A","Driver":"local","Group":"N/A","Labels":"qits.system.runner=d2616b57-95a8-4e1b-865f-c10d8225ce5d,qits.system.runner.work-key=ws-10207","Links":"N/A","Mountpoint":"/var/lib/docker/volumes/qits-system-runner-work-ws-10207-d2616b57/_data","Name":"qits-system-runner-work-ws-10207-d2616b57","Scope":"local","Size":"N/A","Status":"N/A"}
+{"Availability":"N/A","Driver":"local","Group":"N/A","Labels":"com.docker.volume.anonymous=","Links":"N/A","Mountpoint":"/var/lib/docker/volumes/3f49f7508f534e3614ffc3bdd2c240800f208996d8ce4deb0f2dd9dd5e5e4dc0/_data","Name":"3f49f7508f534e3614ffc3bdd2c240800f208996d8ce4deb0f2dd9dd5e5e4dc0","Scope":"local","Size":"N/A","Status":"N/A"}
+JSON
+        ;;
+    esac
     ;;
 
   network)
+    # `network ls --format '{{json .}}'`, sorted by name as docker sorts it: the swarm overlay and a
+    # runner's internal lease bridge. A node listing no networks prints nothing and exits 0; a
+    # state that wants one writes this file (ProviderStates.A_NODE_LISTING_NO_NETWORKS).
+    if [ -f "$here/no-networks" ]; then
+      exit 0
+    fi
     cat <<'JSON'
 {"CreatedAt":"2026-08-18 02:13:24 +0000 UTC","Driver":"overlay","ID":"mulnl3uqqi0h","IPv4":"true","IPv6":"false","Internal":"false","Labels":"","Name":"qits-net","Scope":"swarm"}
+{"CreatedAt":"2026-08-15 06:44:01.671795447 +0000 UTC","Driver":"bridge","ID":"c8c43a515890","IPv4":"true","IPv6":"false","Internal":"true","Labels":"qits.system.runner=d2616b57-95a8-4e1b-865f-c10d8225ce5d","Name":"qits-system-runner-leases-d2616b57","Scope":"local"}
 JSON
     ;;
 

@@ -124,6 +124,51 @@ public class ProviderStates {
   public static final String NO_SUCH_SWARM_NODE = "no such swarm node";
 
   /**
+   * This node, running no container: {@code docker ps} (and {@code ps -a}) prints nothing and exits
+   * 0, so the container list is {@code []} (qits-2352, for a consumer's empty-containers screen). A
+   * real node always runs at least qits-system itself, so this answer is defensive — it exists for
+   * the consumer to render, not because a live node ever gives it. Only the container listing
+   * differs; the fake docker reads a {@code no-containers} file beside it.
+   */
+  public static final String A_NODE_RUNNING_NO_CONTAINERS = "a node running no containers";
+
+  /**
+   * This node's docker daemon listing no network: {@code docker network ls} prints nothing and exits
+   * 0, so the network list is {@code []}. A real daemon always lists at least {@code bridge}, {@code
+   * host} and {@code none}, so this never happens on a live node — it is the defensive empty answer
+   * a consumer must still render (qits-2354). Only the network listing differs; the fake docker
+   * reads a {@code no-networks} file beside it.
+   */
+  public static final String A_NODE_LISTING_NO_NETWORKS = "a node listing no networks";
+
+  /**
+   * This node's docker holding no volume: {@code docker volume ls} prints nothing and exits 0, so
+   * the volume list is {@code []}. A real daemon here always holds volumes — this service's own
+   * deployment mounts some — so this is the defensive empty answer a consumer must still render
+   * (qits-2355). Only the volume listing differs; the fake docker reads a {@code no-volumes} file
+   * beside it.
+   */
+  public static final String A_NODE_HOLDING_NO_VOLUMES = "a node holding no volumes";
+
+  /**
+   * This node's docker holding no image: {@code docker image ls} prints nothing and exits 0, so the
+   * image list is {@code []}. A real daemon here always holds at least this service's own image —
+   * it is running from one — so this is the defensive empty answer a consumer must still render
+   * (qits-2353). Only the image listing differs; the fake docker reads a {@code no-images} file
+   * beside it.
+   */
+  public static final String A_SWARM_NODE_HOLDING_NO_IMAGES = "a swarm node holding no images";
+
+  /**
+   * A node-resource door addressed to a swarm node that is not the one this service runs on:
+   * {@code NodeReads.requireLocal} refuses any id that is neither {@code local} nor the local
+   * node's id, so the door answers 409 {@code NODE_REMOTE} without asking docker anything. No fake-docker setup.
+   * Shared by the four node-resource doors — containers (qits-2352), images (qits-2353), networks
+   * (qits-2354) and volumes (qits-2355); each adds its own row.
+   */
+  public static final String A_REMOTE_SWARM_NODE = "a swarm node this service cannot reach";
+
+  /**
    * The same swarm, read for a config whose spec carries no data and no labels: {@code config
    * inspect qits-empty-config} answers it, so its detail carries {@code data: ""}, {@code binary:
    * false} and {@code labels: {}} (qits-2349). Param {@code configId}. The fake docker's {@code
@@ -403,6 +448,11 @@ public class ProviderStates {
     states.put(NO_SUCH_SWARM_SERVICE, () -> new Setup(Map.of("serviceId", UNKNOWN_SERVICE_ID)));
     states.put(A_SWARM_NODE_RUNNING_NO_TASKS, ProviderStates::aSwarmNodeRunningNoTasks);
     states.put(NO_SUCH_SWARM_NODE, () -> new Setup(Map.of("nodeId", UNKNOWN_NODE_ID)));
+    states.put(A_NODE_RUNNING_NO_CONTAINERS, ProviderStates::aNodeRunningNoContainers);
+    states.put(A_NODE_LISTING_NO_NETWORKS, ProviderStates::aNodeListingNoNetworks);
+    states.put(A_NODE_HOLDING_NO_VOLUMES, ProviderStates::aNodeHoldingNoVolumes);
+    states.put(A_SWARM_NODE_HOLDING_NO_IMAGES, ProviderStates::aSwarmNodeHoldingNoImages);
+    states.put(A_REMOTE_SWARM_NODE, () -> new Setup(Map.of()));
     states.put(
         A_SWARM_CONFIG_HOLDING_NO_DATA, () -> new Setup(Map.of("configId", EMPTY_CONFIG_ID)));
     states.put(
@@ -444,6 +494,10 @@ public class ProviderStates {
     configsHeld(true);
     secretsHeld(true);
     nodeTasksRunning(true);
+    containersRunning(true);
+    networksListed(true);
+    volumesHeld(true);
+    imagesHeld(true);
     if (runner != null) {
       runner.answering(null);
       runner.close();
@@ -471,6 +525,10 @@ public class ProviderStates {
     configsHeld(true);
     secretsHeld(true);
     nodeTasksRunning(true);
+    containersRunning(true);
+    networksListed(true);
+    volumesHeld(true);
+    imagesHeld(true);
     return setup.get();
   }
 
@@ -513,9 +571,29 @@ public class ProviderStates {
     return new Setup(Map.of());
   }
 
+  private static Setup aNodeListingNoNetworks() {
+    networksListed(false);
+    return new Setup(Map.of());
+  }
+
+  private static Setup aNodeHoldingNoVolumes() {
+    volumesHeld(false);
+    return new Setup(Map.of());
+  }
+
+  private static Setup aSwarmNodeHoldingNoImages() {
+    imagesHeld(false);
+    return new Setup(Map.of());
+  }
+
   private static Setup aSwarmNodeRunningNoTasks() {
     nodeTasksRunning(false);
     return new Setup(Map.of("nodeId", NODE_ID));
+  }
+
+  private static Setup aNodeRunningNoContainers() {
+    containersRunning(false);
+    return new Setup(Map.of());
   }
 
   /**
@@ -559,6 +637,41 @@ public class ProviderStates {
    */
   private static void nodeTasksRunning(boolean running) {
     marker("no-node-tasks", !running);
+  }
+
+  /**
+   * Whether the fake docker's {@code ps} prints this node's containers, or nothing at all. The file
+   * sits beside the script, which every test in the run shares, so {@link #close} turns them back
+   * on.
+   */
+  private static void containersRunning(boolean running) {
+    marker("no-containers", !running);
+  }
+
+  /**
+   * Whether the fake docker's {@code network ls} prints this node's networks, or nothing at all. The
+   * file sits beside the script, which every test in the run shares, so {@link #close} turns them
+   * back on.
+   */
+  private static void networksListed(boolean listed) {
+    marker("no-networks", !listed);
+  }
+
+  /**
+   * Whether the fake docker's {@code volume ls} prints its volumes, or nothing at all. The file
+   * sits beside the script, which every test in the run shares, so {@link #close} turns them back
+   * on.
+   */
+  private static void volumesHeld(boolean held) {
+    marker("no-volumes", !held);
+  }
+
+  /**
+   * Whether the fake docker's {@code image ls} prints its images, or nothing at all. The file sits
+   * beside the script, which every test in the run shares, so {@link #close} turns them back on.
+   */
+  private static void imagesHeld(boolean held) {
+    marker("no-images", !held);
   }
 
   /**
