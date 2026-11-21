@@ -114,6 +114,15 @@ public class ProviderStates {
   /** Target {@code lab}: registered, connected nowhere, six slots, a settled health check. */
   public static final String A_DECLARED_TARGET = "a declared target";
 
+  /**
+   * Target {@code lab} described as {@link #A_DECLARED_TARGET} is, but quarantined — {@code
+   * quarantined=true}, {@code quarantinedAt} set, {@code quarantineReason} the text a failed health
+   * check writes ({@code runner.TargetHealth}'s package-private {@code FAILED}, repeated here as the
+   * literal {@code "health check failed"} since it is not reachable from this package). Param {@code
+   * targetId}.
+   */
+  public static final String A_QUARANTINED_TARGET = "a quarantined target";
+
   /** The toolkit's register states, which every runner host shares (qits-ci recorded them first). */
   public static final String AN_UNREGISTERED_RUNNER = "an unregistered runner";
 
@@ -332,6 +341,7 @@ public class ProviderStates {
     states.put(NO_SUCH_SWARM_SERVICE, () -> new Setup(Map.of("serviceId", UNKNOWN_SERVICE_ID)));
     states.put(NO_TARGET, this::noTarget);
     states.put(A_DECLARED_TARGET, this::aDeclaredTarget);
+    states.put(A_QUARANTINED_TARGET, this::aQuarantinedTarget);
     states.put(AN_UNREGISTERED_RUNNER, this::anUnregisteredRunner);
     states.put(A_REGISTERED_RUNNER, this::aRegisteredRunner);
     states.put(A_ROTATED_RUNNER, this::aRotatedRunner);
@@ -499,6 +509,24 @@ public class ProviderStates {
                       + "{\"claude\":\"PRESENT\",\"kimi\":\"ABSENT\"}},"
                       + "{\"name\":\"slots\",\"ok\":true,\"detail\":null,\"data\":"
                       + "{\"reservations\":5,\"total\":6}}]}";
+            });
+    return new Setup(Map.of("targetId", TARGET_ID));
+  }
+
+  /**
+   * {@link #aDeclaredTarget}'s row, quarantined the way a failed health check quarantines one
+   * ({@code control.Targets#quarantineFor}): {@code quarantinedAt} set, {@code quarantineReason}
+   * {@code "health check failed"}.
+   */
+  private Setup aQuarantinedTarget() {
+    aDeclaredTarget();
+    UUID id = UUID.fromString(TARGET_ID);
+    QuarkusTransaction.requiringNew()
+        .run(
+            () -> {
+              Target target = Target.findById(id);
+              target.quarantinedAt = TargetRows.T0;
+              target.quarantineReason = "health check failed";
             });
     return new Setup(Map.of("targetId", TARGET_ID));
   }

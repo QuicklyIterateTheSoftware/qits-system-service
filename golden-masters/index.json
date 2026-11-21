@@ -521,6 +521,59 @@
       ]
     },
     {
+      "name": "a quarantined target",
+      "slug": "a-quarantined-target",
+      "params": {
+        "targetId": "00000000-0000-4000-8000-000000000001"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "greenlightTarget",
+          "method": "POST",
+          "path": "/system/api/targets/{targetId}/greenlight",
+          "status": 200,
+          "file": "a-quarantined-target/greenlightTarget.json",
+          "frozen": {
+            "ids": [
+              "$.id"
+            ],
+            "instants": [
+              "$.login.checkedAt",
+              "$.registeredAt",
+              "$.lastSeenAt",
+              "$.lastHealthCheckAt",
+              "$.createdAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listTargets",
+          "method": "GET",
+          "path": "/system/api/targets",
+          "status": 200,
+          "file": "a-quarantined-target/listTargets.json",
+          "frozen": {
+            "ids": [
+              "$[*].id"
+            ],
+            "instants": [
+              "$[*].login.checkedAt",
+              "$[*].quarantinedAt",
+              "$[*].registeredAt",
+              "$[*].lastSeenAt",
+              "$[*].lastHealthCheckAt",
+              "$[*].createdAt"
+            ],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a queued desk lease",
       "slug": "a-queued-desk-lease",
       "params": {

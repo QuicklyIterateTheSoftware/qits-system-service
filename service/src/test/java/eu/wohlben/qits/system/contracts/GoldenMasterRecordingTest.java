@@ -253,6 +253,8 @@ class GoldenMasterRecordingTest {
           call(ProviderStates.NO_TARGET, "listTargets", "GET", API + "/targets", 200, null, Map.of()),
           call(ProviderStates.A_DECLARED_TARGET, "listTargets", "GET", API + "/targets", 200, null, Map.of()),
           call(
+              ProviderStates.A_QUARANTINED_TARGET, "listTargets", "GET", API + "/targets", 200, null, Map.of()),
+          call(
               ProviderStates.A_CONNECTED_TARGET_WITH_LEASES,
               "listTargets",
               "GET",
@@ -287,6 +289,14 @@ class GoldenMasterRecordingTest {
               Map.of()),
           call(
               ProviderStates.A_DECLARED_TARGET,
+              "greenlightTarget",
+              "POST",
+              TARGET + "/greenlight",
+              200,
+              null,
+              Map.of()),
+          call(
+              ProviderStates.A_QUARANTINED_TARGET,
               "greenlightTarget",
               "POST",
               TARGET + "/greenlight",

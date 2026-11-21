@@ -206,6 +206,11 @@ class ConsumerPactVerificationTest {
     return states.params(ProviderStates.A_DECLARED_TARGET);
   }
 
+  @State(ProviderStates.A_QUARANTINED_TARGET)
+  Map<String, String> aQuarantinedTarget() {
+    return states.params(ProviderStates.A_QUARANTINED_TARGET);
+  }
+
   @State(ProviderStates.AN_UNREGISTERED_RUNNER)
   Map<String, String> anUnregisteredRunner() {
     return states.params(ProviderStates.AN_UNREGISTERED_RUNNER);
