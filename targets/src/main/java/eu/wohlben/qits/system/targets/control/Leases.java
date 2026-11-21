@@ -67,7 +67,10 @@ public class Leases {
 
   @Inject TargetPresence presence;
 
-  /** What an owner asks for. {@code spec} is checked by {@link LeaseSpecs#require}. */
+  /**
+   * What an owner asks for. {@code spec} is checked by {@link LeaseSpecs#require}; {@code
+   * avoidTargetId} is a soft preference the allocator honours for an unpinned lease (qits-2382).
+   */
   public record NewLease(
       SlotType slotType,
       String ownerRef,
@@ -76,7 +79,8 @@ public class Leases {
       int priority,
       JsonNode spec,
       UUID pinTargetId,
-      Map<String, String> adopt) {}
+      Map<String, String> adopt,
+      UUID avoidTargetId) {}
 
   /** A listing's filter; null members filter nothing. {@code ownerApp} null is every owner. */
   public record Filter(LeaseState state, SlotType slotType, UUID targetId, String ownerApp) {}
@@ -130,6 +134,7 @@ public class Leases {
                     lease.projectId = request.projectId();
                     lease.workKey = request.workKey();
                     lease.pinTargetId = request.pinTargetId();
+                    lease.avoidTargetId = request.avoidTargetId();
                     lease.priority = request.priority();
                     lease.state = LeaseState.QUEUED;
                     lease.spec = LeaseSpecs.text(spec);
@@ -245,10 +250,15 @@ public class Leases {
    * <p><b>The dial-back streak</b> (qits-1809). The end of a CI lease that was RUNNING tells whether
    * its ci daemon dialled back: {@link #NEVER_DIALLED_BACK} counts one more failure on its target,
    * any other reason or none resets the count, since a daemon that registered proves the link
-   * works. At {@code qits.system.targets.dialback.threshold} in a row the target is quarantined
-   * ({@link Targets#quarantineFor}, which only renews the reason of a standing one); the {@code
-   * dialback} health check then holds it there for the cool-off. Every other end leaves the count
-   * alone: a lease that never ran says nothing about the link.
+   * works. An EXITED CI lease that ran first ({@code started_at} set) counts the same with {@link
+   * #NEVER_DIALLED_BACK} (qits-2382): its ci daemon gave up dialling and exited before its owner
+   * ended it, which is the same broken link; without the reason it leaves the count alone, since an
+   * exit says nothing of whether the daemon registered. At {@code
+   * qits.system.targets.dialback.threshold} in a row the target is quarantined ({@link
+   * Targets#quarantineFor}, which only renews the reason of a standing one); the {@code dialback}
+   * health check then holds it there for the cool-off. Every other end leaves the count alone: a
+   * lease that never ran (GRANTED, or EXITED without {@code started_at}) says nothing about the
+   * link, and a FAILED one was counted, if at all, when it failed.
    *
    * <p>The streak has a second cause (qits-525): a GRANTED CI lease its runner reports FAILED — it
    * could not start it at all, an image it could not pull, a container docker refused — counts one
@@ -263,12 +273,15 @@ public class Leases {
     Ended ended = endOne(id, false, why);
     Lease lease = ended.lease();
     if (lease.slotType != SlotType.CI
-        || ended.before() != LeaseState.RUNNING
         || lease.state == ended.before()
         || lease.targetId == null) {
       return new OwnerEnd(lease, null);
     }
     boolean neverDialled = NEVER_DIALLED_BACK.equals(why);
+    boolean ranThenExited = ended.before() == LeaseState.EXITED && lease.startedAt != null;
+    if (ended.before() != LeaseState.RUNNING && !(ranThenExited && neverDialled)) {
+      return new OwnerEnd(lease, null);
+    }
     Integer failures = targets.recordDialback(lease.targetId, neverDialled, Instant.now());
     if (!neverDialled || failures == null) {
       return new OwnerEnd(lease, null);
@@ -832,7 +845,9 @@ public class Leases {
    * threshold the target is quarantined the same way, with a {@code start: } reason naming the
    * last lease and its runner's detail. Nothing else here touches the count: a RUNNING lease that
    * failed or exited ran, so its target can start leases, and a GRANTED one that EXITED is no
-   * start failure. The state before is kept per lease inside the transaction, no column.
+   * start failure. Whether a RUNNING lease that EXITED dialled back is its owner's to say: its end
+   * with {@link #NEVER_DIALLED_BACK} counts it there (qits-2382). The state before is kept per
+   * lease inside the transaction, no column.
    *
    * <p>The leases alone, for a caller with no runner to tell; {@link #apply} also answers the
    * quarantine.

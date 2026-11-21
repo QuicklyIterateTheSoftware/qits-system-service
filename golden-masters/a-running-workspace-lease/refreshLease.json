@@ -6,6 +6,7 @@
   "projectId": null,
   "workKey": "ws-17",
   "pinTargetId": null,
+  "avoidTargetId": null,
   "targetId": "00000000-0000-4000-8000-000000000001",
   "priority": 0,
   "state": "RUNNING",

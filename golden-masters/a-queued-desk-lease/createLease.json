@@ -6,6 +6,7 @@
   "projectId": null,
   "workKey": "desk-00000000-0000-4000-8000-000000000005",
   "pinTargetId": null,
+  "avoidTargetId": null,
   "targetId": null,
   "priority": 0,
   "state": "QUEUED",

@@ -6,6 +6,7 @@
   "projectId": null,
   "workKey": "desk-00000000-0000-4000-8000-000000000003",
   "pinTargetId": null,
+  "avoidTargetId": null,
   "targetId": "00000000-0000-4000-8000-000000000001",
   "priority": 0,
   "state": "ENDING",

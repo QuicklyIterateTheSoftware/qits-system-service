@@ -43,6 +43,13 @@ public class Lease extends PanacheEntityBase implements CausedRow {
   @Column(name = "pin_target_id")
   public UUID pinTargetId;
 
+  /**
+   * A target the owner would rather not land on (qits-2382): an unpinned lease goes to any other
+   * target that can take it, and to this one only when none can. Null avoids nothing.
+   */
+  @Column(name = "avoid_target_id")
+  public UUID avoidTargetId;
+
   @Column(name = "target_id")
   public UUID targetId;
 

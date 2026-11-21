@@ -118,6 +118,24 @@ class LeaseDoorsTest {
   }
 
   @Test
+  void aTargetTheOwnerAvoidsIsKeptOnTheLeaseAndAnswered() {
+    UUID avoided = UUID.randomUUID();
+    String id =
+        lease("dev-qits-ci", "CI", "run-1", CI_IMAGE, ",\"avoidTargetId\":\"" + avoided + "\"")
+            .then()
+            .statusCode(201)
+            .body("avoidTargetId", equalTo(avoided.toString()))
+            .body("pinTargetId", nullValue())
+            .extract()
+            .path("id");
+    assertEquals(avoided, TargetRows.reload(UUID.fromString(id)).avoidTargetId);
+    lease("dev-qits-ci", "CI", "run-2", CI_IMAGE, "")
+        .then()
+        .statusCode(201)
+        .body("avoidTargetId", nullValue());
+  }
+
+  @Test
   void aLiveLeaseForTheSameRefIsRefused() {
     lease("dev-qits-ci", "CI", "run-1", CI_IMAGE, "").then().statusCode(201);
     lease("dev-qits-ci", "CI", "run-1", CI_IMAGE, "")

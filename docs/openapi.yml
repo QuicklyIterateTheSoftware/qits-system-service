@@ -182,6 +182,11 @@ components:
           additionalProperties:
             type: string
           description: "{container, volume} of a retired runner's work to take over"
+        avoidTargetId:
+          $ref: "#/components/schemas/UUID"
+          description: Prefer any other target; this one only when no other can take
+            the lease
+          type: string
     CreateTargetRequest:
       type: object
       required:
@@ -426,6 +431,8 @@ components:
         workKey:
           type: string
         pinTargetId:
+          $ref: "#/components/schemas/UUID"
+        avoidTargetId:
           $ref: "#/components/schemas/UUID"
         targetId:
           $ref: "#/components/schemas/UUID"
@@ -1269,8 +1276,9 @@ paths:
         schema:
           type: string
       - description: "Why; it lands in the lease's detail, and an operator's in the\
-          \ audit too. An owner's never-dialled-back on a RUNNING CI lease counts\
-          \ toward its target's dial-back quarantine (qits-1809)"
+          \ audit too. An owner's never-dialled-back on a RUNNING CI lease, or on\
+          \ an EXITED one that ran, counts toward its target's dial-back quarantine\
+          \ (qits-1809, qits-2382)"
         name: reason
         in: query
         schema:

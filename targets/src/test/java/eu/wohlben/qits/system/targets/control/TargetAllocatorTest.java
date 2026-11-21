@@ -190,6 +190,56 @@ class TargetAllocatorTest {
     assertFalse(decision.granted());
   }
 
+  // --- avoidance (qits-2382) ------------------------------------------------------------------------
+
+  private static Request avoiding(SlotType type, UUID pinnedTo, UUID avoided) {
+    return new Request(UUID.randomUUID(), type, 0, T0, pinnedTo, 0, avoided);
+  }
+
+  @Test
+  void anAvoidedTargetWithMoreFreeSlotsIsPassedOverForAnotherThatCanTakeTheLease() {
+    TargetSlots roomy = target(A, "alpha", 8, counts(0, 0, 0), true);
+    TargetSlots tight = target(B, "beta", 2, counts(1, 0, 0), true);
+    assertEquals(
+        A, SlotAllocator.allocate(List.of(roomy, tight), List.of(request(SlotType.CI, 0, 0))).get(0).targetId(),
+        "without avoidance the most free slots win");
+    Decision decision =
+        SlotAllocator.allocate(List.of(roomy, tight), List.of(avoiding(SlotType.CI, null, A))).get(0);
+    assertEquals(B, decision.targetId());
+  }
+
+  @Test
+  void anAvoidedTargetTakesTheLeaseWhenNoOtherCan() {
+    TargetSlots avoided = target(A, "alpha", 4, counts(0, 0, 0), true);
+    TargetSlots full = target(B, "beta", 1, counts(1, 0, 0), true);
+    TargetSlots quarantined =
+        new TargetSlots(
+            UUID.randomUUID(), "gamma", 4, counts(0, 0, 0), counts(0, 0, 0), true, true, true);
+    Decision decision =
+        SlotAllocator.allocate(
+                List.of(avoided, full, quarantined), List.of(avoiding(SlotType.CI, null, A)))
+            .get(0);
+    assertEquals(A, decision.targetId());
+  }
+
+  @Test
+  void aPinnedLeaseLandsOnItsPinEvenWhenItAvoidsIt() {
+    TargetSlots alpha = target(A, "alpha", 4, counts(0, 0, 0), true);
+    TargetSlots beta = target(B, "beta", 8, counts(0, 0, 0), true);
+    Decision decision =
+        SlotAllocator.allocate(List.of(alpha, beta), List.of(avoiding(SlotType.CI, A, A))).get(0);
+    assertEquals(A, decision.targetId());
+  }
+
+  @Test
+  void anAvoidingLeaseThatNoTargetCanTakeWaitsAsAnyOther() {
+    TargetSlots full = target(A, "alpha", 1, counts(1, 0, 0), true);
+    Decision decision =
+        SlotAllocator.allocate(List.of(full), List.of(avoiding(SlotType.CI, null, A))).get(0);
+    assertFalse(decision.granted());
+    assertEquals("no target has a free CI slot", decision.detail());
+  }
+
   // --- the sign-in gate ---------------------------------------------------------------------------
 
   @Test

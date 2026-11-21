@@ -7,6 +7,7 @@
     "projectId": null,
     "workKey": null,
     "pinTargetId": null,
+    "avoidTargetId": null,
     "targetId": null,
     "priority": 0,
     "state": "QUEUED",

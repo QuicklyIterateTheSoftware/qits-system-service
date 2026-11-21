@@ -61,8 +61,11 @@ import java.util.UUID;
  * breaks a tie, so a pass is deterministic). Each lease is considered on its own: one that cannot be
  * placed does not hold back the ones behind it. A lease pinned to a target — by {@code
  * pin_target_id} or by its work volume — is considered on that target only; any other goes to the
- * target with the most free slots, ties broken by name. Every grant counts at once — its slot, its
- * charge and its type's last charge — so one pass never over-fills a target.
+ * target with the most free slots, ties broken by name. An unpinned lease that avoids a target
+ * ({@code avoid_target_id}, qits-2382) is chosen by that rule among every other target first, and
+ * goes to the avoided one only when none of them can take it; a pinned lease ignores its avoidance.
+ * Avoidance never reorders the queue. Every grant counts at once — its slot, its charge and its
+ * type's last charge — so one pass never over-fills a target.
  *
  * <p><b>Who gets nothing.</b> A target that is not available (quarantined, or no connection) is never
  * granted anything. A WORKSPACE or DESK lease is granted only on a target that is signed in (either
@@ -202,7 +205,8 @@ public final class SlotAllocator {
 
   /**
    * A queued lease. {@code pinnedTo} is its pin or its work volume's target, else null; {@code
-   * chargeBytes} its {@code spec.limits.memory} ({@link DockerSizes#charge}).
+   * chargeBytes} its {@code spec.limits.memory} ({@link DockerSizes#charge}); {@code avoiding} the
+   * target it would rather not land on, else null — ignored when it is pinned.
    */
   public record Request(
       UUID leaseId,
@@ -210,7 +214,19 @@ public final class SlotAllocator {
       int priority,
       Instant requestedAt,
       UUID pinnedTo,
-      long chargeBytes) {
+      long chargeBytes,
+      UUID avoiding) {
+
+    /** A lease that avoids no target. */
+    public Request(
+        UUID leaseId,
+        SlotType type,
+        int priority,
+        Instant requestedAt,
+        UUID pinnedTo,
+        long chargeBytes) {
+      this(leaseId, type, priority, requestedAt, pinnedTo, chargeBytes, null);
+    }
 
     /** A lease charged nothing. */
     public Request(UUID leaseId, SlotType type, int priority, Instant requestedAt, UUID pinnedTo) {
@@ -263,10 +279,23 @@ public final class SlotAllocator {
           ? new Decision(request.leaseId(), pinned.id(), null)
           : new Decision(request.leaseId(), null, refusal);
     }
+    if (request.avoiding() != null) {
+      List<TargetSlots> others =
+          state.values().stream().filter(t -> !t.id().equals(request.avoiding())).toList();
+      Decision elsewhere = choose(others, request);
+      if (elsewhere.granted()) {
+        return elsewhere;
+      }
+    }
+    return choose(state.values(), request);
+  }
+
+  /** The unpinned rule over {@code candidates}: the most free slots, then the name; else why not. */
+  private static Decision choose(Iterable<TargetSlots> candidates, Request request) {
     TargetSlots best = null;
     TargetSlots signedOut = null;
     boolean memoryShort = false;
-    for (TargetSlots target : state.values()) {
+    for (TargetSlots target : candidates) {
       if (!target.available() || !slotsFit(target, request.type())) {
         continue;
       }
