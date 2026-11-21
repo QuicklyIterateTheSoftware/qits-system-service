@@ -9,6 +9,7 @@ erDiagram
   lease {
     uuid id PK "not null"
     jsonb adopt
+    uuid avoid_target_id
     uuid causation_id
     string detail
     instant ended_at
