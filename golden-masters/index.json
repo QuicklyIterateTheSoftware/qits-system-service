@@ -323,7 +323,10 @@
         {
           "operationId": "listLeases",
           "method": "GET",
-          "path": "/system/api/leases?targetId=00000000-0000-4000-8000-000000000001",
+          "path": "/system/api/leases",
+          "query": {
+            "targetId": "{targetId}"
+          },
           "status": 200,
           "file": "a-connected-target-with-leases/listLeases.json",
           "frozen": {
@@ -1400,7 +1403,10 @@
         {
           "operationId": "getContainerLogs",
           "method": "GET",
-          "path": "/system/api/nodes/local/containers/dev-qits-ci.1.k4g0nn1ld7o272jl7fciatg6m/logs?tail=200",
+          "path": "/system/api/nodes/local/containers/dev-qits-ci.1.k4g0nn1ld7o272jl7fciatg6m/logs",
+          "query": {
+            "tail": "200"
+          },
           "status": 200,
           "file": "a-single-node-swarm/getContainerLogs.json",
           "frozen": {

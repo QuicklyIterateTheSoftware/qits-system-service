@@ -14,9 +14,11 @@ import jakarta.inject.Inject;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URL;
+import java.net.URLDecoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -67,8 +69,11 @@ class GoldenMasterRecordingTest {
   static final String PROVIDER = "qits-system";
 
   /**
-   * One recorded interaction. {@code path} may carry {@code {param}}s of its state; {@code body}
-   * likewise; {@code headers} are recorded unexpanded and sent expanded.
+   * One recorded interaction. {@code path} may carry {@code {param}}s of its state and an optional
+   * {@code ?query}, which the index records apart as {@code query} — the shape the consumers'
+   * pacts build a request from; {@code body} likewise carries {@code {param}}s; {@code headers} are
+   * recorded unexpanded and sent expanded. The request sent is {@code path} expanded whole,
+   * query included.
    */
   record Interaction(
       String state,
@@ -315,7 +320,7 @@ class GoldenMasterRecordingTest {
               ProviderStates.A_CONNECTED_TARGET_WITH_LEASES,
               "listLeases",
               "GET",
-              API + "/leases?targetId=" + ProviderStates.TARGET_ID,
+              API + "/leases?targetId={targetId}",
               200,
               null,
               Map.of()),
@@ -625,7 +630,13 @@ class GoldenMasterRecordingTest {
       ObjectNode operation = JsonNodeFactory.instance.objectNode();
       operation.put("operationId", interaction.operationId());
       operation.put("method", interaction.method());
-      operation.put("path", interaction.path());
+      // The path is the route alone and the query its own object, as the consumers' pacts send it.
+      int queryAt = interaction.path().indexOf('?');
+      operation.put(
+          "path", queryAt < 0 ? interaction.path() : interaction.path().substring(0, queryAt));
+      if (queryAt >= 0) {
+        operation.set("query", query(interaction.path().substring(queryAt + 1)));
+      }
       if (!interaction.headers().isEmpty()) {
         ObjectNode headers = operation.putObject("headers");
         new TreeMap<>(interaction.headers()).forEach(headers::put);
@@ -760,6 +771,18 @@ class GoldenMasterRecordingTest {
       out = out.replace("{" + param.getKey() + "}", param.getValue());
     }
     return out;
+  }
+
+  /** A query string as an object, names and values decoded; a {@code {param}} is kept unexpanded. */
+  private static ObjectNode query(String raw) {
+    ObjectNode query = JsonNodeFactory.instance.objectNode();
+    for (String pair : raw.split("&")) {
+      int eq = pair.indexOf('=');
+      query.put(
+          URLDecoder.decode(eq < 0 ? pair : pair.substring(0, eq), StandardCharsets.UTF_8),
+          eq < 0 ? "" : URLDecoder.decode(pair.substring(eq + 1), StandardCharsets.UTF_8));
+    }
+    return query;
   }
 
   private static ArrayNode strings(List<String> values) {
