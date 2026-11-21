@@ -1,0 +1,26 @@
+[
+  {
+    "id": "abx4yo2tk0ls7z5z5t80pweo9",
+    "name": "dev-qits-artifacts.1",
+    "slot": 1,
+    "nodeId": null,
+    "nodeHostname": "fake-host",
+    "state": "Running 4 hours ago",
+    "desiredState": "Running",
+    "error": "",
+    "image": "registry.dev.localhost:8080/qits/qits-artifacts:09920e6",
+    "updatedAt": null
+  },
+  {
+    "id": "q8m3c1xv7d2kz0pn4wr6ys9tb",
+    "name": "dev-qits-artifacts.1",
+    "slot": 1,
+    "nodeId": null,
+    "nodeHostname": "fake-host",
+    "state": "Failed 5 hours ago",
+    "desiredState": "Shutdown",
+    "error": "task: non-zero exit (1)",
+    "image": "registry.dev.localhost:8080/qits/qits-artifacts:09920e6",
+    "updatedAt": null
+  }
+]
