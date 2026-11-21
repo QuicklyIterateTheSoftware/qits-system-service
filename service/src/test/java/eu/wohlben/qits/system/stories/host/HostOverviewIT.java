@@ -207,7 +207,12 @@ public class HostOverviewIT {
         .get(StoryTarget.LOCAL_NODE + "/volumes")
         .then()
         .statusCode(200)
-        .body("size()", equalTo(1));
+        .body("size()", equalTo(3))
+        // `unused` is docker's dangling list: no container references the volume. The runner's
+        // work volume between leases is one, and its labels say whose it is — not safe to delete.
+        .body("[0].unused", equalTo(false))
+        .body("[1].unused", equalTo(true))
+        .body("[1].labels['qits.system.runner.work-key']", equalTo("ws-10207"));
     StoryIdentities.operator(given())
         .get(StoryTarget.LOCAL_NODE + "/networks")
         .then()
@@ -229,7 +234,7 @@ public class HostOverviewIT {
 
     // THE ONE DECLARATION. A forked child talking to a unix socket is what `declare` exists for:
     // there is no port to sit in front of and no request log that is the daemon's rather than the
-    // fixture's. It renders muted and marked [declared], and the seven observed process edges above
+    // fixture's. It renders muted and marked [declared], and the eight observed process edges above
     // it are what stands where evidence can stand.
     network.declare(NetworkEdge.SOCKET, StoryDocker.DOCKER, StoryDocker.DAEMON, StoryDocker.SOCKET_LABEL);
   }
@@ -372,6 +377,7 @@ public class HostOverviewIT {
     docker(MACHINE_SLUG, "container inspect " + StoryTarget.CONTAINER, "0");
     docker(MACHINE_SLUG, "image ls", "0");
     docker(MACHINE_SLUG, "volume ls", "0");
+    docker(MACHINE_SLUG, "volume ls -q", "0");
     docker(MACHINE_SLUG, "network ls", "0");
 
     ReportAssertions.assertDeclaredEdge(
@@ -382,11 +388,11 @@ public class HostOverviewIT {
         StoryDocker.DAEMON,
         StoryDocker.SOCKET_LABEL);
 
-    // Six reads in, seven calls out to the CLI, one socket behind it. THE CLOSURE IS THE CLAIM:
+    // Six reads in, eight calls out to the CLI, one socket behind it. THE CLOSURE IS THE CLAIM:
     // "it is introspection of THIS machine and no peer" is what the story says, and a call to a
-    // host this catalogue would then have to stand in for would be a fifteenth edge no presence
+    // host this catalogue would then have to stand in for would be a sixteenth edge no presence
     // check could see.
-    ReportAssertions.assertEdgeCount(CATEGORY_SLUG, MACHINE_SLUG, 14);
+    ReportAssertions.assertEdgeCount(CATEGORY_SLUG, MACHINE_SLUG, 15);
     ReportAssertions.assertOnlyEdgesFrom(
         CATEGORY_SLUG,
         MACHINE_SLUG,

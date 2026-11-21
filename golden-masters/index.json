@@ -524,6 +524,27 @@
       ]
     },
     {
+      "name": "a node holding no volumes",
+      "slug": "a-node-holding-no-volumes",
+      "params": {},
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listNodeVolumes",
+          "method": "GET",
+          "path": "/system/api/nodes/local/volumes",
+          "status": 200,
+          "file": "a-node-holding-no-volumes/listNodeVolumes.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a quarantined target",
       "slug": "a-quarantined-target",
       "params": {
@@ -1736,6 +1757,27 @@
           "path": "/system/api/swarm/nodes/{nodeId}/tasks",
           "status": 200,
           "file": "a-swarm-node-running-no-tasks/listSwarmNodeTasks.json",
+          "frozen": {
+            "ids": [],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a swarm node this service cannot reach",
+      "slug": "a-swarm-node-this-service-cannot-reach",
+      "params": {},
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "listNodeVolumes",
+          "method": "GET",
+          "path": "/system/api/nodes/no-such-node/volumes",
+          "status": 409,
+          "file": "a-swarm-node-this-service-cannot-reach/listNodeVolumes.json",
           "frozen": {
             "ids": [],
             "instants": [],

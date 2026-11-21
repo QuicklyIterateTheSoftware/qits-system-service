@@ -211,6 +211,16 @@ class ConsumerPactVerificationTest {
     return states.params(ProviderStates.A_SWARM_NODE_RUNNING_NO_TASKS);
   }
 
+  @State(ProviderStates.A_NODE_HOLDING_NO_VOLUMES)
+  Map<String, String> aNodeHoldingNoVolumes() {
+    return states.params(ProviderStates.A_NODE_HOLDING_NO_VOLUMES);
+  }
+
+  @State(ProviderStates.A_REMOTE_SWARM_NODE)
+  Map<String, String> aRemoteSwarmNode() {
+    return states.params(ProviderStates.A_REMOTE_SWARM_NODE);
+  }
+
   @State(ProviderStates.NO_SUCH_SWARM_NODE)
   Map<String, String> noSuchSwarmNode() {
     return states.params(ProviderStates.NO_SUCH_SWARM_NODE);

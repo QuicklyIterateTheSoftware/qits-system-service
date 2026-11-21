@@ -298,6 +298,22 @@ class GoldenMasterRecordingTest {
           get("getContainerLogs", CONTAINER + "/logs?tail=200"),
           get("listNodeImages", API + "/nodes/local/images"),
           get("listNodeVolumes", API + "/nodes/local/volumes"),
+          call(
+              ProviderStates.A_NODE_HOLDING_NO_VOLUMES,
+              "listNodeVolumes",
+              "GET",
+              API + "/nodes/local/volumes",
+              200,
+              null,
+              Map.of()),
+          call(
+              ProviderStates.A_REMOTE_SWARM_NODE,
+              "listNodeVolumes",
+              "GET",
+              API + "/nodes/no-such-node/volumes",
+              409,
+              null,
+              Map.of()),
           get("listNodeNetworks", API + "/nodes/local/networks"),
           // --- the targets doors (qits-1481) ---
           call(
@@ -781,7 +797,9 @@ class GoldenMasterRecordingTest {
         || interaction.state().equals(ProviderStates.NO_SUCH_SWARM_NODE)
         || interaction.state().equals(ProviderStates.A_SWARM_CONFIG_HOLDING_NO_DATA)
         || interaction.state().equals(ProviderStates.A_SWARM_CONFIG_HOLDING_BINARY_DATA)
-        || interaction.state().equals(ProviderStates.NO_SUCH_SWARM_CONFIG)) {
+        || interaction.state().equals(ProviderStates.NO_SUCH_SWARM_CONFIG)
+        || interaction.state().equals(ProviderStates.A_NODE_HOLDING_NO_VOLUMES)
+        || interaction.state().equals(ProviderStates.A_REMOTE_SWARM_NODE)) {
       // The swarm reads are the fake docker's captures, the same every run: nothing to freeze.
       return new Recorded(body, params, new Freezer());
     }

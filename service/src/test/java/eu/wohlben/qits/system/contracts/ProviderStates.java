@@ -124,6 +124,24 @@ public class ProviderStates {
   public static final String NO_SUCH_SWARM_NODE = "no such swarm node";
 
   /**
+   * This node's docker holding no volume: {@code docker volume ls} prints nothing and exits 0, so
+   * the volume list is {@code []}. A real daemon here always holds volumes — this service's own
+   * deployment mounts some — so this is the defensive empty answer a consumer must still render
+   * (qits-2355). Only the volume listing differs; the fake docker reads a {@code no-volumes} file
+   * beside it.
+   */
+  public static final String A_NODE_HOLDING_NO_VOLUMES = "a node holding no volumes";
+
+  /**
+   * A node-resource door addressed to a swarm node that is not the one this service runs on:
+   * {@code NodeReads.requireLocal} refuses any id that is neither {@code local} nor the local
+   * node's id, so the door answers 409 {@code NODE_REMOTE} without asking docker anything. No fake-docker setup.
+   * Shared by the four node-resource doors — containers (qits-2352), images (qits-2353), networks
+   * (qits-2354) and volumes (qits-2355); each adds its own row.
+   */
+  public static final String A_REMOTE_SWARM_NODE = "a swarm node this service cannot reach";
+
+  /**
    * The same swarm, read for a config whose spec carries no data and no labels: {@code config
    * inspect qits-empty-config} answers it, so its detail carries {@code data: ""}, {@code binary:
    * false} and {@code labels: {}} (qits-2349). Param {@code configId}. The fake docker's {@code
@@ -403,6 +421,8 @@ public class ProviderStates {
     states.put(NO_SUCH_SWARM_SERVICE, () -> new Setup(Map.of("serviceId", UNKNOWN_SERVICE_ID)));
     states.put(A_SWARM_NODE_RUNNING_NO_TASKS, ProviderStates::aSwarmNodeRunningNoTasks);
     states.put(NO_SUCH_SWARM_NODE, () -> new Setup(Map.of("nodeId", UNKNOWN_NODE_ID)));
+    states.put(A_NODE_HOLDING_NO_VOLUMES, ProviderStates::aNodeHoldingNoVolumes);
+    states.put(A_REMOTE_SWARM_NODE, () -> new Setup(Map.of()));
     states.put(
         A_SWARM_CONFIG_HOLDING_NO_DATA, () -> new Setup(Map.of("configId", EMPTY_CONFIG_ID)));
     states.put(
@@ -444,6 +464,7 @@ public class ProviderStates {
     configsHeld(true);
     secretsHeld(true);
     nodeTasksRunning(true);
+    volumesHeld(true);
     if (runner != null) {
       runner.answering(null);
       runner.close();
@@ -471,6 +492,7 @@ public class ProviderStates {
     configsHeld(true);
     secretsHeld(true);
     nodeTasksRunning(true);
+    volumesHeld(true);
     return setup.get();
   }
 
@@ -510,6 +532,11 @@ public class ProviderStates {
 
   private static Setup aSwarmHoldingNoSecrets() {
     secretsHeld(false);
+    return new Setup(Map.of());
+  }
+
+  private static Setup aNodeHoldingNoVolumes() {
+    volumesHeld(false);
     return new Setup(Map.of());
   }
 
@@ -559,6 +586,15 @@ public class ProviderStates {
    */
   private static void nodeTasksRunning(boolean running) {
     marker("no-node-tasks", !running);
+  }
+
+  /**
+   * Whether the fake docker's {@code volume ls} prints its volumes, or nothing at all. The file
+   * sits beside the script, which every test in the run shares, so {@link #close} turns them back
+   * on.
+   */
+  private static void volumesHeld(boolean held) {
+    marker("no-volumes", !held);
   }
 
   /**
