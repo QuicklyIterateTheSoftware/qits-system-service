@@ -121,7 +121,7 @@
         <!-- The qits-system-runner's own frames (qits-1481): SystemRunnerProtocol, SystemRunnerCodec
              and SystemRunnerBinary, whose VERSION is the runner image every target is pinned to.
              Published by qits-system-runner-daemon. -->
-        <qits.system-runner-protocol.version>2026.1121.235432</qits.system-runner-protocol.version>
+        <qits.system-runner-protocol.version>2026.1122.100736</qits.system-runner-protocol.version>
         <!-- THE LOGIN PROBE'S LAST-RESORT IMAGE (qits-1593): qits-workspace-daemon-protocol's
              WorkspaceImage carries the `qits/workspace` tag of the release that published it, so a
              brand-new target with no WORKSPACE or DESK lease yet can still be probed and sign in,
@@ -161,7 +161,7 @@
              qits jar, so qits-maintenance bumps it when the consumer releases a changed pact (its
              PomParser reads pins regardless of scope, and records this property as the line to
              edit). Named like every pact pin on the estate: the artifactId without its `qits-`. -->
-        <qits.landing-app-pacts-qits-system-service.version>2026.1121.163543</qits.landing-app-pacts-qits-system-service.version>
+        <qits.landing-app-pacts-qits-system-service.version>2026.1122.110520</qits.landing-app-pacts-qits-system-service.version>
         <qits.maintenance-service-pacts-qits-system-service.version>2026.1031.131646</qits.maintenance-service-pacts-qits-system-service.version>
         <qits.projects-service-pacts-qits-system-service.version>2026.1112.21947</qits.projects-service-pacts-qits-system-service.version>
         <qits.workspaces-service-pacts-qits-system-service.version>2026.1115.230904</qits.workspaces-service-pacts-qits-system-service.version>
