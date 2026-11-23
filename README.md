@@ -189,7 +189,10 @@ leases held for it sets reservations its memory can carry.
 
 The builder is charged on a target that takes CI (qits-2503). An image build a CI lease sends to the
 target's shared buildkitd runs in the builder's cgroup, outside the lease's own `limits.memory`; the
-runner starts that buildkitd under `--memory` = `BUILDER_CONCURRENT_BUILDS × 8 GiB` (8 GiB: the 6g heap of qits-projects-service's native build plus room around it) and reports the cap
+runner starts that buildkitd under `--memory` = `BUILDER_CONCURRENT_BUILDS × 8 GiB` (8 GiB: the 6g
+heap of qits-projects-service's native build plus room around it). A raised cap reaches a builder that
+CI leases are still using in place (`docker update --memory`), not only at its next replacement, so
+the figure placement charges is the one the builder runs under. The runner reports the cap
 in its inventory as `builderMemoryBytes`, stored as `builder_memory_bytes` and shown in the target's
 `memory`. A target takes CI when CI is reserved there (`reservations.ci > 0`), a CI lease occupies it
 (GRANTED, RUNNING or ENDING), or the lease being placed is CI — the same test the `buildkit` health
