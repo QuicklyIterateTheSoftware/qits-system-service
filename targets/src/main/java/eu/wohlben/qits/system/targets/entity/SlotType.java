@@ -3,16 +3,20 @@ package eu.wohlben.qits.system.targets.entity;
 import java.util.Locale;
 
 /**
- * The three kinds of work a target's slots run. Each is leased by exactly one application ({@code
+ * The four kinds of work a target's slots run. Each is leased by exactly one application ({@code
  * qits.system.targets.tenants.<app>=<TYPE>}), and each has its own image prefix ({@code
  * qits.system.targets.slot-images.<type>}) and its own container policy in the runner.
  */
 public enum SlotType {
   CI,
   WORKSPACE,
-  DESK;
+  DESK,
+  AGENT;
 
-  /** The lower-case spelling config keys and wire maps use: {@code ci}, {@code workspace}, {@code desk}. */
+  /**
+   * The lower-case spelling config keys and wire maps use: {@code ci}, {@code workspace}, {@code
+   * desk}, {@code agent}.
+   */
   public String key() {
     return name().toLowerCase(Locale.ROOT);
   }

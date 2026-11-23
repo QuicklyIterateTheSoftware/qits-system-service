@@ -19,7 +19,8 @@ class LeaseSpecsTest {
       Map.of(
           "ci", "registry.qits.example.eu/qits/build-images/ci-slot",
           "workspace", "registry.qits.example.eu/qits/workspace",
-          "desk", "registry.qits.example.eu/qits/project-agent");
+          "desk", "registry.qits.example.eu/qits/project-agent",
+          "agent", "registry.qits.example.eu/qits/agent");
 
   @Test
   void anImageMustBeItsTypesRepositoryNotASibling() {
@@ -46,6 +47,27 @@ class LeaseSpecsTest {
                     SlotType.DESK,
                     IMAGES));
     assertEquals(TargetRefusal.IMAGE_NOT_ALLOWED, refused.code());
+    LeaseSpecs.require(
+        JSON.readTree("{\"image\":\"registry.qits.example.eu/qits/agent:1\"}"),
+        SlotType.AGENT,
+        IMAGES);
+    // The agent's repository is its own: a desk's image is not an agent's, nor the reverse.
+    TargetRefusal deskAsAgent =
+        assertThrows(
+            TargetRefusal.class,
+            () ->
+                LeaseSpecs.require(
+                    JSON.readTree("{\"image\":\"registry.qits.example.eu/qits/project-agent:1\"}"),
+                    SlotType.AGENT,
+                    IMAGES));
+    assertEquals(TargetRefusal.IMAGE_NOT_ALLOWED, deskAsAgent.code());
+    assertThrows(
+        TargetRefusal.class,
+        () ->
+            LeaseSpecs.require(
+                JSON.readTree("{\"image\":\"registry.qits.example.eu/qits/agent:1\"}"),
+                SlotType.DESK,
+                IMAGES));
     assertThrows(TargetRefusal.class, () -> LeaseSpecs.require(JSON.readTree("[]"), SlotType.CI, IMAGES));
     assertThrows(
         TargetRefusal.class,
@@ -71,6 +93,7 @@ class LeaseSpecsTest {
     assertEquals("qits-ci", OwnerIdentity.application("dev-qits-ci", "dev"));
     assertEquals("qits-workspaces", OwnerIdentity.application("prod-qits-workspaces", "prod"));
     assertEquals("qits-projects", OwnerIdentity.application("qits-projects", "dev"));
+    assertEquals("qits-agents", OwnerIdentity.application("dev-qits-agents", "dev"));
     assertEquals("dev-", OwnerIdentity.application("dev-", "dev"));
     assertEquals(null, OwnerIdentity.application(" ", "dev"));
   }

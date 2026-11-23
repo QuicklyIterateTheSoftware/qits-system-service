@@ -43,6 +43,9 @@ public class Target extends PanacheEntityBase implements CausedRow {
   @Column(name = "reserved_desk", nullable = false)
   public int reservedDesk;
 
+  @Column(name = "reserved_agent", nullable = false)
+  public int reservedAgent;
+
   /** The most CI leases this target runs at once; null is no ceiling (qits-1813). */
   @Column(name = "max_ci")
   public Integer maxCi;
@@ -54,6 +57,10 @@ public class Target extends PanacheEntityBase implements CausedRow {
   /** The most DESK leases this target runs at once; null is no ceiling. */
   @Column(name = "max_desk")
   public Integer maxDesk;
+
+  /** The most AGENT leases this target runs at once; null is no ceiling. */
+  @Column(name = "max_agent")
+  public Integer maxAgent;
 
   /** The {@code hello} capabilities extension as the runner sent it. */
   @JdbcTypeCode(SqlTypes.JSON)
@@ -182,7 +189,7 @@ public class Target extends PanacheEntityBase implements CausedRow {
     return quarantinedAt != null;
   }
 
-  /** Either harness is signed in: the sign-in gate for WORKSPACE and DESK leases. */
+  /** Either harness is signed in: the sign-in gate for WORKSPACE, DESK and AGENT leases. */
   public boolean signedIn() {
     return loginClaude == LoginValue.PRESENT || loginKimi == LoginValue.PRESENT;
   }
@@ -192,6 +199,7 @@ public class Target extends PanacheEntityBase implements CausedRow {
     reservations.put(SlotType.CI, reservedCi);
     reservations.put(SlotType.WORKSPACE, reservedWorkspace);
     reservations.put(SlotType.DESK, reservedDesk);
+    reservations.put(SlotType.AGENT, reservedAgent);
     return reservations;
   }
 
@@ -201,10 +209,11 @@ public class Target extends PanacheEntityBase implements CausedRow {
     maximums.put(SlotType.CI, maxCi);
     maximums.put(SlotType.WORKSPACE, maxWorkspace);
     maximums.put(SlotType.DESK, maxDesk);
+    maximums.put(SlotType.AGENT, maxAgent);
     return maximums;
   }
 
   public int reservationsSum() {
-    return reservedCi + reservedWorkspace + reservedDesk;
+    return reservedCi + reservedWorkspace + reservedDesk + reservedAgent;
   }
 }

@@ -44,6 +44,8 @@ class LeaseDoorsTest {
 
   static final String CI_IMAGE = "registry.qits.wohlben.eu/qits/build-images/ci-slot:2026.1";
   static final String WORKSPACE_IMAGE = "registry.qits.wohlben.eu/qits/workspace:2026.1";
+  static final String DESK_IMAGE = "registry.qits.wohlben.eu/qits/project-agent:2026.1";
+  static final String AGENT_IMAGE = "registry.qits.wohlben.eu/qits/agent:2026.1";
 
   @Inject TargetAllocation allocation;
 
@@ -158,6 +160,43 @@ class LeaseDoorsTest {
         .then()
         .statusCode(201)
         .body("ownerApp", equalTo("qits-workspaces"));
+  }
+
+  /**
+   * AGENT (qits-2519) is qits-agents' and no other tenant's: the desk's owner, the other tenants and a
+   * stranger asking for one are refused, and qits-agents is granted its lease with the work key
+   * {@code agent-<agentId>} — while asking for any other type is not its to do.
+   */
+  @Test
+  void anAgentLeaseIsQitsAgentsAloneToAskFor() {
+    for (String other : new String[] {"dev-qits-projects", "dev-qits-workspaces", "dev-qits-ci"}) {
+      lease(other, "AGENT", "a-1", AGENT_IMAGE, "")
+          .then()
+          .statusCode(403)
+          .body("code", equalTo("SLOT_TYPE_NOT_YOURS"));
+    }
+    lease("dev-qits-deployments", "AGENT", "a-1", AGENT_IMAGE, "")
+        .then()
+        .statusCode(403)
+        .body("code", equalTo("NOT_A_TENANT"));
+    lease("dev-qits-agents", "DESK", "a-1", DESK_IMAGE, "")
+        .then()
+        .statusCode(403)
+        .body("code", equalTo("SLOT_TYPE_NOT_YOURS"));
+    String agentId = UUID.randomUUID().toString();
+    lease("dev-qits-agents", "AGENT", agentId, AGENT_IMAGE, ",\"workKey\":\"agent-" + agentId + "\"")
+        .then()
+        .statusCode(201)
+        .body("state", equalTo("QUEUED"))
+        .body("ownerApp", equalTo("qits-agents"))
+        .body("slotType", equalTo("AGENT"))
+        .body("workKey", equalTo("agent-" + agentId))
+        .body("spec.image", equalTo(AGENT_IMAGE));
+    // The agent's slot runs the agent's image only, never the desk's.
+    lease("dev-qits-agents", "AGENT", "a-2", DESK_IMAGE, "")
+        .then()
+        .statusCode(400)
+        .body("code", equalTo("IMAGE_NOT_ALLOWED"));
   }
 
   @Test

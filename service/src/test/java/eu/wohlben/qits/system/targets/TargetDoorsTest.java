@@ -87,6 +87,7 @@ class TargetDoorsTest {
         .body("target.reservations.ci", equalTo(2))
         .body("target.reservations.workspace", equalTo(1))
         .body("target.reservations.desk", equalTo(0))
+        .body("target.reservations.agent", equalTo(0))
         .body("target.quarantined", is(true))
         .body("target.connected", is(false))
         .body("target.loginCommand", nullValue())
@@ -134,9 +135,25 @@ class TargetDoorsTest {
         .then()
         .statusCode(409)
         .body("code", equalTo("RESERVATIONS_EXCEED_TOTAL"));
+    // The agent's reservation counts toward the sum as the desk's does.
     admin()
         .contentType("application/json")
-        .body("{\"reservations\":{\"ci\":2,\"workspace\":2}, \"description\":\"four slots\"}")
+        .body("{\"reservations\":{\"ci\":2,\"workspace\":2,\"agent\":1}}")
+        .patch(API + "/" + id)
+        .then()
+        .statusCode(409)
+        .body("code", equalTo("RESERVATIONS_EXCEED_TOTAL"));
+    admin()
+        .contentType("application/json")
+        .body("{\"reservations\":{\"ci\":2,\"workspace\":1,\"agent\":1}}")
+        .patch(API + "/" + id)
+        .then()
+        .statusCode(200)
+        .body("reservations.agent", equalTo(1));
+    assertEquals(1, targets.get(id).reservedAgent);
+    admin()
+        .contentType("application/json")
+        .body("{\"reservations\":{\"ci\":2,\"workspace\":2,\"agent\":0}, \"description\":\"four slots\"}")
         .patch(API + "/" + id)
         .then()
         .statusCode(200)
@@ -159,42 +176,50 @@ class TargetDoorsTest {
         .statusCode(200)
         .body("maximums.ci", nullValue())
         .body("maximums.workspace", nullValue())
-        .body("maximums.desk", nullValue());
-    patch(id, "{\"reservations\":{\"ci\":2,\"workspace\":1},\"maximums\":{\"ci\":2,\"desk\":3}}")
+        .body("maximums.desk", nullValue())
+        .body("maximums.agent", nullValue());
+    patch(
+            id,
+            "{\"reservations\":{\"ci\":2,\"workspace\":1},\"maximums\":{\"ci\":2,\"desk\":3,\"agent\":2}}")
         .then()
         .statusCode(200)
         .body("maximums.ci", equalTo(2))
         .body("maximums.workspace", nullValue())
-        .body("maximums.desk", equalTo(3));
+        .body("maximums.desk", equalTo(3))
+        .body("maximums.agent", equalTo(2));
     // A member left out keeps its value; a maximum above the total is allowed.
     patch(id, "{\"maximums\":{\"workspace\":12}}")
         .then()
         .statusCode(200)
         .body("maximums.ci", equalTo(2))
         .body("maximums.workspace", equalTo(12))
-        .body("maximums.desk", equalTo(3));
+        .body("maximums.desk", equalTo(3))
+        .body("maximums.agent", equalTo(2));
     Target row = targets.get(id);
     assertEquals(Integer.valueOf(2), row.maxCi);
     assertEquals(Integer.valueOf(12), row.maxWorkspace);
     assertEquals(Integer.valueOf(3), row.maxDesk);
+    assertEquals(Integer.valueOf(2), row.maxAgent);
     admin()
         .get(API)
         .then()
         .statusCode(200)
         .body("find { it.name == 'lab' }.maximums.ci", equalTo(2));
     // An explicit null clears one; a patch naming no maximums keeps them all.
-    patch(id, "{\"maximums\":{\"desk\":null}}")
+    patch(id, "{\"maximums\":{\"desk\":null,\"agent\":null}}")
         .then()
         .statusCode(200)
         .body("maximums.ci", equalTo(2))
         .body("maximums.workspace", equalTo(12))
-        .body("maximums.desk", nullValue());
+        .body("maximums.desk", nullValue())
+        .body("maximums.agent", nullValue());
     patch(id, "{\"description\":\"eight slots\"}")
         .then()
         .statusCode(200)
         .body("maximums.ci", equalTo(2))
         .body("maximums.desk", nullValue());
     assertNull(targets.get(id).maxDesk);
+    assertNull(targets.get(id).maxAgent);
   }
 
   @Test
@@ -224,6 +249,13 @@ class TargetDoorsTest {
     patch(id, "{\"maximums\":[2]}").then().statusCode(400);
     // 0 is a ceiling, not a clear: a type reserved nothing may be held to none.
     patch(id, "{\"maximums\":{\"desk\":0}}").then().statusCode(200).body("maximums.desk", equalTo(0));
+    // The agent's maximum is judged against the agent's reservation, as the desk's is.
+    patch(id, "{\"reservations\":{\"agent\":2}}").then().statusCode(200);
+    patch(id, "{\"maximums\":{\"agent\":1}}")
+        .then()
+        .statusCode(409)
+        .body("code", equalTo("MAXIMUM_BELOW_RESERVATION"));
+    patch(id, "{\"maximums\":{\"agent\":2}}").then().statusCode(200).body("maximums.agent", equalTo(2));
     assertEquals(Integer.valueOf(4), targets.get(id).maxCi);
   }
 
@@ -693,6 +725,7 @@ class TargetDoorsTest {
     TargetRows.lease(UUID.randomUUID(), SlotType.CI, "qits-ci", "r2", LeaseState.ENDING, id);
     TargetRows.lease(UUID.randomUUID(), SlotType.WORKSPACE, "qits-workspaces", "w1", LeaseState.GRANTED, id);
     TargetRows.lease(UUID.randomUUID(), SlotType.DESK, "qits-projects", "d1", LeaseState.EXITED, id);
+    TargetRows.lease(UUID.randomUUID(), SlotType.AGENT, "qits-agents", "a1", LeaseState.RUNNING, id);
     admin()
         .get(API + "/" + id)
         .then()
@@ -700,6 +733,7 @@ class TargetDoorsTest {
         .body("used.ci", equalTo(2))
         .body("used.workspace", equalTo(1))
         .body("used.desk", equalTo(0))
+        .body("used.agent", equalTo(1))
         .body("slotsTotal", equalTo(6))
         .body("login.claude", equalTo("UNKNOWN"))
         .body("kimiLoginCommand", nullValue())

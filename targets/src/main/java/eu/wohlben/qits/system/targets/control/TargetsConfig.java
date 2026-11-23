@@ -14,16 +14,19 @@ import java.util.Optional;
 @ConfigMapping(prefix = "qits.system.targets")
 public interface TargetsConfig {
 
-  /** {@code <application>} → the slot type it may lease ({@code CI}, {@code WORKSPACE}, {@code DESK}). */
+  /**
+   * {@code <application>} → the slot type it may lease ({@code CI}, {@code WORKSPACE}, {@code
+   * DESK}, {@code AGENT}).
+   */
   Map<String, String> tenants();
 
   /** The {@code <environment>-} prefix stripped from a caller's client id. */
   String environment();
 
-  /** {@code ci|workspace|desk} → the prefix a lease's {@code spec.image} must start with. */
+  /** {@code ci|workspace|desk|agent} → the prefix a lease's {@code spec.image} must start with. */
   Map<String, String> slotImages();
 
-  /** The login probe's image when no WORKSPACE or DESK lease names one; see {@code ProbeImages}. */
+  /** The login probe's image when no WORKSPACE, DESK or AGENT lease names one; see {@code ProbeImages}. */
   Optional<String> probeImage();
 
   /** The platform's public domain; blank or dotless is none. */

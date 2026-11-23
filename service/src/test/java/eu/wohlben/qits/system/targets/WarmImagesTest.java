@@ -50,6 +50,8 @@ class WarmImagesTest {
 
   private static final String DESK = "registry.qits.wohlben.eu/qits/project-agent";
 
+  private static final String AGENT = "registry.qits.wohlben.eu/qits/agent";
+
   private static final ObjectMapper JSON = new ObjectMapper();
 
   @TestHTTPResource("/")
@@ -105,6 +107,10 @@ class WarmImagesTest {
   }
 
   private static void reservations(UUID targetId, int ci, int workspace, int desk) {
+    reservations(targetId, ci, workspace, desk, 0);
+  }
+
+  private static void reservations(UUID targetId, int ci, int workspace, int desk, int agent) {
     QuarkusTransaction.requiringNew()
         .run(
             () -> {
@@ -112,6 +118,7 @@ class WarmImagesTest {
               target.reservedCi = ci;
               target.reservedWorkspace = workspace;
               target.reservedDesk = desk;
+              target.reservedAgent = agent;
             });
   }
 
@@ -127,8 +134,15 @@ class WarmImagesTest {
   void eachSlotImageIsMatchedToItsOwnType() {
     offer(release("docker", "qits/build-images/ci-slot", "2026.1027.1"));
     offer(release("docker", "qits/project-agent", "2026.1027.2"));
+    offer(release("docker", "qits/agent", "2026.1027.3"));
     assertEquals(
-        Map.of(SlotType.CI, CI + ":2026.1027.1", SlotType.DESK, DESK + ":2026.1027.2"),
+        Map.of(
+            SlotType.CI,
+            CI + ":2026.1027.1",
+            SlotType.DESK,
+            DESK + ":2026.1027.2",
+            SlotType.AGENT,
+            AGENT + ":2026.1027.3"),
         warmImages.current());
   }
 
@@ -191,18 +205,30 @@ class WarmImagesTest {
     TargetRows.target(ciOnly, "ci-only", 2, null, false);
     reservations(ciOnly, 2, 0, 0);
     TargetRows.target(agentsOnly, "platform", 4, null, false);
-    reservations(agentsOnly, 0, 2, 2);
+    reservations(agentsOnly, 0, 2, 1, 1);
     offer(release("docker", "qits/workspace", "2026.1027.193351"));
     offer(release("docker", "qits/build-images/ci-slot", "2026.1027.1"));
     offer(release("docker", "qits/project-agent", "2026.1027.2"));
+    offer(release("docker", "qits/agent", "2026.1027.3"));
 
     assertEquals(
-        List.of(CI + ":2026.1027.1", WORKSPACE + ":2026.1027.193351", DESK + ":2026.1027.2"),
+        List.of(
+            CI + ":2026.1027.1",
+            WORKSPACE + ":2026.1027.193351",
+            DESK + ":2026.1027.2",
+            AGENT + ":2026.1027.3"),
         allocation.estateOf(anything).warmImages());
     assertEquals(List.of(CI + ":2026.1027.1"), allocation.estateOf(ciOnly).warmImages());
     assertEquals(
-        List.of(WORKSPACE + ":2026.1027.193351", DESK + ":2026.1027.2"),
+        List.of(WORKSPACE + ":2026.1027.193351", DESK + ":2026.1027.2", AGENT + ":2026.1027.3"),
         allocation.estateOf(agentsOnly).warmImages());
+    // A target whose every slot is reserved for the others never runs AGENT, so keeps none warm.
+    UUID noAgent = UUID.randomUUID();
+    TargetRows.target(noAgent, "no-agent", 4, null, false);
+    reservations(noAgent, 2, 1, 1, 0);
+    assertEquals(
+        List.of(CI + ":2026.1027.1", WORKSPACE + ":2026.1027.193351", DESK + ":2026.1027.2"),
+        allocation.estateOf(noAgent).warmImages());
 
     JsonNode wire = JSON.readTree(frames.encodeEstate(allocation.estateOf(ciOnly)));
     assertEquals("estate", wire.get("type").asText());

@@ -26,10 +26,15 @@ class TargetAllocatorTest {
   private static final UUID B = UUID.fromString("00000000-0000-0000-0000-00000000000b");
 
   private static Map<SlotType, Integer> counts(int ci, int workspace, int desk) {
+    return counts(ci, workspace, desk, 0);
+  }
+
+  private static Map<SlotType, Integer> counts(int ci, int workspace, int desk, int agent) {
     Map<SlotType, Integer> counts = new EnumMap<>(SlotType.class);
     counts.put(SlotType.CI, ci);
     counts.put(SlotType.WORKSPACE, workspace);
     counts.put(SlotType.DESK, desk);
+    counts.put(SlotType.AGENT, agent);
     return counts;
   }
 
@@ -93,6 +98,25 @@ class TargetAllocatorTest {
                 request(SlotType.DESK, 0, 2),
                 request(SlotType.DESK, 0, 3)));
     assertEquals(List.of(true, true, true, false), decisions.stream().map(Decision::granted).toList());
+  }
+
+  @Test
+  void anAgentReservationStaysFreeForAgentLeasesAsADesksDoes() {
+    // T=6, reservations ci 2, workspace 1, desk 1, agent 1, 2 ci running: one more ci fits (2 + 1 +
+    // 1 + 1 + 1 = 6), a third does not, and the agent's reserved slot is still an agent's to take.
+    TargetSlots slots =
+        new TargetSlots(A, "alpha", 6, counts(2, 1, 1, 1), counts(2, 0, 0), true, false, true);
+    assertTrue(SlotAllocator.fits(slots, SlotType.CI));
+    List<Decision> decisions =
+        SlotAllocator.allocate(
+            List.of(slots),
+            List.of(
+                request(SlotType.CI, 0, 0),
+                request(SlotType.CI, 0, 1),
+                request(SlotType.AGENT, 0, 2),
+                request(SlotType.AGENT, 0, 3)));
+    assertEquals(List.of(true, false, true, false), decisions.stream().map(Decision::granted).toList());
+    assertEquals("no target has a free AGENT slot", decisions.get(3).detail());
   }
 
   // --- Σ min > total ------------------------------------------------------------------------------
@@ -245,7 +269,7 @@ class TargetAllocatorTest {
   @Test
   void anAgentLeaseWaitsOnASignedOutTargetAndSaysWhy() {
     TargetSlots signedOut = target(A, "alpha", 4, counts(0, 0, 0), false);
-    for (SlotType type : List.of(SlotType.WORKSPACE, SlotType.DESK)) {
+    for (SlotType type : List.of(SlotType.WORKSPACE, SlotType.DESK, SlotType.AGENT)) {
       Decision decision =
           SlotAllocator.allocate(List.of(signedOut), List.of(request(type, 0, 0))).get(0);
       assertNull(decision.targetId());
@@ -328,10 +352,16 @@ class TargetAllocatorTest {
 
   /** A map with a null (no ceiling) where a type is unset. */
   private static Map<SlotType, Integer> maximums(Integer ci, Integer workspace, Integer desk) {
+    return maximums(ci, workspace, desk, null);
+  }
+
+  private static Map<SlotType, Integer> maximums(
+      Integer ci, Integer workspace, Integer desk, Integer agent) {
     Map<SlotType, Integer> maximums = new EnumMap<>(SlotType.class);
     maximums.put(SlotType.CI, ci);
     maximums.put(SlotType.WORKSPACE, workspace);
     maximums.put(SlotType.DESK, desk);
+    maximums.put(SlotType.AGENT, agent);
     return maximums;
   }
 
@@ -388,6 +418,7 @@ class TargetAllocatorTest {
     TargetSlots slots = wsProof(2, 2);
     assertTrue(SlotAllocator.fits(slots, SlotType.WORKSPACE));
     assertTrue(SlotAllocator.fits(slots, SlotType.DESK));
+    assertTrue(SlotAllocator.fits(slots, SlotType.AGENT));
     // A maximum on one type holds back no other: the workspace ceiling is unset.
     List<Decision> decisions =
         SlotAllocator.allocate(
@@ -405,6 +436,46 @@ class TargetAllocatorTest {
     assertEquals(
         "target ws-proof runs its maximum of 2 CI lease(s)",
         SlotAllocator.allocate(List.of(wsProof(2, 2)), List.of(pinned)).get(0).detail());
+  }
+
+  @Test
+  void anAgentMaximumIsItsCeilingAsADesksIs() {
+    // T=8, nothing reserved, agent at most 1: one AGENT lease is granted, the second waits while
+    // every other slot is free — and a DESK lease beside them is not held back by it.
+    TargetSlots slots =
+        new TargetSlots(
+            A,
+            "alpha",
+            8,
+            counts(0, 0, 0),
+            maximums(null, null, null, 1),
+            counts(0, 0, 0),
+            true,
+            false,
+            true);
+    List<Decision> decisions =
+        SlotAllocator.allocate(
+            List.of(slots),
+            List.of(
+                request(SlotType.AGENT, 0, 0),
+                request(SlotType.AGENT, 0, 1),
+                request(SlotType.DESK, 0, 2)));
+    assertEquals(List.of(true, false, true), decisions.stream().map(Decision::granted).toList());
+    Request pinned = new Request(UUID.randomUUID(), SlotType.AGENT, 0, T0, A);
+    TargetSlots atMaximum =
+        new TargetSlots(
+            A,
+            "alpha",
+            8,
+            counts(0, 0, 0),
+            maximums(null, null, null, 1),
+            counts(0, 0, 0, 1),
+            true,
+            false,
+            true);
+    assertEquals(
+        "target alpha runs its maximum of 1 AGENT lease(s)",
+        SlotAllocator.allocate(List.of(atMaximum), List.of(pinned)).get(0).detail());
   }
 
   @Test
@@ -754,7 +825,7 @@ class TargetAllocatorTest {
     // held, and the lease, the builder and the candidate alone overflow.
     TargetSlots oneCi = withBuilder(counts(2, 1, 0), counts(1, 0, 0), 14 * GIB, SIX_G, SIX_G);
     assertEquals(counts(1, 0, 0), SlotAllocator.honouredReservations(oneCi, SlotType.WORKSPACE));
-    for (SlotType type : List.of(SlotType.CI, SlotType.WORKSPACE, SlotType.DESK)) {
+    for (SlotType type : List.of(SlotType.CI, SlotType.WORKSPACE, SlotType.DESK, SlotType.AGENT)) {
       assertTrue(SlotAllocator.slotsFit(oneCi, type), type.name());
       Decision decision =
           SlotAllocator.allocate(List.of(oneCi), List.of(charged(type, 0, SIX_G))).get(0);
@@ -775,6 +846,7 @@ class TargetAllocatorTest {
     TargetSlots wsOnly = withBuilder(counts(0, 1, 0), counts(0, 1, 0), 14 * GIB, SIX_G, SIX_G);
     assertTrue(SlotAllocator.fits(wsOnly, SlotType.WORKSPACE, SIX_G));
     assertTrue(SlotAllocator.fits(wsOnly, SlotType.DESK, SIX_G));
+    assertTrue(SlotAllocator.fits(wsOnly, SlotType.AGENT, SIX_G));
     assertEquals(
         A,
         SlotAllocator.allocate(List.of(wsOnly), List.of(charged(SlotType.WORKSPACE, 0, SIX_G)))
@@ -832,6 +904,7 @@ class TargetAllocatorTest {
     assertTrue(SlotAllocator.canEverRun(2, ciOnly, SlotType.CI));
     assertFalse(SlotAllocator.canEverRun(2, ciOnly, SlotType.WORKSPACE));
     assertFalse(SlotAllocator.canEverRun(2, ciOnly, SlotType.DESK));
+    assertFalse(SlotAllocator.canEverRun(2, ciOnly, SlotType.AGENT));
   }
 
   @Test

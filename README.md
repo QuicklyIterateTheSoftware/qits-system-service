@@ -154,8 +154,8 @@ desk's administrator — beside it (epic qits-1621; no refusal is recorded for t
 ## Execution targets
 
 The machines a `qits-system-runner` (components/qits-system/qits-system-runner-daemon) holds a docker
-socket on, each with a number of typed slots — CI, WORKSPACE, DESK — that qits-ci, qits-workspaces and
-qits-projects lease. This service decides which lease runs where (`SlotAllocator`) and pushes each
+socket on, each with a number of typed slots — CI, WORKSPACE, DESK, AGENT — that qits-ci, qits-workspaces,
+qits-projects and qits-agents lease. This service decides which lease runs where (`SlotAllocator`) and pushes each
 runner its whole desired `estate`; the runner answers with an `inventory`.
 
 A reservation holds slots for one type. It is not a limit: a type may use more than its reservation
@@ -181,7 +181,7 @@ no target's memory can hold waits with `no target has memory for a 6g WORKSPACE 
 
 Reservations the memory cannot meet are honoured in priority order, CI first (qits-2515), never
 dropped whole. Starting from the capacity less the builder (below) when the target takes CI, each type
-in turn — CI, then WORKSPACE, then DESK — is honoured as many of its reservations as the memory left
+in turn — CI, then WORKSPACE, then DESK, then AGENT — is honoured as many of its reservations as the memory left
 holds at its price (`h[u] = min(r[u], ⌊A / charge(u)⌋)`, all of them for a type priced at 0), and
 those are taken off before the next type; the middle term then counts only the honoured reservations
 a type does not use. Reservations the memory can meet are honoured whole, and nothing changes. Until
@@ -205,7 +205,7 @@ in its inventory as `builderMemoryBytes`, stored as `builder_memory_bytes` and s
 (GRANTED, RUNNING or ENDING), or the lease being placed is CI — the same test the `buildkit` health
 check counts by — and only then is the builder's cap added to the committed charges, once: the rule
 is committed + the other types' unused reservations + builder + the lease's own charge ≤ capacity. A
-workspace- or desk-only target never starts the builder and is not charged it, and a runner too old
+workspace-, desk- or agent-only target never starts the builder and is not charged it, and a runner too old
 to report the cap (null) is charged nothing for it. The builder comes off the capacity before any
 reservation is honoured (qits-2515): it is fixed overhead, not a reservation. The
 `node-memory-reserve` (2g) is what the node's own processes keep — the kernel, docker, the runner —
@@ -246,11 +246,11 @@ outside their caps — not a regression.
 
 - **The owner of a lease is the caller**: its bearer's client id without `<environment>-`, checked
   against `qits.system.targets.tenants.<app>=<TYPE>` (qits-ci CI, qits-workspaces WORKSPACE,
-  qits-projects DESK). Anyone else is 403; another type is 403 `SLOT_TYPE_NOT_YOURS`.
+  qits-projects DESK, qits-agents AGENT). Anyone else is 403; another type is 403 `SLOT_TYPE_NOT_YOURS`.
 - **A slot runs only its type's images** (`qits.system.targets.slot-images.<type>`, 400
   `IMAGE_NOT_ALLOWED`), never as root, and never with a policy-owned env key (`HOME`,
   `CLAUDE_CONFIG_DIR`, `BUILDKIT_HOST`; 400 `ENV_KEY_NOT_ALLOWED`).
-- **A WORKSPACE or DESK lease waits on a target nobody signed in** — `detail` names the command:
+- **A WORKSPACE, DESK or AGENT lease waits on a target nobody signed in** — `detail` names the command:
   `qits targets sign-in --target <name>`, which signs in through the sign-in doors below, as the
   Targets page does. `loginCommand`/`kimiLoginCommand` are the manual fallback, run on the node:
   rendered from the volume the runner reported, once its `loginState` arrived on the current
@@ -294,8 +294,8 @@ outside their caps — not a regression.
   lease on it is FAILED and every ENDING lease of any type ENDED, `ended_at` the sweep's
   instant, `detail = "target <name> offline since <instant>"`, announced, and audited as
   `LEASE_ABANDONED` by `qits-system`. The deadline is long because the runner's socket crosses the
-  edge, which an outage can cut while the node runs on (2026-11-12: 85 minutes). RUNNING WORKSPACE
-  and DESK leases are left alone: their agent sessions survive an outage of any length today, and a
+  edge, which an outage can cut while the node runs on (2026-11-12: 85 minutes). RUNNING WORKSPACE,
+  DESK and AGENT leases are left alone: their agent sessions survive an outage of any length today, and a
   FAILED lease's container is removed by the runner that comes back. A GRANTED CI lease never gets
   this far — it has no work key, so the requeue above takes it after the reconnect grace.
 - **`target_audit`**: who did what to a target or lease beyond its owner's doors (`TargetAuditLog`,
@@ -367,8 +367,8 @@ under it — so the landing app's apex can dial the socket while a foreign page 
 
 The targets module's keys are `qits.system.targets.*`, defaulted in
 `targets/src/main/resources/META-INF/microprofile-config.properties`: `tenants.<app>`,
-`slot-images.{ci,workspace,desk}`, `probe-image` (optional: the probe runs the newest WORKSPACE, else
-DESK, lease's image first), `registry-mirrors.{registry-hosts,mirror-hosts,
+`slot-images.{ci,workspace,desk,agent}`, `probe-image` (optional: the probe runs the newest WORKSPACE,
+else DESK, else AGENT, lease's image first), `registry-mirrors.{registry-hosts,mirror-hosts,
 upstreams}`, `runner-version-override`, `reconnect-grace=PT2M`, `commission-reconcile-interval=1h`,
 `public-url` (wss base), `estate-interval=PT1M`, `node-memory-reserve=2g` (qits-2362: a target's lease capacity is min(memoryMaxBytes, memoryTotalBytes) less this, kept for the node's own processes; the shared buildkitd is charged separately, at its reported builderMemoryBytes, on a target that takes CI — qits-2503), `healthcheck.schedule`, `healthcheck.timeout=PT5M`,
 `dialback.threshold=3` and `dialback.cooloff=PT30M` (qits-1809: that many RUNNING CI leases in a row

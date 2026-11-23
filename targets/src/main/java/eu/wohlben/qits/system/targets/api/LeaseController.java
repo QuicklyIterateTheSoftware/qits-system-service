@@ -80,12 +80,14 @@ public class LeaseController {
 
   @Schema(name = "CreateLeaseRequest")
   public record CreateLeaseRequest(
-      @Schema(description = "CI, WORKSPACE or DESK; must be the caller's", required = true)
+      @Schema(description = "CI, WORKSPACE, DESK or AGENT; must be the caller's", required = true)
           String slotType,
       @Schema(description = "The owner's own key for the work (a run id, a row id)", required = true)
           String ownerRef,
       UUID projectId,
-      @Schema(description = "ws-<rowId> or desk-<deskId>: the work volume, kept between leases")
+      @Schema(
+              description =
+                  "ws-<rowId>, desk-<deskId> or agent-<agentId>: the work volume, kept between leases")
           String workKey,
       @Schema(description = "Higher first; default 0") Integer priority,
       @Schema(description = "LeaseSpec{image, env, user, limits}", required = true) JsonNode spec,
@@ -115,7 +117,7 @@ public class LeaseController {
     }
     SlotType type = SlotType.parse(request.slotType());
     if (type == null) {
-      throw TargetRefusal.badRequest("A lease's slotType is CI, WORKSPACE or DESK");
+      throw TargetRefusal.badRequest("A lease's slotType is CI, WORKSPACE, DESK or AGENT");
     }
     String owner = owners.requireTenantOf(identity, type);
     Lease lease =

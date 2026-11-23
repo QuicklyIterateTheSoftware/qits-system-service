@@ -39,8 +39,8 @@ public class Targets {
   public static final String AWAITING_FIRST_HEALTH_CHECK = "awaiting first health check";
 
   /** The reservations a request sets, per type; null members leave the current value. */
-  public record Reservations(Integer ci, Integer workspace, Integer desk) {
-    public static final Reservations NONE = new Reservations(0, 0, 0);
+  public record Reservations(Integer ci, Integer workspace, Integer desk, Integer agent) {
+    public static final Reservations NONE = new Reservations(0, 0, 0, 0);
   }
 
   /**
@@ -184,7 +184,10 @@ public class Targets {
   public static int sum(Reservations reservations) {
     return reservations == null
         ? 0
-        : orZero(reservations.ci()) + orZero(reservations.workspace()) + orZero(reservations.desk());
+        : orZero(reservations.ci())
+            + orZero(reservations.workspace())
+            + orZero(reservations.desk())
+            + orZero(reservations.agent());
   }
 
   /** 400 or 409 for a create that could not be written; asked before anything is commissioned. */
@@ -219,6 +222,7 @@ public class Targets {
                 target.reservedCi = orZero(given.ci());
                 target.reservedWorkspace = orZero(given.workspace());
                 target.reservedDesk = orZero(given.desk());
+                target.reservedAgent = orZero(given.agent());
                 target.registrationTokenId = registrationTokenId;
                 target.registrationTokenSubject = registrationTokenSubject;
                 target.loginClaude = LoginValue.UNKNOWN;
@@ -265,11 +269,12 @@ public class Targets {
                     int ci = reservations.ci() == null ? target.reservedCi : reservations.ci();
                     int ws = reservations.workspace() == null ? target.reservedWorkspace : reservations.workspace();
                     int desk = reservations.desk() == null ? target.reservedDesk : reservations.desk();
-                    if (target.slotsTotal > 0 && ci + ws + desk > target.slotsTotal) {
+                    int agent = reservations.agent() == null ? target.reservedAgent : reservations.agent();
+                    if (target.slotsTotal > 0 && ci + ws + desk + agent > target.slotsTotal) {
                       throw TargetRefusal.conflict(
                           TargetRefusal.RESERVATIONS_EXCEED_TOTAL,
                           "The reservations sum to "
-                              + (ci + ws + desk)
+                              + (ci + ws + desk + agent)
                               + ", above the "
                               + target.slotsTotal
                               + " slot(s) target "
@@ -279,6 +284,7 @@ public class Targets {
                     target.reservedCi = ci;
                     target.reservedWorkspace = ws;
                     target.reservedDesk = desk;
+                    target.reservedAgent = agent;
                   }
                   if (maximums != null) {
                     Map<SlotType, Integer> changes = maximums.changes();
@@ -290,6 +296,9 @@ public class Targets {
                     }
                     if (changes.containsKey(SlotType.DESK)) {
                       target.maxDesk = changes.get(SlotType.DESK);
+                    }
+                    if (changes.containsKey(SlotType.AGENT)) {
+                      target.maxAgent = changes.get(SlotType.AGENT);
                     }
                   }
                   if (reservations != null || maximums != null) {
@@ -675,7 +684,10 @@ public class Targets {
     if (reservations == null) {
       return;
     }
-    for (Integer value : new Integer[] {reservations.ci(), reservations.workspace(), reservations.desk()}) {
+    for (Integer value :
+        new Integer[] {
+          reservations.ci(), reservations.workspace(), reservations.desk(), reservations.agent()
+        }) {
       if (value != null && (value < 0 || value > 1024)) {
         throw TargetRefusal.badRequest("A reservation is between 0 and 1024, not " + value);
       }

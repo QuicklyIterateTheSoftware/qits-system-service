@@ -643,6 +643,163 @@
       ]
     },
     {
+      "name": "a queued agent lease",
+      "slug": "a-queued-agent-lease",
+      "params": {
+        "authorization": "Bearer qits_tok_contract-qits-agents",
+        "leaseId": "00000000-0000-4000-8000-000000000002",
+        "ownerRef": "00000000-0000-4000-8000-000000000003",
+        "workKey": "agent-00000000-0000-4000-8000-000000000003"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "createLease",
+          "method": "POST",
+          "path": "/system/api/leases",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "body": {
+            "slotType": "AGENT",
+            "ownerRef": "00000000-0000-4000-8000-000000000004",
+            "workKey": "agent-00000000-0000-4000-8000-000000000004",
+            "priority": 0,
+            "spec": {
+              "image": "registry.qits.wohlben.eu/qits/agent:2026.1",
+              "env": {
+                "QITS_TOKEN": "qits_tok_lease"
+              },
+              "user": "1000",
+              "limits": {
+                "memory": "8g"
+              }
+            }
+          },
+          "status": 201,
+          "file": "a-queued-agent-lease/createLease.json",
+          "frozen": {
+            "ids": [
+              "$.id",
+              "$.ownerRef"
+            ],
+            "instants": [
+              "$.requestedAt"
+            ],
+            "strings": [
+              "$.workKey"
+            ],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "endLease",
+          "method": "DELETE",
+          "path": "/system/api/leases/{leaseId}",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 200,
+          "file": "a-queued-agent-lease/endLease.json",
+          "frozen": {
+            "ids": [
+              "$.id",
+              "$.ownerRef"
+            ],
+            "instants": [
+              "$.requestedAt",
+              "$.endedAt"
+            ],
+            "strings": [
+              "$.workKey"
+            ],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getLease",
+          "method": "GET",
+          "path": "/system/api/leases/{leaseId}",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 200,
+          "file": "a-queued-agent-lease/getLease.json",
+          "frozen": {
+            "ids": [
+              "$.id",
+              "$.ownerRef"
+            ],
+            "instants": [
+              "$.requestedAt"
+            ],
+            "strings": [
+              "$.workKey"
+            ],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listLeases",
+          "method": "GET",
+          "path": "/system/api/leases",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 200,
+          "file": "a-queued-agent-lease/listLeases.json",
+          "frozen": {
+            "ids": [
+              "$[*].id",
+              "$[*].ownerRef"
+            ],
+            "instants": [
+              "$[*].requestedAt"
+            ],
+            "strings": [
+              "$[*].workKey"
+            ],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "replaceLeaseSpec",
+          "method": "PUT",
+          "path": "/system/api/leases/{leaseId}/spec",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "body": {
+            "spec": {
+              "image": "registry.qits.wohlben.eu/qits/agent:2026.1",
+              "env": {
+                "QITS_TOKEN": "qits_tok_lease"
+              },
+              "user": "1000",
+              "limits": {
+                "memory": "8g"
+              }
+            }
+          },
+          "status": 200,
+          "file": "a-queued-agent-lease/replaceLeaseSpec.json",
+          "frozen": {
+            "ids": [
+              "$.id",
+              "$.ownerRef"
+            ],
+            "instants": [
+              "$.requestedAt"
+            ],
+            "strings": [
+              "$.workKey"
+            ],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
       "name": "a queued desk lease",
       "slug": "a-queued-desk-lease",
       "params": {
@@ -1153,6 +1310,162 @@
             "ids": [],
             "instants": [],
             "strings": [],
+            "listFilteredTo": null
+          }
+        }
+      ]
+    },
+    {
+      "name": "a running agent lease",
+      "slug": "a-running-agent-lease",
+      "params": {
+        "authorization": "Bearer qits_tok_contract-qits-agents",
+        "leaseId": "00000000-0000-4000-8000-000000000002",
+        "ownerRef": "00000000-0000-4000-8000-000000000003",
+        "targetId": "00000000-0000-4000-8000-000000000001",
+        "workKey": "agent-00000000-0000-4000-8000-000000000003"
+      },
+      "dependsOn": [],
+      "operations": [
+        {
+          "operationId": "endLease",
+          "method": "DELETE",
+          "path": "/system/api/leases/{leaseId}",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 200,
+          "file": "a-running-agent-lease/endLease.json",
+          "frozen": {
+            "ids": [
+              "$.id",
+              "$.ownerRef",
+              "$.targetId"
+            ],
+            "instants": [
+              "$.requestedAt",
+              "$.grantedAt",
+              "$.startedAt"
+            ],
+            "strings": [
+              "$.workKey"
+            ],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "getLease",
+          "method": "GET",
+          "path": "/system/api/leases/{leaseId}",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 200,
+          "file": "a-running-agent-lease/getLease.json",
+          "frozen": {
+            "ids": [
+              "$.id",
+              "$.ownerRef",
+              "$.targetId"
+            ],
+            "instants": [
+              "$.requestedAt",
+              "$.grantedAt",
+              "$.startedAt"
+            ],
+            "strings": [
+              "$.workKey"
+            ],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "listLeases",
+          "method": "GET",
+          "path": "/system/api/leases",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 200,
+          "file": "a-running-agent-lease/listLeases.json",
+          "frozen": {
+            "ids": [
+              "$[*].id",
+              "$[*].ownerRef",
+              "$[*].targetId"
+            ],
+            "instants": [
+              "$[*].requestedAt",
+              "$[*].grantedAt",
+              "$[*].startedAt"
+            ],
+            "strings": [
+              "$[*].workKey"
+            ],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "refreshLease",
+          "method": "POST",
+          "path": "/system/api/leases/{leaseId}/refresh",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "status": 200,
+          "file": "a-running-agent-lease/refreshLease.json",
+          "frozen": {
+            "ids": [
+              "$.id",
+              "$.ownerRef",
+              "$.targetId"
+            ],
+            "instants": [
+              "$.requestedAt",
+              "$.grantedAt",
+              "$.startedAt"
+            ],
+            "strings": [
+              "$.workKey"
+            ],
+            "listFilteredTo": null
+          }
+        },
+        {
+          "operationId": "replaceLeaseSpec",
+          "method": "PUT",
+          "path": "/system/api/leases/{leaseId}/spec",
+          "headers": {
+            "Authorization": "{authorization}"
+          },
+          "body": {
+            "spec": {
+              "image": "registry.qits.wohlben.eu/qits/agent:2026.1",
+              "env": {
+                "QITS_TOKEN": "qits_tok_lease"
+              },
+              "user": "1000",
+              "limits": {
+                "memory": "8g"
+              }
+            }
+          },
+          "status": 200,
+          "file": "a-running-agent-lease/replaceLeaseSpec.json",
+          "frozen": {
+            "ids": [
+              "$.id",
+              "$.ownerRef",
+              "$.targetId"
+            ],
+            "instants": [
+              "$.requestedAt",
+              "$.grantedAt",
+              "$.startedAt"
+            ],
+            "strings": [
+              "$.workKey"
+            ],
             "listFilteredTo": null
           }
         }

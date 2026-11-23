@@ -65,7 +65,7 @@ its schedules in it; `service/` discovers them through the jar's jandex index. T
 T` (the maximum `m` never is), one queue `priority desc,
 requested_at asc`, pins considered on their target only, the most free slots then the name (an
 unpinned lease's `avoid_target_id` among the other targets first, qits-2382), nothing
-for a quarantined or disconnected target, and the sign-in gate for WORKSPACE and DESK. A
+for a quarantined or disconnected target, and the sign-in gate for WORKSPACE, DESK and AGENT. A
 reservation holds slots for one type; it is not a limit, so a type may use more while shared
 slots are free. A maximum (qits-1813) is the limit, per type and optional: null is no ceiling, and
 the patch door keeps it at or above its type's reservation. Memory is one more conjunct (qits-2362):
@@ -77,14 +77,14 @@ leases, `c[u]` the charge of the newest lease of type `u` granted there (0 if no
 candidate's (0 without a limit; `memorySwap` is never charged), and the reserved term dropped when the
 reservations are ignored as slots (`Σ r > T`). Reservations the memory cannot meet are honoured in
 priority order, CI first (qits-2515), never dropped whole: the term is `Σ_{u≠t} max(0, h[u] − n[u]) ×
-c[u]` with `A = C − [takes CI] × B` and, for `u` in CI, WORKSPACE, DESK, `h[u] = min(r[u], ⌊A /
+c[u]` with `A = C − [takes CI] × B` and, for `u` in CI, WORKSPACE, DESK, AGENT, `h[u] = min(r[u], ⌊A /
 c[u]⌋)` (`r[u]` when `c[u] = 0`), `A −= h[u] × c[u]` (`SlotAllocator.honouredReservations`); when they
 fit, `h = r`. `B` is the shared buildkitd's
 memory cap (qits-2503, `builder_memory_bytes`, the runner's `BUILDER_CONCURRENT_BUILDS × 8 GiB`; null
 from an older runner is 0): image builds run in the builder's cgroup, outside a CI lease's own limit,
 so it is charged once on a target that takes CI — `r[CI] > 0`, `n[CI] > 0`, or a CI candidate
 (`SlotAllocator.takesCi`, the same test `TargetHealth` counts `buildkit` by) — and never on a
-workspace- or desk-only target. It comes off `A` before any reservation is honoured: fixed overhead,
+workspace-, desk- or agent-only target. It comes off `A` before any reservation is honoured: fixed overhead,
 not a reservation. The node reserve is the node's own processes, not the builder.
 `TargetAllocation` reads those from the rows; `SlotAllocator.Memory.capacity` takes
 the min of every known figure (`memory_max_bytes`, `memory_total_bytes`). At 6g a lease and an 8 GiB
@@ -97,8 +97,8 @@ concurrent 6g leases, not four, once it takes CI. Change it in
 
 **`login` and `slots` are reported, never a quarantine** (`TargetHealth.REPORT_ONLY`). They fail
 the recorded health and its detail; quarantine and reinstatement decide on every other check. A
-signed-out target keeps running CI — the allocator's sign-in gate holds only its WORKSPACE and DESK
-leases — and reservations that do not fit the total are already ignored by the allocator.
+signed-out target keeps running CI — the allocator's sign-in gate holds only its WORKSPACE, DESK and
+AGENT leases — and reservations that do not fit the total are already ignored by the allocator.
 
 **The owner is the bearer, never the body.** `OwnerIdentity` takes the caller's client id (`sub`, or
 the forwarded principal) without its `<environment>-` prefix and looks it up in
@@ -116,8 +116,8 @@ the slot back), and the same sweep queues again every GRANTED lease without a wo
 is not `TargetPresence.present` (qits-1829). Its third pass settles the leases of a target without a
 connection for `qits.system.leases.absent-deadline` (PT30M, from `TargetPresence.absentSince`, which
 counts from the process's start for a target not seen since): a RUNNING CI lease is FAILED and an
-ENDING lease of any type ENDED, each a `LEASE_ABANDONED` audit row (qits-2227). RUNNING WORKSPACE and
-DESK leases are left alone however long the target is away: their containers hold agent sessions
+ENDING lease of any type ENDED, each a `LEASE_ABANDONED` audit row (qits-2227). RUNNING WORKSPACE,
+DESK and AGENT leases are left alone however long the target is away: their containers hold agent sessions
 that outlive an edge outage, and FAILED would have the returning runner remove them. An end of a GRANTED or
 RUNNING lease whose target holds no connection is ENDED at once, never ENDING: no runner is there to
 report the container gone.
@@ -152,7 +152,7 @@ every connected target that can run the type. The pinned protocol jar's `Estate`
 carries it is pinned, that seam folds back into the record.
 
 **The login probe's image is chosen from the leases, never a `:latest`** (`runner/ProbeImages`):
-the newest non-ENDED WORKSPACE lease's image (QUEUED counts), else the newest DESK lease's, else
+the newest non-ENDED WORKSPACE lease's image (QUEUED counts), else the newest DESK lease's, else the newest AGENT lease's, else
 `qits.system.targets.probe-image` when set, else none. The runner reads it from every `ack` and
 probes at once, so `TargetRegistry.probeImageMayHaveChanged` (after every allocation pass) re-acks a
 serving connection whose ack named another image. The login commands name the image last acked.

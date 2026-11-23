@@ -64,6 +64,32 @@ class TargetHealthDialbackTest {
     assertTrue(dialback(row(0, null), FAILED_AT).ok());
   }
 
+  /** {@code login} counts an AGENT reservation as a slot reserved for agents, as a desk's (qits-2519). */
+  @Test
+  void loginFailsOnASignedOutTargetReservedForAgentLeases() {
+    Target row = row(0, null);
+    CheckResult unreserved = login(row);
+    assertTrue(unreserved.ok());
+    row.reservedAgent = 2;
+    CheckResult reserved = login(row);
+    assertFalse(reserved.ok());
+    assertEquals(
+        "neither claude nor kimi is signed in, and 2 slot(s) are reserved for agents:"
+            + " qits targets sign-in --target workstation",
+        reserved.detail());
+    row.reservedDesk = 1;
+    assertTrue(login(row).detail().contains("and 3 slot(s)"), login(row).detail());
+    row.loginClaude = LoginValue.PRESENT;
+    assertTrue(login(row).ok());
+  }
+
+  private static CheckResult login(Target row) {
+    return TargetHealth.serverChecks(row, THRESHOLD, COOLOFF, FAILED_AT).stream()
+        .filter(c -> TargetHealth.LOGIN.equals(c.name()))
+        .findFirst()
+        .orElseThrow();
+  }
+
   @Test
   void itGatesUnlikeLoginAndSlots() {
     List<CheckResult> checks = new ArrayList<>();

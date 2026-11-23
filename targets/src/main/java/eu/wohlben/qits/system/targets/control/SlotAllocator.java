@@ -59,12 +59,12 @@ import java.util.UUID;
  * {@code limits.memory}, and the runner caps that builder at {@code BUILDER_CONCURRENT_BUILDS × 8
  * GiB} and reports the cap as {@code builder_memory_bytes} ({@code B}, 0 when unreported — an older
  * runner). It is charged once per target, and only when the target takes CI: {@code r[CI] > 0}, or
- * {@code n[CI] > 0}, or the candidate is a CI lease. A workspace- or desk-only target never starts
+ * {@code n[CI] > 0}, or the candidate is a CI lease. A workspace-, desk- or agent-only target never starts
  * the builder and is not charged it.
  *
  * <p><b>Memory honours the reservations in priority order, CI first</b> (qits-2515). Reservations
  * the memory cannot meet are not dropped but honoured as far as it reaches: with {@code A = C −
- * [takes CI] × B}, for {@code u} in CI, WORKSPACE, DESK, {@code h[u] = min(r[u], ⌊A / c[u]⌋)}
+ * [takes CI] × B}, for {@code u} in CI, WORKSPACE, DESK, AGENT, {@code h[u] = min(r[u], ⌊A / c[u]⌋)}
  * ({@code r[u]} when {@code c[u] = 0}) and {@code A −= h[u] × c[u]} ({@link #honouredReservations}).
  * So the memory conjunct is
  *
@@ -90,7 +90,7 @@ import java.util.UUID;
  * type's last charge — so one pass never over-fills a target.
  *
  * <p><b>Who gets nothing.</b> A target that is not available (quarantined, or no connection) is never
- * granted anything. A WORKSPACE or DESK lease is granted only on a target that is signed in (either
+ * granted anything. A WORKSPACE, DESK or AGENT lease is granted only on a target that is signed in (either
  * harness PRESENT): an agent slot on a signed-out target only produces refusals. CI is never gated.
  * A lease that waits is answered a {@link Decision#detail()} saying why, in the words an owner shows.
  */

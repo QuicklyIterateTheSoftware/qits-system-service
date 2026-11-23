@@ -89,7 +89,7 @@ import org.jboss.logging.Logger;
  * its GRANTED leases without a work key go back to QUEUED ({@code LeaseEndingDeadline}, qits-1829):
  * nothing was started for them, so nothing would ever report them. Its RUNNING CI and its ENDING
  * leases are left as they are for {@code qits.system.leases.absent-deadline}, counted from {@link
- * #absentSince}, and settled after it (qits-2227); its RUNNING WORKSPACE and DESK leases for good. A process that just started has seen no
+ * #absentSince}, and settled after it (qits-2227); its RUNNING WORKSPACE, DESK and AGENT leases for good. A process that just started has seen no
  * runner yet, and counts each from its own start — the grace and the absent deadline alike.
  *
  * <p><b>Sign-in.</b> {@code loginState} is written to the row ({@link Targets#recordLogin}) and
@@ -718,7 +718,7 @@ public class TargetRegistry implements TargetPresence {
    * The probe image is chosen from the leases ({@link ProbeImages}); every serving connection whose
    * {@code ack} named another one is acked again. The runner takes the probe image from every
    * {@code ack} and probes at once, so a fresh target re-probes as soon as the first WORKSPACE (or
-   * DESK) lease is asked for.
+   * DESK, or AGENT) lease is asked for.
    */
   @Override
   public void probeImageMayHaveChanged() {
@@ -899,7 +899,8 @@ public class TargetRegistry implements TargetPresence {
             new SlotImages(
                 images.get(SlotType.CI.key()),
                 images.get(SlotType.WORKSPACE.key()),
-                images.get(SlotType.DESK.key())),
+                images.get(SlotType.DESK.key()),
+                images.get(SlotType.AGENT.key())),
             probe,
             addresses.registryMirrors());
     return new Ack(SystemRunnerProtocol.CAPABILITY_VERSION, slots, null, extension.extensions());

@@ -18,6 +18,7 @@ import org.jboss.logging.Logger;
  *   <li>the image of the newest WORKSPACE lease that has not ENDED (QUEUED counts: a queued lease
  *       already carries the owner's real, pinned image);
  *   <li>else the newest DESK lease's;
+ *   <li>else the newest AGENT lease's;
  *   <li>else {@code qits.system.targets.probe-image}, when a deployment set it;
  *   <li>else the pinned workspace image, {@code qits.system.targets.slot-images.workspace} at
  *       {@link WorkspaceImage#VERSION} — the released {@code qits/workspace} tag this reactor
@@ -41,15 +42,19 @@ public class ProbeImages {
   public String current() {
     Optional<String> workspace = Optional.empty();
     Optional<String> desk = Optional.empty();
+    Optional<String> agent = Optional.empty();
     try {
       workspace = leases.newestImage(SlotType.WORKSPACE);
       if (workspace.isEmpty()) {
         desk = leases.newestImage(SlotType.DESK);
       }
+      if (workspace.isEmpty() && desk.isEmpty()) {
+        agent = leases.newestImage(SlotType.AGENT);
+      }
     } catch (RuntimeException e) {
       LOG.warnf("Could not read the leases' images for the login probe: %s", e.toString());
     }
-    return choose(workspace, desk, config.probeImage(), pin()).orElse(null);
+    return choose(workspace, desk, agent, config.probeImage(), pin()).orElse(null);
   }
 
   private Optional<String> pin() {
@@ -63,9 +68,14 @@ public class ProbeImages {
   static Optional<String> choose(
       Optional<String> workspace,
       Optional<String> desk,
+      Optional<String> agent,
       Optional<String> configured,
       Optional<String> pin) {
-    return set(workspace).or(() -> set(desk)).or(() -> set(configured)).or(() -> set(pin));
+    return set(workspace)
+        .or(() -> set(desk))
+        .or(() -> set(agent))
+        .or(() -> set(configured))
+        .or(() -> set(pin));
   }
 
   private static Optional<String> set(Optional<String> value) {

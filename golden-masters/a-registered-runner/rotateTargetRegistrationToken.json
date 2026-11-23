@@ -7,17 +7,20 @@
     "reservations": {
       "ci": 0,
       "workspace": 0,
-      "desk": 0
+      "desk": 0,
+      "agent": 0
     },
     "maximums": {
       "ci": null,
       "workspace": null,
-      "desk": null
+      "desk": null,
+      "agent": null
     },
     "used": {
       "ci": 0,
       "workspace": 0,
-      "desk": 0
+      "desk": 0,
+      "agent": 0
     },
     "login": {
       "claude": "UNKNOWN",

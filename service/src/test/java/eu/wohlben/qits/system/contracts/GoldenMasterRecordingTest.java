@@ -125,13 +125,24 @@ class GoldenMasterRecordingTest {
             "00000000-0000-4000-8000-000000000004",
             "desk-00000000-0000-4000-8000-000000000004",
             ProviderStates.DESK_IMAGE));
+    // qits-agents' AGENT leases (qits-2519): the lease states only, no unused work volume yet.
+    all.addAll(
+        tenant(
+            ProviderStates.A_QUEUED_AGENT_LEASE,
+            ProviderStates.A_RUNNING_AGENT_LEASE,
+            null,
+            "AGENT",
+            "00000000-0000-4000-8000-000000000004",
+            "agent-00000000-0000-4000-8000-000000000004",
+            ProviderStates.AGENT_IMAGE));
     return List.copyOf(all);
   }
 
   /**
    * One tenant's lease doors over its three states, every call with its bearer: a create (beside
    * the queued lease, for another ownerRef), the reads, a roll and an end of the queued and of the
-   * running lease, the running lease's refresh, and the purge of the unused work volume.
+   * running lease, the running lease's refresh, and the purge of the unused work volume when the
+   * tenant records one ({@code unused} null records none).
    */
   private static List<Interaction> tenant(
       String queued,
@@ -173,8 +184,10 @@ class GoldenMasterRecordingTest {
     }
     // A running lease's refresh (qits-2091): its generation raised, its container recreated.
     rows.add(call(running, "refreshLease", "POST", LEASE + "/refresh", 200, null, BEARER));
-    rows.add(
-        call(unused, "purgeWorkVolume", "DELETE", API + "/work-volumes/{workKey}", 202, null, BEARER));
+    if (unused != null) {
+      rows.add(
+          call(unused, "purgeWorkVolume", "DELETE", API + "/work-volumes/{workKey}", 202, null, BEARER));
+    }
     return rows;
   }
 

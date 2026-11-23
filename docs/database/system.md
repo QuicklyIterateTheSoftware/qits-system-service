@@ -58,6 +58,7 @@ erDiagram
     instant login_checked_at
     enum login_claude
     enum login_kimi
+    int max_agent
     int max_ci
     int max_desk
     int max_workspace
@@ -71,6 +72,7 @@ erDiagram
     instant registered_at
     string registration_token_id
     string registration_token_subject
+    int reserved_agent "not null"
     int reserved_ci "not null"
     int reserved_desk "not null"
     int reserved_workspace "not null"

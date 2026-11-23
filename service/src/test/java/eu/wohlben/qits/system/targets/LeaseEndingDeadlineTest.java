@@ -40,7 +40,7 @@ import org.junit.jupiter.api.Test;
  * nudged with its estate once, then the lease is ENDED; a disconnected one's is ENDED at the
  * deadline. A target without a connection for the absent deadline (PT30M) has its RUNNING CI leases
  * FAILED and its ENDING ones ENDED (qits-2227), counted from its last close, or from this process's
- * start for a target it has not seen; its RUNNING WORKSPACE and DESK leases are left alone.
+ * start for a target it has not seen; its RUNNING WORKSPACE, DESK and AGENT leases are left alone.
  */
 @QuarkusTest
 class LeaseEndingDeadlineTest {
@@ -285,7 +285,7 @@ class LeaseEndingDeadlineTest {
   }
 
   @Test
-  void aTargetGonePastTheAbsentDeadlineKeepsItsWorkspaceAndDeskLeasesRunning() {
+  void aTargetGonePastTheAbsentDeadlineKeepsItsWorkspaceDeskAndAgentLeasesRunning() {
     // An edge outage longer than the deadline must not kill agent sessions: only the CI lease and
     // the ENDING one, whose owner asked for the end, are settled.
     UUID ci = UUID.randomUUID();
@@ -294,6 +294,8 @@ class LeaseEndingDeadlineTest {
     TargetRows.lease(workspace, SlotType.WORKSPACE, "qits-workspaces", "17", LeaseState.RUNNING, target);
     UUID desk = UUID.randomUUID();
     TargetRows.lease(desk, SlotType.DESK, "qits-projects", "desk-1", LeaseState.RUNNING, target);
+    UUID agent = UUID.randomUUID();
+    TargetRows.lease(agent, SlotType.AGENT, "qits-agents", "agent-1", LeaseState.RUNNING, target);
     Instant started = presence.absentSince(target).orElseThrow();
     Instant due = started.plus(ABSENT).plus(Duration.ofHours(2));
     UUID ending = UUID.randomUUID();
@@ -303,7 +305,7 @@ class LeaseEndingDeadlineTest {
     assertEquals(Set.of(ci, ending), Set.copyOf(swept.abandoned()));
     assertEquals(LeaseState.FAILED, TargetRows.reload(ci).state);
     assertEquals(LeaseState.ENDED, TargetRows.reload(ending).state);
-    for (UUID kept : List.of(workspace, desk)) {
+    for (UUID kept : List.of(workspace, desk, agent)) {
       Lease row = TargetRows.reload(kept);
       assertEquals(LeaseState.RUNNING, row.state, row.slotType + " is left alone");
       assertNull(row.endedAt);

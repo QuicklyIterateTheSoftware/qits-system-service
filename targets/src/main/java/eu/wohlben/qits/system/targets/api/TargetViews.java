@@ -32,22 +32,26 @@ public class TargetViews {
 
   /** Slots per type. */
   @Schema(name = "SlotCounts")
-  public record SlotCounts(Integer ci, Integer workspace, Integer desk) {
+  public record SlotCounts(Integer ci, Integer workspace, Integer desk, Integer agent) {
     static SlotCounts of(Map<SlotType, Integer> counts) {
       return new SlotCounts(
           counts.getOrDefault(SlotType.CI, 0),
           counts.getOrDefault(SlotType.WORKSPACE, 0),
-          counts.getOrDefault(SlotType.DESK, 0));
+          counts.getOrDefault(SlotType.DESK, 0),
+          counts.getOrDefault(SlotType.AGENT, 0));
     }
 
     /** Every type as it is, a null kept null: the maximums, where null is no ceiling. */
     static SlotCounts ofNullable(Map<SlotType, Integer> counts) {
       return new SlotCounts(
-          counts.get(SlotType.CI), counts.get(SlotType.WORKSPACE), counts.get(SlotType.DESK));
+          counts.get(SlotType.CI),
+          counts.get(SlotType.WORKSPACE),
+          counts.get(SlotType.DESK),
+          counts.get(SlotType.AGENT));
     }
 
     Targets.Reservations reservations() {
-      return new Targets.Reservations(ci, workspace, desk);
+      return new Targets.Reservations(ci, workspace, desk, agent);
     }
   }
 

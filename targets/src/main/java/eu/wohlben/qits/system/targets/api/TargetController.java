@@ -665,7 +665,7 @@ public class TargetController {
 
   /**
    * A patch's {@code maximums}: absent or null changes none; a member left out keeps its value, an
-   * explicit null clears it, a whole number sets it. Members other than ci, workspace and desk are
+   * explicit null clears it, a whole number sets it. Members other than ci, workspace, desk and agent are
    * ignored, as for the reservations.
    */
   static Targets.Maximums maximums(JsonNode given) {

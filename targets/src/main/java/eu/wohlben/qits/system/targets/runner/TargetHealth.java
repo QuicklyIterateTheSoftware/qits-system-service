@@ -33,7 +33,7 @@ import org.jboss.logging.Logger;
  * the two only it can judge, because only it knows the reservations ({@link #serverChecks}):
  *
  * <ul>
- *   <li>{@code login} <b>fails</b> when {@code reserved_workspace + reserved_desk > 0} and neither harness is
+ *   <li>{@code login} <b>fails</b> when {@code reserved_workspace + reserved_desk + reserved_agent > 0} and neither harness is
  *       PRESENT: a target reserved for agents that cannot run one;
  *   <li>{@code slots} fails when the reservations do not fit the total, naming the sum and the total.
  * </ul>
@@ -167,7 +167,7 @@ public class TargetHealth {
    * A settled check's two answers. {@code ok} is the reported health: every check that counts,
    * {@code login} and {@code slots} included. {@code admitted} is what quarantine and reinstatement
    * decide on, and it leaves {@link #REPORT_ONLY} out: a signed-out target must never stop CI (the
-   * allocator's sign-in gate already holds its WORKSPACE and DESK leases), nor must reservations that do
+   * allocator's sign-in gate already holds its WORKSPACE, DESK and AGENT leases), nor must reservations that do
    * not fit the total (the allocator already ignores them).
    */
   record Verdict(boolean ok, boolean admitted, String detail, String gateDetail) {}
@@ -207,7 +207,7 @@ public class TargetHealth {
   static List<CheckResult> serverChecks(
       Target row, int dialbackThreshold, Duration dialbackCooloff, Instant now) {
     List<CheckResult> checks = new ArrayList<>();
-    int agentReservations = row.reservedWorkspace + row.reservedDesk;
+    int agentReservations = row.reservedWorkspace + row.reservedDesk + row.reservedAgent;
     boolean loginOk = agentReservations == 0 || row.signedIn();
     checks.add(
         new CheckResult(

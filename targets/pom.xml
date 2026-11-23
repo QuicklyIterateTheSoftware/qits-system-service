@@ -10,8 +10,8 @@
     </parent>
 
     <!-- EXECUTION TARGETS (epic qits-1481): the machines a qits-system-runner holds a docker socket
-         on, the typed slots they offer (CI, WORKSPACE, DESK), the leases qits-ci, qits-workspaces
-         and qits-projects take on those slots, and the work volumes a lease keeps between runs.
+         on, the typed slots they offer (CI, WORKSPACE, DESK, AGENT), the leases qits-ci,
+         qits-workspaces, qits-projects and qits-agents take on those slots, and the work volumes a lease keeps between runs.
 
          THE ONE MODULE THAT WRITES. qits-system-plan.md amends this service's "reads only" rule for
          this module and nothing else: target, lease and work_volume rows in this service's own

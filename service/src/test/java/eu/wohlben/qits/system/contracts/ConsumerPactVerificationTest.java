@@ -331,6 +331,16 @@ class ConsumerPactVerificationTest {
     return states.params(ProviderStates.AN_UNUSED_DESK_WORK_VOLUME);
   }
 
+  @State(ProviderStates.A_QUEUED_AGENT_LEASE)
+  Map<String, String> aQueuedAgentLease() {
+    return states.params(ProviderStates.A_QUEUED_AGENT_LEASE);
+  }
+
+  @State(ProviderStates.A_RUNNING_AGENT_LEASE)
+  Map<String, String> aRunningAgentLease() {
+    return states.params(ProviderStates.A_RUNNING_AGENT_LEASE);
+  }
+
   @State(ProviderStates.A_CONNECTED_TARGET)
   Map<String, String> aConnectedTarget() {
     return states.params(ProviderStates.A_CONNECTED_TARGET);

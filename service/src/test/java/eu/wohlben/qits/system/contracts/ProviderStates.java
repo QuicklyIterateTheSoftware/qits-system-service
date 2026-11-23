@@ -273,6 +273,15 @@ public class ProviderStates {
   /** qits-projects' work volume {@code desk-<project>} on target {@code lab}, its lease ENDED. */
   public static final String AN_UNUSED_DESK_WORK_VOLUME = "an unused desk work volume";
 
+  /**
+   * qits-agents' AGENT lease for agent {@link #AGENT_ID} (work key {@code agent-<agentId>}), QUEUED
+   * (qits-2519).
+   */
+  public static final String A_QUEUED_AGENT_LEASE = "a queued agent lease";
+
+  /** The same lease RUNNING on target {@code lab}, its work volume there, its runner connected. */
+  public static final String A_RUNNING_AGENT_LEASE = "a running agent lease";
+
   /** Target {@code lab}, its runner connected and served, no sign-in running (qits-1593). */
   public static final String A_CONNECTED_TARGET = "a connected target";
 
@@ -373,6 +382,13 @@ public class ProviderStates {
 
   static final String DESK_IMAGE = "registry.qits.wohlben.eu/qits/project-agent:2026.1";
 
+  /** Not seeded into the freezer, like {@link #PROJECT_ID}. */
+  static final String AGENT_ID = Freezer.frozenId(0x11);
+
+  static final String AGENTS_BEARER = "Bearer qits_tok_contract-qits-agents";
+
+  static final String AGENT_IMAGE = "registry.qits.wohlben.eu/qits/agent:2026.1";
+
   /** A tenant's lease, as the per-tenant states stand it up. */
   record Tenant(
       String app, String client, String bearer, SlotType type, String image, String ownerRef,
@@ -434,6 +450,16 @@ public class ProviderStates {
           DESK_IMAGE,
           PROJECT_ID,
           "desk-" + PROJECT_ID);
+
+  static final Tenant AGENTS =
+      new Tenant(
+          "qits-agents",
+          "dev-qits-agents",
+          AGENTS_BEARER,
+          SlotType.AGENT,
+          AGENT_IMAGE,
+          AGENT_ID,
+          "agent-" + AGENT_ID);
 
   public record Setup(Map<String, String> params, Set<String> uniqueTokens) {
     Setup(Map<String, String> params) {
@@ -498,6 +524,8 @@ public class ProviderStates {
     states.put(A_QUEUED_DESK_LEASE, () -> tenantLease(PROJECTS, LeaseState.QUEUED));
     states.put(A_RUNNING_DESK_LEASE, () -> tenantLease(PROJECTS, LeaseState.RUNNING));
     states.put(AN_UNUSED_DESK_WORK_VOLUME, () -> tenantLease(PROJECTS, LeaseState.ENDED));
+    states.put(A_QUEUED_AGENT_LEASE, () -> tenantLease(AGENTS, LeaseState.QUEUED));
+    states.put(A_RUNNING_AGENT_LEASE, () -> tenantLease(AGENTS, LeaseState.RUNNING));
     states.put(A_CONNECTED_TARGET, this::aConnectedTarget);
     states.put(A_CLAUDE_SIGN_IN_AWAITING_ITS_CODE, this::aClaudeSignInAwaitingItsCode);
     states.put(A_CONNECTED_TARGET_WITH_LEASES, this::aConnectedTargetWithLeases);

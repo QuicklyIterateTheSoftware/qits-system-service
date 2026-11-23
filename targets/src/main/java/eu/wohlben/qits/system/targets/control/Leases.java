@@ -47,7 +47,10 @@ public class Leases {
 
   private static final Logger LOG = Logger.getLogger(Leases.class);
 
-  /** A work key: it becomes part of a docker volume name. {@code ws-<rowId>}, {@code desk-<id>}. */
+  /**
+   * A work key: it becomes part of a docker volume name. {@code ws-<rowId>}, {@code desk-<id>},
+   * {@code agent-<id>}.
+   */
   public static final Pattern WORK_KEY = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_.-]{0,127}");
 
   /** A docker container or volume name, as an {@code adopt} member may carry it. */
@@ -95,7 +98,7 @@ public class Leases {
    */
   public Lease create(String ownerApp, NewLease request) {
     if (request.slotType() == null) {
-      throw TargetRefusal.badRequest("A lease needs a slotType: CI, WORKSPACE or DESK");
+      throw TargetRefusal.badRequest("A lease needs a slotType: CI, WORKSPACE, DESK or AGENT");
     }
     if (request.ownerRef() == null
         || request.ownerRef().isBlank()
@@ -217,7 +220,7 @@ public class Leases {
                   return lease;
                 });
     allocation.estateChanged(rolled.targetId);
-    // A rolled image may be the newest WORKSPACE or DESK one, which is the login probe's.
+    // A rolled image may be the newest WORKSPACE, DESK or AGENT one, which is the login probe's.
     allocation.requestPass();
     return rolled;
   }
@@ -677,8 +680,8 @@ public class Leases {
 
   /**
    * The leases {@link #abandon} may settle, in id order: every RUNNING CI lease and every ENDING one,
-   * whatever its type. A RUNNING WORKSPACE or DESK lease is left out: its container holds an agent
-   * session that outlives an edge outage, and settling it would have the returning runner remove it.
+   * whatever its type. A RUNNING WORKSPACE, DESK or AGENT lease is left out: its container holds an
+   * agent session that outlives an edge outage, and settling it would have the returning runner remove it.
    * A GRANTED lease is left out too: a CI one has no work key, so {@link #requeue} has it back in the
    * queue after the reconnect grace, long before the absent deadline.
    */
@@ -705,8 +708,8 @@ public class Leases {
    * qits.system.leases.absent-deadline} (qits-2227): a RUNNING CI lease is FAILED — its owner learns
    * its step did not finish, and ends it as it ends any FAILED one — and an ENDING one of any type
    * is ENDED; both with {@code ended_at = now} and {@code detail}. Only while it is still on {@code
-   * onTarget}'s target in one of those states, re-read under the row lock: a WORKSPACE or DESK lease
-   * is never FAILED here. Announced; the target's
+   * onTarget}'s target in one of those states, re-read under the row lock: a WORKSPACE, DESK or
+   * AGENT lease is never FAILED here. Announced; the target's
    * estate is pushed (FAILED and ENDED are both {@code desired: ENDED}, so a runner that comes back
    * removes the container) and a pass is asked for, since the slot is free. Answers the lease and
    * what it was, or null when something else moved it first.

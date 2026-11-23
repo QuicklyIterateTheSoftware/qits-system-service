@@ -157,7 +157,7 @@ components:
       properties:
         slotType:
           type: string
-          description: "CI, WORKSPACE or DESK; must be the caller's"
+          description: "CI, WORKSPACE, DESK or AGENT; must be the caller's"
         ownerRef:
           type: string
           description: "The owner's own key for the work (a run id, a row id)"
@@ -165,8 +165,8 @@ components:
           $ref: "#/components/schemas/UUID"
         workKey:
           type: string
-          description: "ws-<rowId> or desk-<deskId>: the work volume, kept between\
-            \ leases"
+          description: "ws-<rowId>, desk-<deskId> or agent-<agentId>: the work volume,\
+            \ kept between leases"
         priority:
           type: integer
           format: int32
@@ -654,6 +654,9 @@ components:
             desk:
               type: integer
               format: int32
+            agent:
+              type: integer
+              format: int32
           description: "The most leases per type the target runs at once, 0..1024\
             \ and at least that type's reservation; absent members leave theirs, an\
             \ explicit null clears one (no ceiling). 0 is a ceiling: that type never\
@@ -797,12 +800,16 @@ components:
         desk:
           type: integer
           format: int32
+        agent:
+          type: integer
+          format: int32
     SlotType:
       type: string
       enum:
       - CI
       - WORKSPACE
       - DESK
+      - AGENT
     StartTargetSignInRequest:
       type: object
       required:

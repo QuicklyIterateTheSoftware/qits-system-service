@@ -13,7 +13,7 @@ import java.util.UUID;
 
 /**
  * The volume a lease's {@code /workspace} lives on, kept across the leases of one piece of work
- * ({@code ws-<rowId>}, {@code desk-<deskId>}). It lives on exactly one target, so a lease whose
+ * ({@code ws-<rowId>}, {@code desk-<deskId>}, {@code agent-<agentId>}). It lives on exactly one target, so a lease whose
  * work key has one is pinned there.
  */
 @Entity

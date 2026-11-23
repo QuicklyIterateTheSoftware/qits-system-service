@@ -68,7 +68,7 @@ import org.jboss.logging.Logger;
  * row, and its slot handed to the pass. The deadline is long (PT30M) because the runner's socket
  * crosses the edge, which an outage can cut for longer than the reconnect grace while the node runs
  * on. A target dropped before a restart counts from the restart, since the drop is held in memory.
- * A RUNNING WORKSPACE or DESK lease is left alone however long its target is away: its container
+ * A RUNNING WORKSPACE, DESK or AGENT lease is left alone however long its target is away: its container
  * holds an agent session that survives an outage, and a FAILED lease's container is removed by the
  * runner that comes back. A GRANTED CI lease never reaches this pass (the requeue above takes it),
  * and EXITED, FAILED, ENDED and QUEUED leases have nothing left to settle.

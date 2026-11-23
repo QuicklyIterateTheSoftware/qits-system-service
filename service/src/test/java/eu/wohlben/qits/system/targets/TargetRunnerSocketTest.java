@@ -103,6 +103,7 @@ class TargetRunnerSocketTest {
       assertEquals("registry.qits.wohlben.eu/qits/build-images/ci-slot", extension.slotImages().ci());
       assertEquals("registry.qits.wohlben.eu/qits/workspace", extension.slotImages().workspace());
       assertEquals("registry.qits.wohlben.eu/qits/project-agent", extension.slotImages().desk());
+      assertEquals("registry.qits.wohlben.eu/qits/agent", extension.slotImages().agent());
       assertEquals(
           "registry.qits.wohlben.eu/qits/workspace:" + WorkspaceImage.VERSION,
           extension.probeImage(),
@@ -309,6 +310,12 @@ class TargetRunnerSocketTest {
   void theProbeImageIsTheNewestWorkspaceLeasesElseTheNewestDesksAndARunnerIsReAcked()
       throws Exception {
     try (FakeTargetRunner runner = greetedRunner()) {
+      // An AGENT lease alone names the probe image ...
+      String agent = "registry.qits.wohlben.eu/qits/agent:2026.6";
+      LeaseDoorsTest.lease("dev-qits-agents", "AGENT", "a1", agent, "").then().statusCode(201);
+      runner.await(Ack.class, a -> agent.equals(SystemRunnerAck.of(a).probeImage()));
+
+      // ... and a DESK lease outranks it.
       String desk = "registry.qits.wohlben.eu/qits/project-agent:2026.7";
       LeaseDoorsTest.lease("dev-qits-projects", "DESK", "d1", desk, "").then().statusCode(201);
       assertEquals(desk, SystemRunnerAck.of(runner.await(Ack.class, a -> desk.equals(SystemRunnerAck.of(a).probeImage()))).probeImage());
