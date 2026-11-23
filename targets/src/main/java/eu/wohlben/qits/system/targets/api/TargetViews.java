@@ -211,7 +211,9 @@ public class TargetViews {
               description =
                   "Processes of this lease killed by any OOM killer (its container's cgroup"
                       + " memory.events oom_kill); the last sample is kept after it exits. Null"
-                      + " until a runner reported one")
+                      + " until a runner reported one. docker reporting the container OOM-killed"
+                      + " counts as at least one kill even when its last cgroup sample showed none"
+                      + " (qits-2502)")
           Long oomKills,
       @Schema(
               description =

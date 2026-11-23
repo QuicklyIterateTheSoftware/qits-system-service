@@ -156,6 +156,57 @@ class LeasesTransitionTest {
     assertEquals(Long.valueOf(2), lease.oomKills);
   }
 
+  // --- qits-2502: a vanished cgroup still credits docker's own OOMKilled ------------------------
+
+  @Test
+  void anExitedOomKilledReportWithNoCgroupSampleStillCreditsOneKillAsANodeKill() {
+    Lease lease = lease(LeaseState.RUNNING, null);
+    assertTrue(
+        Leases.recordMemory(lease, memory(lease.id, "EXITED", 0L, 0L, null, Boolean.TRUE)));
+    assertEquals(Long.valueOf(1), lease.oomKills);
+    assertEquals("NODE", lease.oomScope());
+  }
+
+  @Test
+  void anExitedOomKilledReportWithALeaseLimitHitIsCreditedAsALeaseKill() {
+    Lease lease = lease(LeaseState.RUNNING, null);
+    assertTrue(
+        Leases.recordMemory(lease, memory(lease.id, "EXITED", 0L, 1L, null, Boolean.TRUE)));
+    assertEquals(Long.valueOf(1), lease.oomKills);
+    assertEquals("LEASE", lease.oomScope());
+  }
+
+  @Test
+  void anOomKilledReportNeverLowersAStoredCountAboveOne() {
+    Lease lease = lease(LeaseState.RUNNING, null);
+    lease.oomKills = 3L;
+    assertFalse(
+        Leases.recordMemory(lease, memory(lease.id, "EXITED", 0L, 0L, null, Boolean.TRUE)));
+    assertEquals(Long.valueOf(3), lease.oomKills);
+  }
+
+  @Test
+  void oomKilledFalseOrNullNeverCreditsAKillOnItsOwn() {
+    Lease zero = lease(LeaseState.RUNNING, null);
+    assertFalse(Leases.recordMemory(zero, memory(zero.id, "EXITED", 0L, 0L, null, Boolean.FALSE)));
+    assertEquals(Long.valueOf(0), zero.oomKills);
+
+    Lease untouched = lease(LeaseState.RUNNING, null);
+    assertFalse(
+        Leases.recordMemory(untouched, memory(untouched.id, "EXITED", null, null, null, null)));
+    assertNull(untouched.oomKills);
+  }
+
+  @Test
+  void aSecondIdenticalOomKilledReportAfterCreditingItAgainReturnsFalse() {
+    Lease lease = lease(LeaseState.RUNNING, null);
+    assertTrue(
+        Leases.recordMemory(lease, memory(lease.id, "EXITED", 0L, 0L, null, Boolean.TRUE)));
+    assertFalse(
+        Leases.recordMemory(lease, memory(lease.id, "EXITED", 0L, 0L, null, Boolean.TRUE)));
+    assertEquals(Long.valueOf(1), lease.oomKills);
+  }
+
   @Test
   void anExitCarriesItsLastSampleAndOomKilled() {
     Lease lease = lease(LeaseState.RUNNING, null);

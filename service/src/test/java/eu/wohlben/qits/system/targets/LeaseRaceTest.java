@@ -268,6 +268,22 @@ class LeaseRaceTest {
     }
   }
 
+  /**
+   * qits-2502: an EXITED report whose cgroup sample shows no kill but whose {@code oomKilled} is
+   * true still credits the lease, and {@link Leases.Applied#credited()} names it.
+   */
+  @Test
+  void anOomKilledReportWithNoCgroupSampleCreditsItsLeaseInApplied() {
+    UUID id = UUID.randomUUID();
+    TargetRows.lease(id, SlotType.CI, "qits-ci", "run-oom", LeaseState.RUNNING, target);
+    Leases.Applied applied =
+        leases.apply(
+            target,
+            List.of(new Leases.Held(id, "EXITED", null, 137, null, 0L, 0L, null, Boolean.TRUE)));
+    assertEquals(List.of(id), applied.credited());
+    assertEquals(Long.valueOf(1), TargetRows.reload(id).oomKills);
+  }
+
   @Test
   void aGrantAndAnEndOnTheSameQueuedLeaseNeverGrantAnEndedOne() throws Exception {
     bearers.grant("Bearer race", "target-runner-client-race", "qits:target-runner");
