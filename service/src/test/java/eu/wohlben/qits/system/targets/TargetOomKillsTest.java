@@ -250,6 +250,39 @@ class TargetOomKillsTest {
     }
   }
 
+  /**
+   * qits-2502: the container's cgroup vanished before the runner sampled it (oomKills, oomEvents
+   * both 0), but docker's own {@code State.OOMKilled} says otherwise — the lease is still credited
+   * with a kill, and its scope is the node's, since nothing says the lease hit its own limit.
+   */
+  @Test
+  void anExitedLeaseDockerCallsOomKilledIsCreditedEvenWithNoCgroupSample() throws Exception {
+    UUID id = lease(LeaseState.RUNNING, UUID.randomUUID());
+    try (FakeTargetRunner runner = servingRunner()) {
+      runner.inventory(
+          List.of(
+              FakeTargetRunner.report(
+                  id.toString(),
+                  eu.wohlben.qits.systemrunner.protocol.LeaseState.EXITED,
+                  0L,
+                  0L,
+                  null,
+                  Boolean.TRUE)),
+          List.of());
+      List<TargetLeaseChanged> events =
+          bus.await(TargetLeaseChanged.class, e -> e.leaseId().equals(id.toString()), 1, SETTLE);
+      assertEquals(1, events.size(), events.toString());
+      TargetLeaseChanged killed = events.get(0);
+      assertEquals("EXITED", killed.state());
+      assertEquals(Long.valueOf(1), killed.oomKills());
+      assertEquals("NODE", killed.oomScope());
+
+      Lease stored = TargetRows.reload(id);
+      assertEquals(Long.valueOf(1), stored.oomKills);
+      assertEquals(Boolean.TRUE, stored.oomKilled);
+    }
+  }
+
   @Test
   void anInventoryWithoutTheFactsChangesNone() throws Exception {
     UUID id = lease(LeaseState.GRANTED, UUID.randomUUID());

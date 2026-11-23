@@ -857,10 +857,12 @@ public class Leases {
   }
 
   /**
-   * An inventory's outcome: the leases that changed, and the quarantine a start failure among them
-   * began or renewed (null when none touched one; the last of several wins).
+   * An inventory's outcome: the leases that changed, the quarantine a start failure among them
+   * began or renewed (null when none touched one; the last of several wins), and the ids of the
+   * leases this call credited with an OOM kill (qits-2502) — a {@link #recordMemory} that returned
+   * true, whether or not the lease's state itself moved.
    */
-  public record Applied(List<Lease> changed, Targets.Quarantine quarantine) {}
+  public record Applied(List<Lease> changed, Targets.Quarantine quarantine, List<UUID> credited) {}
 
   /**
    * {@link #applyInventory}, answering the quarantine too: a quarantine its start failures began is
@@ -876,6 +878,7 @@ public class Leases {
       }
     }
     Map<UUID, LeaseState> before = new HashMap<>();
+    List<UUID> credited = new ArrayList<>();
     List<Lease> changed =
         QuarkusTransaction.requiringNew()
             .call(
@@ -895,6 +898,9 @@ public class Leases {
                   for (Lease lease : mine) {
                     Held report = reported.get(lease.id);
                     boolean killed = recordMemory(lease, report);
+                    if (killed) {
+                      credited.add(lease.id);
+                    }
                     recordResolvers(lease, report);
                     before.put(lease.id, lease.state);
                     if (transition(lease, report, now) | killed) {
@@ -932,7 +938,7 @@ public class Leases {
     if (changed.stream().anyMatch(l -> !LeaseState.OCCUPYING.contains(l.state))) {
       allocation.requestPass();
     }
-    return new Applied(changed, quarantine);
+    return new Applied(changed, quarantine, List.copyOf(credited));
   }
 
   /**
@@ -1036,8 +1042,11 @@ public class Leases {
   /**
    * A report's memory facts onto its lease's row (qits-1818). A null leaves the stored value — an
    * EXITED lease keeps the last sample its container gave — and the counters and the peak never
-   * move down: a lower value is a stale or coarser read, not a new truth. True when {@code
-   * oomKills} rose, a first report above 0 included.
+   * move down: a lower value is a stale or coarser read, not a new truth. A report whose {@code
+   * oomKilled} is true credits the lease with at least one kill (qits-2502): its container's cgroup
+   * can have vanished before a sample caught the kill, which would otherwise leave {@code oomKills}
+   * at 0 under docker's own {@code State.OOMKilled} true. True when {@code oomKills} rose, a first
+   * report above 0 — from either source — included.
    */
   static boolean recordMemory(Lease lease, Held report) {
     if (report == null) {
@@ -1045,6 +1054,9 @@ public class Leases {
     }
     Long before = lease.oomKills;
     lease.oomKills = highest(lease.oomKills, report.oomKills());
+    if (Boolean.TRUE.equals(report.oomKilled())) {
+      lease.oomKills = highest(lease.oomKills, 1L);
+    }
     lease.oomEvents = highest(lease.oomEvents, report.oomEvents());
     lease.memoryPeakBytes = highest(lease.memoryPeakBytes, report.memoryPeakBytes());
     if (report.oomKilled() != null) {

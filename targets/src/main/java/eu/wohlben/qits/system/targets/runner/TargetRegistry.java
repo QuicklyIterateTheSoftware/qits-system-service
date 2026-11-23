@@ -449,6 +449,11 @@ public class TargetRegistry implements TargetPresence {
    * TargetOomKilled}. An inventory without them (a runner before qits-1818) leaves them as they were.
    * A quarantine its start failures began or renewed (qits-525, {@link Leases#apply}) is sent back
    * to this session: {@code quarantined}, then an ack of 0 slots.
+   *
+   * <p>The node's warn (qits-2502) names the leases this same {@link Leases#apply} call credited
+   * with a kill ({@code Applied.credited()}), so a kill the node lost alone — docker, the runner,
+   * buildkitd or another node process, or a lease whose exit lands in a later report — says so
+   * instead of naming nothing. A failed {@code apply} credits none.
    */
   public void onInventory(Session session, Inventory inventory) {
     List<Leases.Held> held = new ArrayList<>();
@@ -470,8 +475,11 @@ public class TargetRegistry implements TargetPresence {
                 lease.resolversStale()));
       }
     }
+    List<UUID> credited = List.of();
     try {
-      Targets.Quarantine quarantine = leases.apply(session.targetId, held).quarantine();
+      Leases.Applied applied = leases.apply(session.targetId, held);
+      credited = applied.credited();
+      Targets.Quarantine quarantine = applied.quarantine();
       // A start failure that quarantined the target (qits-525) is this runner's to hear, as an
       // owner's end tells it through LeaseController: the frame, then an ack of 0 slots.
       if (quarantine != null
@@ -498,12 +506,17 @@ public class TargetRegistry implements TargetPresence {
                 node.memoryTotalBytes());
         if (recorded != null && recorded.killed()) {
           LOG.warnf(
-              "Target %s lost %d process(es) to the OOM killer (node %s, kernel %s); projects %s",
+              "Target %s lost %d process(es) to the OOM killer (node %s, kernel %s); projects %s;"
+                  + " credited %s",
               session.targetName,
               recorded.delta(),
               recorded.target().nodeOomKills,
               recorded.target().kernelOomKills,
-              recorded.projectIds());
+              recorded.projectIds(),
+              credited.isEmpty()
+                  ? "no lease in this inventory (dockerd, the runner, buildkitd or another node"
+                      + " process, or a lease whose exit lands in a later report)"
+                  : credited);
           events.oomKilled(recorded);
         }
       } catch (RuntimeException e) {

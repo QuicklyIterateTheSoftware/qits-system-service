@@ -97,7 +97,9 @@ public class Lease extends PanacheEntityBase implements CausedRow {
   /**
    * Processes the OOM killer took in the lease container's cgroup ({@code memory.events}' {@code
    * oom_kill}), as the runner last reported it (qits-1818); never lowered, kept after the lease
-   * exits. Null until a runner reported one.
+   * exits. Null until a runner reported one. docker reporting the container {@code
+   * State.OOMKilled} counts as at least one kill (qits-2502), even when its last cgroup sample
+   * showed none — the cgroup can vanish before a runner samples it.
    */
   @Column(name = "oom_kills")
   public Long oomKills;
