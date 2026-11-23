@@ -470,7 +470,9 @@ components:
           format: int64
           description: Processes of this lease killed by any OOM killer (its container's
             cgroup memory.events oom_kill); the last sample is kept after it exits.
-            Null until a runner reported one
+            Null until a runner reported one. docker reporting the container OOM-killed
+            counts as at least one kill even when its last cgroup sample showed none
+            (qits-2502)
         oomScope:
           type: string
           description: LEASE (the lease hit its own memory limit) or NODE (the node
@@ -3023,4 +3025,4 @@ paths:
         - qits:system
 info:
   title: qits-platform-system API
-  version: 2026.1028.191413
+  version: 2026.1122.192546
