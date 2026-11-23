@@ -187,6 +187,26 @@ The consequence on ws-proof (16 GiB reported, so 14 GiB of capacity) at 6g per l
 met in memory, so they are ignored there and still apply as slots; an operator who wants CI's two
 leases held for it sets reservations its memory can carry.
 
+The builder is charged on a target that takes CI (qits-2503). An image build a CI lease sends to the
+target's shared buildkitd runs in the builder's cgroup, outside the lease's own `limits.memory`; the
+runner starts that buildkitd under `--memory` = `BUILDER_CONCURRENT_BUILDS × 6 GiB` and reports the cap
+in its inventory as `builderMemoryBytes`, stored as `builder_memory_bytes` and shown in the target's
+`memory`. A target takes CI when CI is reserved there (`reservations.ci > 0`), a CI lease occupies it
+(GRANTED, RUNNING or ENDING), or the lease being placed is CI — the same test the `buildkit` health
+check counts by — and only then is the builder's cap added to the committed charges, once: the rule
+is committed + the other types' unused reservations + builder + the lease's own charge ≤ capacity. A
+workspace- or desk-only target never starts the builder and is not charged it, and a runner too old
+to report the cap (null) is charged nothing for it. The builder is not part of the
+"reservations cannot be met in memory" comparison: it is fixed overhead, not a reservation. The
+`node-memory-reserve` (2g) is what the node's own processes keep — the kernel, docker, the runner —
+and no longer stands in for the builder.
+
+What that costs, counted rather than lost: ws-proof (16 GiB, so 14 GiB of capacity, CI reserved 2)
+holds one 6g lease beside its 6 GiB builder, not two (6 + 6 + 6 > 14); the workstation (29.2 GiB, so
+27.2 GiB of capacity) goes from four concurrent 6g leases to three once it takes CI (4 × 6 + 6 = 30 >
+27.2). That is the builder's memory counted, which those leases' image builds were using all along
+outside their caps — not a regression.
+
     POST   /system/api/targets                       declare one; answers its install line, once
     GET    /system/api/targets[/{id}[/health]]       slots, reservations, maximums, used, login, ...
     PATCH  /system/api/targets/{id}                  description, reservations, maximums (409
@@ -290,9 +310,10 @@ leases held for it sets reservations its memory can carry.
   TIMEOUT | NOT_CONNECTED | BAD_REQUEST` (an unknown target is NOT_FOUND with no target id); reading
   the audit is not itself audited.
 - **OOM kills** (qits-1818): an `inventory` carries the node's memory (`nodeOomKills`,
-  `kernelOomKills`, `memoryMaxBytes`, `memoryTotalBytes` since qits-2362) and each lease's (`oomKills`, `oomEvents`, `memoryPeakBytes`,
+  `kernelOomKills`, `memoryMaxBytes`, `memoryTotalBytes` since qits-2362, `builderMemoryBytes` since
+  qits-2503) and each lease's (`oomKills`, `oomEvents`, `memoryPeakBytes`,
   `oomKilled`), all nullable. A target shows them as `memory {nodeOomKills, kernelOomKills,
-  memoryMaxBytes, memoryTotalBytes, reportedAt}`, a lease as `oomKills`, `oomScope` (`LEASE` when it hit its own limit,
+  memoryMaxBytes, memoryTotalBytes, builderMemoryBytes, reportedAt}`, a lease as `oomKills`, `oomScope` (`LEASE` when it hit its own limit,
   `NODE` otherwise, null without a kill — `Lease.oomScope`), `memoryPeakBytes`, `oomKilled`. A
   lease's counters and peak never move down and a missing value keeps the stored one, so an EXITED
   lease keeps its last sample; an old-shaped inventory changes none of them.
@@ -339,7 +360,7 @@ The targets module's keys are `qits.system.targets.*`, defaulted in
 `slot-images.{ci,workspace,desk}`, `probe-image` (optional: the probe runs the newest WORKSPACE, else
 DESK, lease's image first), `registry-mirrors.{registry-hosts,mirror-hosts,
 upstreams}`, `runner-version-override`, `reconnect-grace=PT2M`, `commission-reconcile-interval=1h`,
-`public-url` (wss base), `estate-interval=PT1M`, `node-memory-reserve=2g` (qits-2362: a target's lease capacity is min(memoryMaxBytes, memoryTotalBytes) less this), `healthcheck.schedule`, `healthcheck.timeout=PT5M`,
+`public-url` (wss base), `estate-interval=PT1M`, `node-memory-reserve=2g` (qits-2362: a target's lease capacity is min(memoryMaxBytes, memoryTotalBytes) less this, kept for the node's own processes; the shared buildkitd is charged separately, at its reported builderMemoryBytes, on a target that takes CI — qits-2503), `healthcheck.schedule`, `healthcheck.timeout=PT5M`,
 `dialback.threshold=3` and `dialback.cooloff=PT30M` (qits-1809: that many RUNNING CI leases in a row
 ended `never-dialled-back` — or CI leases that ran and EXITED before that end, qits-2382 — quarantine
 the target, and the gating `dialback` check holds it for the

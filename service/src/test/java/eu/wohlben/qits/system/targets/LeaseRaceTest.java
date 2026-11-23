@@ -227,6 +227,47 @@ class LeaseRaceTest {
     }
   }
 
+  /**
+   * qits-2503: the builder's reported cap is read off the row and charged on a target running CI.
+   * The same 14 GiB node with a 6 GiB builder holds one 6g CI lease, not two: 6 + 6 + 6 > 14.
+   */
+  @Test
+  void aTargetRunningCiIsChargedItsBuildersMemory() throws Exception {
+    bearers.grant("Bearer race", "target-runner-client-race", "qits:target-runner");
+    try (FakeTargetRunner runner = FakeTargetRunner.dial(base, "Bearer race")) {
+      runner.hello(4, "vol");
+      HealthCheck check = runner.await(HealthCheck.class);
+      runner.healthChecked(check.requestId(), true);
+      runner.await(Reinstated.class);
+      runner.await(Ack.class, a -> a.slots() == 4);
+      UUID first = UUID.randomUUID();
+      UUID second = UUID.randomUUID();
+      TargetRows.lease(first, SlotType.CI, "qits-ci", "run-1", LeaseState.RUNNING, target);
+      TargetRows.lease(second, SlotType.CI, "qits-ci", "run-2", LeaseState.QUEUED, null);
+      String sixG =
+          "{\"image\":\"registry.qits.wohlben.eu/qits/ci:1\",\"limits\":{\"memory\":\"6g\"}}";
+      QuarkusTransaction.requiringNew()
+          .run(
+              () -> {
+                Lease.<Lease>findById(first).spec = sixG;
+                Lease.<Lease>findById(second).spec = sixG;
+                Target row = Target.findById(target);
+                row.memoryMaxBytes = null;
+                row.memoryTotalBytes = 16L << 30;
+                row.builderMemoryBytes = 6L << 30;
+              });
+      allocation.pass();
+      Lease waiting = TargetRows.reload(second);
+      assertEquals(LeaseState.QUEUED, waiting.state);
+      assertEquals("no target has memory for a 6g CI lease", waiting.detail);
+      // An older runner's null builder is charged nothing: 6 + 6 ≤ 14.
+      QuarkusTransaction.requiringNew()
+          .run(() -> Target.<Target>findById(target).builderMemoryBytes = null);
+      allocation.pass();
+      assertEquals(LeaseState.GRANTED, TargetRows.reload(second).state);
+    }
+  }
+
   @Test
   void aGrantAndAnEndOnTheSameQueuedLeaseNeverGrantAnEndedOne() throws Exception {
     bearers.grant("Bearer race", "target-runner-client-race", "qits:target-runner");

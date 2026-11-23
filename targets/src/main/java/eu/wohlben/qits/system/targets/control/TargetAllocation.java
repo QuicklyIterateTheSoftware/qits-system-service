@@ -45,10 +45,13 @@ import org.jboss.logging.Logger;
  * <p><b>The work volume pins.</b> A lease whose work key already has a volume is considered on that
  * volume's target only; one whose volume is marked for purging waits until the purge is done.
  *
- * <p><b>The memory</b> (qits-2362). Each target's {@link Memory}: its capacity from {@code
- * memory_max_bytes} less {@code qits.system.targets.node-memory-reserve}, the charges of its
- * occupying leases, and the charge of the newest grant of each type; each request's charge is its
- * spec's {@code limits.memory} ({@link DockerSizes#charge}).
+ * <p><b>The memory</b> (qits-2362). Each target's {@link Memory}: its capacity from the smaller of
+ * {@code memory_max_bytes} and {@code memory_total_bytes} less {@code
+ * qits.system.targets.node-memory-reserve} (what the node's own processes keep: the kernel, docker,
+ * the runner), the charges of its occupying leases, the charge of the newest grant of each type, and
+ * its {@code builder_memory_bytes} — the cap of the shared buildkitd, which {@link SlotAllocator}
+ * charges only on a target that takes CI (qits-2503; null from an older runner, charged nothing);
+ * each request's charge is its spec's {@code limits.memory} ({@link DockerSizes#charge}).
  */
 @ApplicationScoped
 public class TargetAllocation {
@@ -179,7 +182,8 @@ public class TargetAllocation {
                   Memory.capacity(
                       reserve, target.memoryMaxBytes, target.memoryTotalBytes),
                   committed.getOrDefault(target.id, 0L),
-                  lastCharges.get(target.id))));
+                  lastCharges.get(target.id),
+                  Memory.builderOf(target.builderMemoryBytes))));
     }
     Map<UUID, Lease> leases = new HashMap<>();
     Map<UUID, WorkVolume> volumes = new HashMap<>();

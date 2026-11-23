@@ -661,6 +661,101 @@ class TargetAllocatorTest {
             .targetId());
   }
 
+  // --- the builder (qits-2503): charged on a target that takes CI ------------------------------
+
+  /** A target of 8 slots with {@code reservations}, {@code used}, a memory picture and a builder. */
+  private static TargetSlots withBuilder(
+      Map<SlotType, Integer> reservations,
+      Map<SlotType, Integer> used,
+      long capacity,
+      long committed,
+      Long builder) {
+    return new TargetSlots(
+        A,
+        "ws-proof",
+        8,
+        reservations,
+        null,
+        used,
+        true,
+        false,
+        true,
+        new SlotAllocator.Memory(
+            capacity, committed, lastAtSixG(), SlotAllocator.Memory.builderOf(builder)));
+  }
+
+  @Test
+  void aTargetRunningCiHoldsOneSixGLeaseBesideItsBuilder() {
+    // 14 GiB, one 6g CI lease occupying it, a 6 GiB builder: 6 + 6 + 6 = 18 > 14 for either type,
+    // where without the builder qits-2362's rule took any two.
+    TargetSlots oneCi = withBuilder(counts(2, 1, 0), counts(1, 0, 0), 14 * GIB, SIX_G, SIX_G);
+    assertTrue(SlotAllocator.reservationsExceedMemory(oneCi));
+    for (SlotType type : List.of(SlotType.CI, SlotType.WORKSPACE, SlotType.DESK)) {
+      assertTrue(SlotAllocator.slotsFit(oneCi, type), type.name());
+      Decision decision =
+          SlotAllocator.allocate(List.of(oneCi), List.of(charged(type, 0, SIX_G))).get(0);
+      assertFalse(decision.granted(), type.name());
+      assertEquals("no target has memory for a 6g " + type.name() + " lease", decision.detail());
+    }
+    // A CI reservation with nothing running charges it too: the runner starts the builder for a
+    // target that may take CI. One 6g workspace there leaves no room for a second.
+    TargetSlots oneWsCiReserved =
+        withBuilder(counts(2, 1, 0), counts(0, 1, 0), 14 * GIB, SIX_G, SIX_G);
+    assertFalse(SlotAllocator.fits(oneWsCiReserved, SlotType.WORKSPACE, SIX_G));
+  }
+
+  @Test
+  void aTargetThatTakesNoCiIsNotChargedTheBuilder() {
+    // No CI reservation, no CI lease, a workspace candidate: the builder never starts there, so
+    // 6 + 6 ≤ 14 and the second 6g workspace is granted beside the first.
+    TargetSlots wsOnly = withBuilder(counts(0, 1, 0), counts(0, 1, 0), 14 * GIB, SIX_G, SIX_G);
+    assertTrue(SlotAllocator.fits(wsOnly, SlotType.WORKSPACE, SIX_G));
+    assertTrue(SlotAllocator.fits(wsOnly, SlotType.DESK, SIX_G));
+    assertEquals(
+        A,
+        SlotAllocator.allocate(List.of(wsOnly), List.of(charged(SlotType.WORKSPACE, 0, SIX_G)))
+            .get(0)
+            .targetId());
+    // ... while a CI candidate on the same target would start it: 6 + 6 + 6 > 14.
+    assertFalse(SlotAllocator.fits(wsOnly, SlotType.CI, SIX_G));
+  }
+
+  @Test
+  void aCiCandidateOnAnEmptyTargetIsChargedTheBuilder() {
+    // 8 GiB, nothing reserved, nothing running: the CI lease's 6g plus the 6 GiB builder is 12 > 8.
+    TargetSlots empty = withBuilder(counts(0, 0, 0), counts(0, 0, 0), 8 * GIB, 0, SIX_G);
+    Decision decision =
+        SlotAllocator.allocate(List.of(empty), List.of(charged(SlotType.CI, 0, SIX_G))).get(0);
+    assertFalse(decision.granted());
+    assertEquals("no target has memory for a 6g CI lease", decision.detail());
+    // The same 6g as a workspace is not charged it, and fits.
+    assertTrue(SlotAllocator.fits(empty, SlotType.WORKSPACE, SIX_G));
+    // A grant of CI in a pass makes the target take CI for the rest of it: a workspace after it
+    // finds 6 + 6 + 2 > 12 on a 12 GiB target that took the CI lease alone at 6 + 6.
+    TargetSlots twelve = withBuilder(counts(0, 0, 0), counts(0, 0, 0), 12 * GIB, 0, SIX_G);
+    List<Decision> decisions =
+        SlotAllocator.allocate(
+            List.of(twelve),
+            List.of(charged(SlotType.CI, 0, SIX_G), charged(SlotType.WORKSPACE, 1, 2 * GIB)));
+    assertEquals(List.of(true, false), decisions.stream().map(Decision::granted).toList());
+  }
+
+  @Test
+  void aBuilderThatReportsNoCapIsChargedNothing() {
+    // An older runner reports null: qits-2362's rule as it was — ws-proof holds any two 6g leases.
+    TargetSlots oneCi = withBuilder(counts(2, 1, 0), counts(1, 0, 0), 14 * GIB, SIX_G, null);
+    assertEquals(0, oneCi.memory().builderBytes());
+    assertTrue(SlotAllocator.fits(oneCi, SlotType.CI, SIX_G));
+    assertTrue(SlotAllocator.fits(oneCi, SlotType.WORKSPACE, SIX_G));
+    TargetSlots emptyEight = withBuilder(counts(0, 0, 0), counts(0, 0, 0), 8 * GIB, 0, null);
+    assertTrue(SlotAllocator.fits(emptyEight, SlotType.CI, SIX_G));
+    // And the three-argument memory is the same as a null builder.
+    assertEquals(
+        new SlotAllocator.Memory(14 * GIB, SIX_G, lastAtSixG()),
+        new SlotAllocator.Memory(
+            14 * GIB, SIX_G, lastAtSixG(), SlotAllocator.Memory.builderOf(null)));
+  }
+
   // --- which slot types a target can ever run (qits-1692: its warm images) ---------------------
 
   @Test

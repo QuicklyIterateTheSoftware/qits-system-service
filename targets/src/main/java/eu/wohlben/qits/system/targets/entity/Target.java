@@ -136,7 +136,16 @@ public class Target extends PanacheEntityBase implements CausedRow {
   @Column(name = "memory_total_bytes")
   public Long memoryTotalBytes;
 
-  /** When those four last arrived; null before a runner reported any. */
+  /**
+   * The memory cap of the target's shared buildkitd as its runner last reported it (qits-2503):
+   * {@code BUILDER_CONCURRENT_BUILDS × 6 GiB}. Image builds a CI lease sends there run in the
+   * builder's cgroup, outside the lease's own limit, so placement charges this on a target that
+   * takes CI. Null before a runner reported it, or from a runner too old to.
+   */
+  @Column(name = "builder_memory_bytes")
+  public Long builderMemoryBytes;
+
+  /** When those last arrived; null before a runner reported any. */
   @Column(name = "memory_reported_at")
   public Instant memoryReportedAt;
 

@@ -966,6 +966,12 @@ components:
           format: int64
           description: The node's physical memory (/proc/meminfo MemTotal); null when
             unreadable. Placement sizes the node by the smaller of this and memoryMaxBytes
+        builderMemoryBytes:
+          type: integer
+          format: int64
+          description: "The memory cap of the target's shared buildkitd (qits-2503);\
+            \ null from an older runner. Image builds run there, outside a CI lease's\
+            \ own limit, so placement charges it on a target that takes CI"
         reportedAt:
           $ref: "#/components/schemas/Instant"
           description: When the runner last reported these

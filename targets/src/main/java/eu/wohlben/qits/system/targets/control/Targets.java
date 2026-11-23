@@ -527,7 +527,8 @@ public class Targets {
       Long nodeOomKills,
       Long kernelOomKills,
       Long memoryMaxBytes,
-      Long memoryTotalBytes) {
+      Long memoryTotalBytes,
+      Long builderMemoryBytes) {
     return QuarkusTransaction.requiringNew()
         .call(
             () -> {
@@ -541,6 +542,7 @@ public class Targets {
               target.kernelOomKills = kernelOomKills;
               target.memoryMaxBytes = memoryMaxBytes;
               target.memoryTotalBytes = memoryTotalBytes;
+              target.builderMemoryBytes = builderMemoryBytes;
               target.memoryReportedAt = Instant.now();
               if (before == null || after == null || after <= before) {
                 return new MemoryRecorded(target, 0, List.of());

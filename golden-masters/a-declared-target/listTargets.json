@@ -46,6 +46,7 @@
       "kernelOomKills": null,
       "memoryMaxBytes": null,
       "memoryTotalBytes": null,
+      "builderMemoryBytes": null,
       "reportedAt": null
     }
   }

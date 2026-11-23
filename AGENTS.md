@@ -69,17 +69,26 @@ for a quarantined or disconnected target, and the sign-in gate for WORKSPACE and
 reservation holds slots for one type; it is not a limit, so a type may use more while shared
 slots are free. A maximum (qits-1813) is the limit, per type and optional: null is no ceiling, and
 the patch door keeps it at or above its type's reservation. Memory is one more conjunct (qits-2362):
-`C unknown or M + Σ_{u≠t} max(0, r[u] − n[u]) × c[u] + c ≤ C`, where `C` is the smaller of the target's
+`C unknown or M + Σ_{u≠t} max(0, r[u] − n[u]) × c[u] + [takes CI] × B + c ≤ C`, where `C` is the smaller of the target's
 `memory_max_bytes` (root `memory.max`) and `memory_total_bytes` (`/proc/meminfo` MemTotal) less
 `qits.system.targets.node-memory-reserve` (2g; a null figure is skipped, both null is no memory check —
 localhost and the workstation, whose root `memory.max` is `max`, are sized by MemTotal), `M` the `spec.limits.memory` charges (`DockerSizes`) of its GRANTED, RUNNING and ENDING
 leases, `c[u]` the charge of the newest lease of type `u` granted there (0 if none), `c` the
 candidate's (0 without a limit; `memorySwap` is never charged), and the reserved term dropped when the
 reservations are ignored as slots (`Σ r > T`) or cannot be met in memory (`Σ_u r[u] × c[u] > C`,
-`SlotAllocator.reservationsExceedMemory`; they still apply as slots). `TargetAllocation` reads those from the rows; `SlotAllocator.Memory.capacity` takes
-the min of every known figure (`memory_max_bytes`, `memory_total_bytes`). At 6g a lease, ws-proof
-(16 GiB − 2 GiB = 14 GiB) runs any two 6g leases of either type: its reservations (ci 2, workspace 1:
-18 GiB) cannot be met in memory, so they are ignored there and hold only as slots. Change it in
+`SlotAllocator.reservationsExceedMemory`; they still apply as slots). `B` is the shared buildkitd's
+memory cap (qits-2503, `builder_memory_bytes`, the runner's `BUILDER_CONCURRENT_BUILDS × 6 GiB`; null
+from an older runner is 0): image builds run in the builder's cgroup, outside a CI lease's own limit,
+so it is charged once on a target that takes CI — `r[CI] > 0`, `n[CI] > 0`, or a CI candidate
+(`SlotAllocator.takesCi`, the same test `TargetHealth` counts `buildkit` by) — and never on a
+workspace- or desk-only target. It stays out of the `Σ_u r[u] × c[u] > C` comparison: fixed overhead,
+not a reservation. The node reserve is the node's own processes, not the builder.
+`TargetAllocation` reads those from the rows; `SlotAllocator.Memory.capacity` takes
+the min of every known figure (`memory_max_bytes`, `memory_total_bytes`). At 6g a lease and a 6 GiB
+builder, ws-proof (16 GiB − 2 GiB = 14 GiB, CI reserved) holds one 6g lease of either type beside the
+builder, not two: its reservations (ci 2, workspace 1: 18 GiB) cannot be met in memory, so they are
+ignored there and hold only as slots, and 6 + 6 + 6 > 14. The workstation (29.2 GiB) runs three
+concurrent 6g leases, not four, once it takes CI. Change it in
 `TargetAllocatorTest` first: the dossier's worked example is the first table there.
 
 **`login` and `slots` are reported, never a quarantine** (`TargetHealth.REPORT_ONLY`). They fail
