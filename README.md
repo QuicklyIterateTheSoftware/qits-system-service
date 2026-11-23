@@ -176,16 +176,23 @@ memory limit is charged 0 — every owner sets one today). A lease fits only whe
 target's GRANTED, RUNNING and ENDING leases, plus what the other types' unused reservations would need
 (each priced at the memory limit of that type's most recently granted lease there), plus its own
 charge stay within the capacity. That middle term is ignored when the reservations are ignored as
-slots (`Σ r > T`), and likewise when they cannot be met in memory: when `Σ r[u] × charge(u)`, what
-they would hold with every type at zero use, exceeds the capacity, only the committed charges plus the
-lease's own must fit, and the reservations still apply as slots. A
-target that reports no memory is held to its slots alone. A lease some target's slots would take but
+slots (`Σ r > T`). A target that reports no memory is held to its slots alone. A lease some target's slots would take but
 no target's memory can hold waits with `no target has memory for a 6g WORKSPACE lease`.
 
-The consequence on ws-proof (16 GiB reported, so 14 GiB of capacity) at 6g per lease: it runs any two
-6g leases, of either type, not eight. Its reservations (ci 2 and workspace 1, 18 GiB at 6g) cannot be
-met in memory, so they are ignored there and still apply as slots; an operator who wants CI's two
-leases held for it sets reservations its memory can carry.
+Reservations the memory cannot meet are honoured in priority order, CI first (qits-2515), never
+dropped whole. Starting from the capacity less the builder (below) when the target takes CI, each type
+in turn — CI, then WORKSPACE, then DESK — is honoured as many of its reservations as the memory left
+holds at its price (`h[u] = min(r[u], ⌊A / charge(u)⌋)`, all of them for a type priced at 0), and
+those are taken off before the next type; the middle term then counts only the honoured reservations
+a type does not use. Reservations the memory can meet are honoured whole, and nothing changes. Until
+qits-2515 they were ignored in memory once their sum exceeded the capacity, which let a workspace take
+ws-proof's only lease-sized memory and starved CI for hours.
+
+The consequence on ws-proof (16 GiB reported, so 14 GiB of capacity; an 8 GiB builder; ci 2 and
+workspace 1 at 6g): 14 − 8 = 6 GiB honours ci 1 and workspace 0, so it always keeps one 6g CI lease
+(0 + 8 + 6 = 14) and takes no workspace (0 + 6 held for CI + 8 + 6 = 20 > 14), whichever was queued
+first. At 32 GiB the same reservations are honoured whole (ci 2, workspace 1), and a workspace fits
+while committed + 12 + 8 + 6 ≤ 32 — two of them, not three.
 
 The builder is charged on a target that takes CI (qits-2503). An image build a CI lease sends to the
 target's shared buildkitd runs in the builder's cgroup, outside the lease's own `limits.memory`; the
@@ -199,13 +206,13 @@ in its inventory as `builderMemoryBytes`, stored as `builder_memory_bytes` and s
 check counts by — and only then is the builder's cap added to the committed charges, once: the rule
 is committed + the other types' unused reservations + builder + the lease's own charge ≤ capacity. A
 workspace- or desk-only target never starts the builder and is not charged it, and a runner too old
-to report the cap (null) is charged nothing for it. The builder is not part of the
-"reservations cannot be met in memory" comparison: it is fixed overhead, not a reservation. The
+to report the cap (null) is charged nothing for it. The builder comes off the capacity before any
+reservation is honoured (qits-2515): it is fixed overhead, not a reservation. The
 `node-memory-reserve` (2g) is what the node's own processes keep — the kernel, docker, the runner —
 and no longer stands in for the builder.
 
 What that costs, counted rather than lost: ws-proof (16 GiB, so 14 GiB of capacity, CI reserved 2)
-holds one 6g lease beside its 8 GiB builder (6 + 8 = 14), not two; the workstation (31.2 GiB, so
+holds one 6g lease beside its 8 GiB builder (6 + 8 = 14), not two — a CI lease, since qits-2515; the workstation (31.2 GiB, so
 29.2 GiB of capacity) goes from four concurrent 6g leases to three once it takes CI (4 × 6 + 8 = 32 >
 29.2). That is the builder's memory counted, which those leases' image builds were using all along
 outside their caps — not a regression.

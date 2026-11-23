@@ -50,12 +50,9 @@ import java.util.UUID;
  *
  * — the memory the other types' unused reservations would need stays free for them, priced at what
  * their last lease here asked for. That term is ignored when the reservations are ignored in slots
- * ({@code Σ r > T}), and likewise when they cannot be met in memory: {@code Σ_u r[u] × c[u] > C},
- * what they would hold with every type at zero use, is more than the target has (ws-proof: ci 2 and
- * workspace 1 at 6g is 18 GiB against 14). Then only {@code M + c ≤ C} holds, and the reservations
- * still apply as slots. A target that reports no memory is held to the slot rule alone. A lease the slots of
- * some target would take but whose memory none can hold waits with {@code no target has memory for
- * a 6g WORKSPACE lease}.
+ * ({@code Σ r > T}). A target that reports no memory is held to the slot rule alone. A lease the
+ * slots of some target would take but whose memory none can hold waits with {@code no target has
+ * memory for a 6g WORKSPACE lease}.
  *
  * <p><b>The builder is charged on a target that takes CI</b> (qits-2503). An image build a CI lease
  * sends to the target's shared buildkitd runs in the builder's cgroup, outside the lease's own
@@ -63,16 +60,24 @@ import java.util.UUID;
  * GiB} and reports the cap as {@code builder_memory_bytes} ({@code B}, 0 when unreported — an older
  * runner). It is charged once per target, and only when the target takes CI: {@code r[CI] > 0}, or
  * {@code n[CI] > 0}, or the candidate is a CI lease. A workspace- or desk-only target never starts
- * the builder and is not charged it. So the memory conjunct is
+ * the builder and is not charged it.
+ *
+ * <p><b>Memory honours the reservations in priority order, CI first</b> (qits-2515). Reservations
+ * the memory cannot meet are not dropped but honoured as far as it reaches: with {@code A = C −
+ * [takes CI] × B}, for {@code u} in CI, WORKSPACE, DESK, {@code h[u] = min(r[u], ⌊A / c[u]⌋)}
+ * ({@code r[u]} when {@code c[u] = 0}) and {@code A −= h[u] × c[u]} ({@link #honouredReservations}).
+ * So the memory conjunct is
  *
  * <pre>
- *   C unknown  or  M + Σ_{u ≠ t} max(0, r[u] − n[u]) × c[u] + [takes CI] × B + c ≤ C
+ *   C unknown  or  M + Σ_{u ≠ t} max(0, h[u] − n[u]) × c[u] + [takes CI] × B + c ≤ C
  * </pre>
  *
- * The builder stays out of the {@code Σ_u r[u] × c[u] > C} comparison: that asks whether the
- * reservations alone could ever be honoured in memory, and the builder is no reservation — it is
- * fixed overhead, charged whether they are honoured or ignored. At 6g a lease and an 8 GiB builder,
- * ws-proof (14 GiB) holds one CI lease beside the builder, not two.
+ * When they fit ({@code Σ_u r[u] × c[u] ≤ A}) {@code h = r} and nothing changes. Dropping them
+ * whole, as qits-2362 did once they did not fit, let a workspace take ws-proof's only lease-sized
+ * memory and starved CI for hours: ws-proof (14 GiB, an 8 GiB builder, ci 2 and workspace 1 at 6g)
+ * honours ci 1 and workspace 0, so it always keeps one 6g CI lease ({@code 0 + 8 + 6 = 14}) and takes
+ * no workspace ({@code 0 + 6 + 8 + 6 = 20 > 14}); at 32 GiB it honours ci 2 and workspace 1, and a
+ * workspace fits while {@code M + 12 + 8 + 6 ≤ 32}.
  *
  * <p><b>The order.</b> One queue across types, {@code priority desc, requested_at asc} (the lease id
  * breaks a tie, so a pass is deterministic). Each lease is considered on its own: one that cannot be
@@ -423,10 +428,11 @@ public final class SlotAllocator {
   }
 
   /**
-   * The memory conjunct (qits-2362): {@code C} unknown, or {@code M + Σ_{u≠t} max(0, r[u] − n[u]) ×
-   * c[u] + [takes CI] × B + c ≤ C}, the reserved term dropped when the reservations are ignored, in
-   * slots or in memory ({@link #reservationsExceedMemory}); the builder {@code B} charged when
-   * {@link #takesCi} (qits-2503).
+   * The memory conjunct (qits-2362): {@code C} unknown, or {@code M + Σ_{u≠t} max(0, h[u] − n[u]) ×
+   * c[u] + [takes CI] × B + c ≤ C}, with {@code h} the reservations memory honours ({@link
+   * #honouredReservations}, qits-2515) and the reserved term dropped when the reservations are
+   * ignored in slots ({@code Σ r > T}); the builder {@code B} charged when {@link #takesCi}
+   * (qits-2503).
    */
   public static boolean memoryFits(TargetSlots target, SlotType type, long chargeBytes) {
     Memory memory = target.memory();
@@ -437,50 +443,64 @@ public final class SlotAllocator {
     if (takesCi(target, type)) {
       needed += memory.builderBytes();
     }
-    if (!reservationsExceedTotal(target.total(), target.reservations())
-        && !reservationsExceedMemory(target)) {
-      for (SlotType u : SlotType.values()) {
-        if (u != type) {
-          int reserved = target.reservations().getOrDefault(u, 0);
-          int unused = Math.max(0, reserved - target.used().getOrDefault(u, 0));
-          needed += unused * memory.lastCharge().getOrDefault(u, 0L);
-        }
+    Map<SlotType, Integer> honoured = honouredReservations(target, type);
+    for (SlotType u : SlotType.values()) {
+      if (u != type) {
+        int unused = Math.max(0, honoured.get(u) - target.used().getOrDefault(u, 0));
+        needed += unused * memory.lastCharge().getOrDefault(u, 0L);
       }
     }
     return needed <= memory.capacityBytes();
   }
 
   /**
+   * {@code h[u]}, the reservations {@code target}'s memory honours when it is asked for a lease of
+   * {@code type} (qits-2515): with {@code A = C − [takes CI] × B}, in {@link SlotType} order — CI
+   * first — {@code h[u] = r[u]} when {@code c[u] = 0}, else {@code min(r[u], ⌊A / c[u]⌋)}, and
+   * {@code A} drops by {@code h[u] × c[u]}. Reservations the memory can meet ({@code Σ_u r[u] × c[u]
+   * ≤ A}) are honoured whole; ones it cannot are honoured in priority order rather than dropped, so
+   * ws-proof (14 GiB, an 8 GiB builder, ci 2 and workspace 1 at 6g) honours ci 1 and workspace 0 and
+   * always keeps one 6g CI lease's memory free. Every {@code h[u]} is 0 when the reservations are
+   * ignored in slots ({@code Σ r > T}); {@code h = r} when the capacity is unknown.
+   */
+  public static Map<SlotType, Integer> honouredReservations(TargetSlots target, SlotType type) {
+    Map<SlotType, Integer> honoured = new EnumMap<>(SlotType.class);
+    Memory memory = target.memory();
+    boolean ignored = reservationsExceedTotal(target.total(), target.reservations());
+    long available =
+        memory.capacityBytes() == null
+            ? 0
+            : Math.max(
+                0L,
+                memory.capacityBytes() - (takesCi(target, type) ? memory.builderBytes() : 0L));
+    for (SlotType u : SlotType.values()) {
+      int reserved = target.reservations().getOrDefault(u, 0);
+      long price = memory.lastCharge().getOrDefault(u, 0L);
+      int h;
+      if (ignored) {
+        h = 0;
+      } else if (memory.capacityBytes() == null || price == 0) {
+        h = reserved;
+      } else {
+        h = (int) Math.min(reserved, available / price);
+      }
+      honoured.put(u, h);
+      available = Math.max(0L, available - h * price);
+    }
+    return honoured;
+  }
+
+  /**
    * Whether {@code target}, granted a lease of {@code type}, runs the shared buildkitd and so is
    * charged its memory (qits-2503): CI is reserved there ({@code r[CI] > 0}), a CI lease occupies it
    * ({@code n[CI] > 0}: GRANTED, RUNNING or ENDING), or the candidate is CI. The reservation counts
-   * even when ignored in slots or memory: the runner starts the builder for a target that may take
-   * CI, whether or not it runs a CI lease right now.
+   * even when ignored in slots or only partly honoured in memory: the runner starts the builder for a
+   * target that may take CI, whether or not it runs a CI lease right now.
    */
   static boolean takesCi(TargetSlots target, SlotType type) {
     return type == SlotType.CI
         || target.reservations().getOrDefault(SlotType.CI, 0) > 0
         || target.used().getOrDefault(SlotType.CI, 0) > 0;
-  }
-
-  /**
-   * {@code Σ_u r[u] × c[u] > C}: what the reservations would hold in memory with every type at zero
-   * use is more than the target has, so in memory they are ignored — the memory twin of {@link
-   * #reservationsExceedTotal}. They still hold as slots. False when the capacity is unknown. The
-   * builder (qits-2503) is not in this sum: it is no reservation but fixed overhead, charged
-   * whether the reservations are honoured or ignored.
-   */
-  public static boolean reservationsExceedMemory(TargetSlots target) {
-    Long capacity = target.memory().capacityBytes();
-    if (capacity == null) {
-      return false;
-    }
-    long held = 0;
-    for (SlotType u : SlotType.values()) {
-      long price = target.memory().lastCharge().getOrDefault(u, 0L);
-      held += target.reservations().getOrDefault(u, 0) * price;
-    }
-    return held > capacity;
   }
 
   /** The rule over bare numbers, with no maximums. */

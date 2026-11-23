@@ -75,19 +75,23 @@ the patch door keeps it at or above its type's reservation. Memory is one more c
 localhost and the workstation, whose root `memory.max` is `max`, are sized by MemTotal), `M` the `spec.limits.memory` charges (`DockerSizes`) of its GRANTED, RUNNING and ENDING
 leases, `c[u]` the charge of the newest lease of type `u` granted there (0 if none), `c` the
 candidate's (0 without a limit; `memorySwap` is never charged), and the reserved term dropped when the
-reservations are ignored as slots (`Σ r > T`) or cannot be met in memory (`Σ_u r[u] × c[u] > C`,
-`SlotAllocator.reservationsExceedMemory`; they still apply as slots). `B` is the shared buildkitd's
+reservations are ignored as slots (`Σ r > T`). Reservations the memory cannot meet are honoured in
+priority order, CI first (qits-2515), never dropped whole: the term is `Σ_{u≠t} max(0, h[u] − n[u]) ×
+c[u]` with `A = C − [takes CI] × B` and, for `u` in CI, WORKSPACE, DESK, `h[u] = min(r[u], ⌊A /
+c[u]⌋)` (`r[u]` when `c[u] = 0`), `A −= h[u] × c[u]` (`SlotAllocator.honouredReservations`); when they
+fit, `h = r`. `B` is the shared buildkitd's
 memory cap (qits-2503, `builder_memory_bytes`, the runner's `BUILDER_CONCURRENT_BUILDS × 8 GiB`; null
 from an older runner is 0): image builds run in the builder's cgroup, outside a CI lease's own limit,
 so it is charged once on a target that takes CI — `r[CI] > 0`, `n[CI] > 0`, or a CI candidate
 (`SlotAllocator.takesCi`, the same test `TargetHealth` counts `buildkit` by) — and never on a
-workspace- or desk-only target. It stays out of the `Σ_u r[u] × c[u] > C` comparison: fixed overhead,
+workspace- or desk-only target. It comes off `A` before any reservation is honoured: fixed overhead,
 not a reservation. The node reserve is the node's own processes, not the builder.
 `TargetAllocation` reads those from the rows; `SlotAllocator.Memory.capacity` takes
 the min of every known figure (`memory_max_bytes`, `memory_total_bytes`). At 6g a lease and an 8 GiB
-builder, ws-proof (16 GiB − 2 GiB = 14 GiB, CI reserved) holds one 6g lease of either type beside the
-builder, not two: its reservations (ci 2, workspace 1: 18 GiB) cannot be met in memory, so they are
-ignored there and hold only as slots, and 6 + 6 + 8 > 14. The workstation (29.2 GiB) runs three
+builder, ws-proof (16 GiB − 2 GiB = 14 GiB, ci 2 and workspace 1 reserved: 18 GiB) honours ci 1 and
+workspace 0 (`A = 14 − 8 = 6`), so it always keeps one 6g CI lease (0 + 8 + 6 = 14) and takes no
+workspace (0 + 6 + 8 + 6 = 20 > 14), whichever is queued first; at 32 GiB it honours ci 2 and workspace
+1, and a workspace fits while `M + 12 + 8 + 6 ≤ 32`. The workstation (29.2 GiB) runs three
 concurrent 6g leases, not four, once it takes CI. Change it in
 `TargetAllocatorTest` first: the dossier's worked example is the first table there.
 
