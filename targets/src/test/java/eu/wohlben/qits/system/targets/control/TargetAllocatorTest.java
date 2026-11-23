@@ -593,25 +593,83 @@ class TargetAllocatorTest {
     assertEquals(List.of(true, false), mixed.stream().map(Decision::granted).toList());
   }
 
-  // --- reservations that cannot be met in memory are ignored in memory -------------------------
+  // --- reservations the memory cannot meet are honoured in priority order (qits-2515) ----------
 
-  /** ws-proof as it reports: 16 GiB − 2 GiB, every type last granted at 6g. */
+  /** ws-proof as it reports: 16 GiB − 2 GiB, every type last granted at 6g, no builder cap. */
   private static TargetSlots wsProofAt14(Map<SlotType, Integer> used, long committed) {
     long capacity = SlotAllocator.Memory.capacity(2 * GIB, 16 * GIB);
     return wsProofMemory(used, capacity, committed, lastAtSixG());
   }
 
-  @Test
-  void anEmptyWsProofTakesASixGWorkspace() {
-    // Σ r × c = 2 × 6 + 1 × 6 = 18 GiB > 14: the reservations are ignored in memory, so 0 + 6 ≤ 14.
-    TargetSlots empty = wsProofAt14(counts(0, 0, 0), 0);
-    assertTrue(SlotAllocator.reservationsExceedMemory(empty));
-    assertTrue(SlotAllocator.fits(empty, SlotType.WORKSPACE, SIX_G));
-    assertTrue(SlotAllocator.fits(empty, SlotType.CI, SIX_G));
+  /** ws-proof's slots (T=8, ci 2/ws 1) at {@code capacity} with an 8 GiB builder, every type at 6g. */
+  private static TargetSlots wsProofWithBuilder(
+      Map<SlotType, Integer> used, long capacity, long committed) {
+    return withBuilder(counts(2, 1, 0), used, capacity, committed, 8 * GIB);
   }
 
   @Test
-  void wsProofHoldsAnyTwoSixGLeasesAndNoThird() {
+  void anEmptyWsProofKeepsItsCiLeaseAndTakesNoWorkspace() {
+    // ws-proof as it runs: 14 GiB, an 8 GiB builder (r[CI] = 2 > 0), ci 2 / ws 1 at 6g (18 GiB).
+    // A = 14 − 8 = 6: h[CI] = min(2, ⌊6/6⌋) = 1, A = 0; h[WS] = min(1, 0) = 0.
+    TargetSlots empty = wsProofWithBuilder(counts(0, 0, 0), 14 * GIB, 0);
+    assertEquals(counts(1, 0, 0), SlotAllocator.honouredReservations(empty, SlotType.CI));
+    assertEquals(counts(1, 0, 0), SlotAllocator.honouredReservations(empty, SlotType.WORKSPACE));
+    // CI: 0 + 0 (h[WS] = 0) + 8 + 6 = 14 ≤ 14.
+    assertTrue(SlotAllocator.fits(empty, SlotType.CI, SIX_G));
+    assertEquals(
+        A,
+        SlotAllocator.allocate(List.of(empty), List.of(charged(SlotType.CI, 0, SIX_G)))
+            .get(0)
+            .targetId());
+    // WORKSPACE: 0 + 1 × 6 (h[CI]) + 8 + 6 = 20 > 14, though its slots are free.
+    assertTrue(SlotAllocator.slotsFit(empty, SlotType.WORKSPACE));
+    Decision workspace =
+        SlotAllocator.allocate(List.of(empty), List.of(charged(SlotType.WORKSPACE, 0, SIX_G)))
+            .get(0);
+    assertFalse(workspace.granted());
+    assertEquals("no target has memory for a 6g WORKSPACE lease", workspace.detail());
+    // Without a builder cap (an older runner) A = 14: h[CI] = 2, A = 2, h[WS] = 0, and a workspace
+    // finds 0 + 2 × 6 + 6 = 18 > 14 while CI finds 0 + 0 + 6 = 6.
+    TargetSlots noBuilder = wsProofAt14(counts(0, 0, 0), 0);
+    assertEquals(counts(2, 0, 0), SlotAllocator.honouredReservations(noBuilder, SlotType.WORKSPACE));
+    assertFalse(SlotAllocator.fits(noBuilder, SlotType.WORKSPACE, SIX_G));
+    assertTrue(SlotAllocator.fits(noBuilder, SlotType.CI, SIX_G));
+  }
+
+  @Test
+  void anOlderWorkspaceInTheQueueDoesNotTakeWsProofsCiMemory() {
+    // One pass, the workspace queued first: it finds 0 + 6 + 8 + 6 = 20 > 14 and waits; the CI
+    // lease behind it finds 0 + 0 + 8 + 6 = 14 and is granted — the starvation qits-2515 ends.
+    List<Decision> decisions =
+        SlotAllocator.allocate(
+            List.of(wsProofWithBuilder(counts(0, 0, 0), 14 * GIB, 0)),
+            List.of(charged(SlotType.WORKSPACE, 0, SIX_G), charged(SlotType.CI, 1, SIX_G)));
+    assertEquals(List.of(false, true), decisions.stream().map(Decision::granted).toList());
+    assertEquals("no target has memory for a 6g WORKSPACE lease", decisions.get(0).detail());
+  }
+
+  @Test
+  void wsProofAt32GiBHonoursEveryReservation() {
+    // A = 32 − 8 = 24: h[CI] = min(2, 4) = 2, A = 12; h[WS] = min(1, 2) = 1 — h = r.
+    TargetSlots empty = wsProofWithBuilder(counts(0, 0, 0), 32 * GIB, 0);
+    assertEquals(counts(2, 1, 0), SlotAllocator.honouredReservations(empty, SlotType.WORKSPACE));
+    assertEquals(counts(2, 1, 0), SlotAllocator.honouredReservations(empty, SlotType.CI));
+    // Workspaces fit while M + 2 × 6 + 8 + 6 ≤ 32: at M = 0 (26) and M = 6 (32), not at M = 12 (38).
+    List<Decision> decisions =
+        SlotAllocator.allocate(
+            List.of(empty),
+            List.of(
+                charged(SlotType.WORKSPACE, 0, SIX_G),
+                charged(SlotType.WORKSPACE, 1, SIX_G),
+                charged(SlotType.WORKSPACE, 2, SIX_G)));
+    assertEquals(List.of(true, true, false), decisions.stream().map(Decision::granted).toList());
+    assertEquals("no target has memory for a 6g WORKSPACE lease", decisions.get(2).detail());
+  }
+
+  @Test
+  void wsProofWithoutABuilderHoldsTwoSixGCiAndNoWorkspace() {
+    // 14 GiB, no builder cap: h[CI] = 2, h[WS] = 0. One CI and one workspace running (M = 12):
+    // CI finds 12 + 0 + 6 = 18 > 14, a workspace 12 + (2 − 1) × 6 + 6 = 24 > 14.
     TargetSlots two = wsProofAt14(counts(1, 1, 0), 2 * SIX_G);
     for (SlotType type : List.of(SlotType.CI, SlotType.WORKSPACE)) {
       assertTrue(SlotAllocator.slotsFit(two, type), type.name());
@@ -620,7 +678,8 @@ class TargetAllocatorTest {
       assertFalse(decision.granted(), type.name());
       assertEquals("no target has memory for a 6g " + type.name() + " lease", decision.detail());
     }
-    // And from empty, one pass grants exactly two of four, whatever their types.
+    // From empty, one pass of four: each workspace finds 0 + 12 + 6 = 18 > 14 and waits, the first
+    // CI 0 + 0 + 6 = 6 and the second 6 + 0 + 6 = 12 are granted.
     List<Decision> decisions =
         SlotAllocator.allocate(
             List.of(wsProofAt14(counts(0, 0, 0), 0)),
@@ -630,18 +689,21 @@ class TargetAllocatorTest {
                 charged(SlotType.CI, 2, SIX_G),
                 charged(SlotType.CI, 3, SIX_G)));
     assertEquals(
-        List.of(true, true, false, false), decisions.stream().map(Decision::granted).toList());
+        List.of(false, false, true, true), decisions.stream().map(Decision::granted).toList());
   }
 
   @Test
   void reservationsTheMemoryCanMeetStillHoldIt() {
-    // 20 GiB: Σ r × c = 18 ≤ 20, so a workspace beside one running must leave ci's 12 GiB.
+    // 20 GiB: Σ r × c = 18 ≤ 20, so h = r, and a workspace beside one running must leave ci's
+    // 12 GiB: 6 + 12 + 6 = 24 > 20.
     TargetSlots oneWs = wsProofMemory(counts(0, 1, 0), 20 * GIB, SIX_G, lastAtSixG());
-    assertFalse(SlotAllocator.reservationsExceedMemory(oneWs));
+    assertEquals(counts(2, 1, 0), SlotAllocator.honouredReservations(oneWs, SlotType.WORKSPACE));
     assertFalse(SlotAllocator.fits(oneWs, SlotType.WORKSPACE, SIX_G));
-    // The same target at 14 GiB cannot meet them, and the second workspace fits.
+    // The same target at 14 GiB honours ci 2 (A = 14: ⌊14/6⌋ = 2) and workspace 0, so the second
+    // workspace still finds 6 + 12 + 6 = 24 > 14: ci's reservation comes first.
     TargetSlots oneWsAt14 = wsProofAt14(counts(0, 1, 0), SIX_G);
-    assertTrue(SlotAllocator.fits(oneWsAt14, SlotType.WORKSPACE, SIX_G));
+    assertEquals(counts(2, 0, 0), SlotAllocator.honouredReservations(oneWsAt14, SlotType.WORKSPACE));
+    assertFalse(SlotAllocator.fits(oneWsAt14, SlotType.WORKSPACE, SIX_G));
   }
 
   @Test
@@ -688,8 +750,10 @@ class TargetAllocatorTest {
   void aTargetRunningCiHoldsOneSixGLeaseBesideItsBuilder() {
     // 14 GiB, one 6g CI lease occupying it, a 6 GiB builder: 6 + 6 + 6 = 18 > 14 for either type,
     // where without the builder qits-2362's rule took any two.
+    // A = 14 − 6 = 8 honours ci 1 (⌊8/6⌋) and workspace 0; ci's one is in use, so nothing more is
+    // held, and the lease, the builder and the candidate alone overflow.
     TargetSlots oneCi = withBuilder(counts(2, 1, 0), counts(1, 0, 0), 14 * GIB, SIX_G, SIX_G);
-    assertTrue(SlotAllocator.reservationsExceedMemory(oneCi));
+    assertEquals(counts(1, 0, 0), SlotAllocator.honouredReservations(oneCi, SlotType.WORKSPACE));
     for (SlotType type : List.of(SlotType.CI, SlotType.WORKSPACE, SlotType.DESK)) {
       assertTrue(SlotAllocator.slotsFit(oneCi, type), type.name());
       Decision decision =
@@ -742,11 +806,14 @@ class TargetAllocatorTest {
 
   @Test
   void aBuilderThatReportsNoCapIsChargedNothing() {
-    // An older runner reports null: qits-2362's rule as it was — ws-proof holds any two 6g leases.
+    // An older runner reports null: no builder, so A = 14 honours ci 2 and workspace 0
+    // (qits-2515). Beside one 6g CI lease a second CI fits, 6 + 0 + 6 = 12, but a workspace must
+    // leave ci's second reservation: 6 + 1 × 6 + 6 = 18 > 14.
     TargetSlots oneCi = withBuilder(counts(2, 1, 0), counts(1, 0, 0), 14 * GIB, SIX_G, null);
     assertEquals(0, oneCi.memory().builderBytes());
+    assertEquals(counts(2, 0, 0), SlotAllocator.honouredReservations(oneCi, SlotType.WORKSPACE));
     assertTrue(SlotAllocator.fits(oneCi, SlotType.CI, SIX_G));
-    assertTrue(SlotAllocator.fits(oneCi, SlotType.WORKSPACE, SIX_G));
+    assertFalse(SlotAllocator.fits(oneCi, SlotType.WORKSPACE, SIX_G));
     TargetSlots emptyEight = withBuilder(counts(0, 0, 0), counts(0, 0, 0), 8 * GIB, 0, null);
     assertTrue(SlotAllocator.fits(emptyEight, SlotType.CI, SIX_G));
     // And the three-argument memory is the same as a null builder.
