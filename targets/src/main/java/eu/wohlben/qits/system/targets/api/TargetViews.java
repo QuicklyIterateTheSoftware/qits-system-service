@@ -78,6 +78,12 @@ public class TargetViews {
                   "The node's physical memory (/proc/meminfo MemTotal); null when unreadable."
                       + " Placement sizes the node by the smaller of this and memoryMaxBytes")
           Long memoryTotalBytes,
+      @Schema(
+              description =
+                  "The memory cap of the target's shared buildkitd (qits-2503); null from an older"
+                      + " runner. Image builds run there, outside a CI lease's own limit, so"
+                      + " placement charges it on a target that takes CI")
+          Long builderMemoryBytes,
       @Schema(description = "When the runner last reported these") Instant reportedAt) {}
 
   @Schema(name = "Target")
@@ -292,6 +298,7 @@ public class TargetViews {
             target.kernelOomKills,
             target.memoryMaxBytes,
             target.memoryTotalBytes,
+            target.builderMemoryBytes,
             target.memoryReportedAt));
   }
 

@@ -503,7 +503,8 @@ public class TargetRegistry implements TargetPresence {
                 node.nodeOomKills(),
                 node.kernelOomKills(),
                 node.memoryMaxBytes(),
-                node.memoryTotalBytes());
+                node.memoryTotalBytes(),
+                node.builderMemoryBytes());
         if (recorded != null && recorded.killed()) {
           LOG.warnf(
               "Target %s lost %d process(es) to the OOM killer (node %s, kernel %s); projects %s;"

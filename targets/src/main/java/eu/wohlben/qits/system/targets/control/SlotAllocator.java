@@ -57,6 +57,23 @@ import java.util.UUID;
  * some target would take but whose memory none can hold waits with {@code no target has memory for
  * a 6g WORKSPACE lease}.
  *
+ * <p><b>The builder is charged on a target that takes CI</b> (qits-2503). An image build a CI lease
+ * sends to the target's shared buildkitd runs in the builder's cgroup, outside the lease's own
+ * {@code limits.memory}, and the runner caps that builder at {@code BUILDER_CONCURRENT_BUILDS × 6
+ * GiB} and reports the cap as {@code builder_memory_bytes} ({@code B}, 0 when unreported — an older
+ * runner). It is charged once per target, and only when the target takes CI: {@code r[CI] > 0}, or
+ * {@code n[CI] > 0}, or the candidate is a CI lease. A workspace- or desk-only target never starts
+ * the builder and is not charged it. So the memory conjunct is
+ *
+ * <pre>
+ *   C unknown  or  M + Σ_{u ≠ t} max(0, r[u] − n[u]) × c[u] + [takes CI] × B + c ≤ C
+ * </pre>
+ *
+ * The builder stays out of the {@code Σ_u r[u] × c[u] > C} comparison: that asks whether the
+ * reservations alone could ever be honoured in memory, and the builder is no reservation — it is
+ * fixed overhead, charged whether they are honoured or ignored. At 6g a lease and a 6 GiB builder,
+ * ws-proof (14 GiB) holds one CI lease beside the builder, not two.
+ *
  * <p><b>The order.</b> One queue across types, {@code priority desc, requested_at asc} (the lease id
  * breaks a tie, so a pass is deterministic). Each lease is considered on its own: one that cannot be
  * placed does not hold back the ones behind it. A lease pinned to a target — by {@code
@@ -163,21 +180,34 @@ public final class SlotAllocator {
    * A target's memory as this pass sees it (qits-2362). {@code capacityBytes} is null when the
    * target reports none — no memory check at all; {@code committedBytes} the charges of its
    * GRANTED, RUNNING and ENDING leases; {@code lastCharge} the charge of the most recently granted
-   * lease of each type there, 0 for a type never granted.
+   * lease of each type there, 0 for a type never granted; {@code builderBytes} the memory cap of its
+   * shared buildkitd (qits-2503), charged only while the target takes CI, 0 when unreported.
    */
-  public record Memory(Long capacityBytes, long committedBytes, Map<SlotType, Long> lastCharge) {
+  public record Memory(
+      Long capacityBytes, long committedBytes, Map<SlotType, Long> lastCharge, long builderBytes) {
 
     /** No memory reported: the slot rule alone. */
     public static final Memory UNKNOWN = new Memory(null, 0, null);
 
     public Memory {
       committedBytes = Math.max(0, committedBytes);
+      builderBytes = Math.max(0, builderBytes);
       Map<SlotType, Long> charges = new EnumMap<>(SlotType.class);
       for (SlotType type : SlotType.values()) {
         Long value = lastCharge == null ? null : lastCharge.get(type);
         charges.put(type, value == null ? 0L : Math.max(0L, value));
       }
       lastCharge = charges;
+    }
+
+    /** A target whose builder reports no cap (an older runner): nothing charged for it. */
+    public Memory(Long capacityBytes, long committedBytes, Map<SlotType, Long> lastCharge) {
+      this(capacityBytes, committedBytes, lastCharge, 0);
+    }
+
+    /** {@code builder_memory_bytes} as the row holds it: null, from an older runner, is 0. */
+    public static long builderOf(Long reported) {
+      return reported == null ? 0L : Math.max(0L, reported);
     }
 
     /**
@@ -199,7 +229,8 @@ public final class SlotAllocator {
     Memory plus(SlotType type, long chargeBytes) {
       Map<SlotType, Long> next = new EnumMap<>(lastCharge);
       next.put(type, Math.max(0L, chargeBytes));
-      return new Memory(capacityBytes, committedBytes + Math.max(0L, chargeBytes), next);
+      return new Memory(
+          capacityBytes, committedBytes + Math.max(0L, chargeBytes), next, builderBytes);
     }
   }
 
@@ -393,8 +424,9 @@ public final class SlotAllocator {
 
   /**
    * The memory conjunct (qits-2362): {@code C} unknown, or {@code M + Σ_{u≠t} max(0, r[u] − n[u]) ×
-   * c[u] + c ≤ C}, the reserved term dropped when the reservations are ignored, in slots or in
-   * memory ({@link #reservationsExceedMemory}).
+   * c[u] + [takes CI] × B + c ≤ C}, the reserved term dropped when the reservations are ignored, in
+   * slots or in memory ({@link #reservationsExceedMemory}); the builder {@code B} charged when
+   * {@link #takesCi} (qits-2503).
    */
   public static boolean memoryFits(TargetSlots target, SlotType type, long chargeBytes) {
     Memory memory = target.memory();
@@ -402,6 +434,9 @@ public final class SlotAllocator {
       return true;
     }
     long needed = memory.committedBytes() + Math.max(0L, chargeBytes);
+    if (takesCi(target, type)) {
+      needed += memory.builderBytes();
+    }
     if (!reservationsExceedTotal(target.total(), target.reservations())
         && !reservationsExceedMemory(target)) {
       for (SlotType u : SlotType.values()) {
@@ -416,9 +451,24 @@ public final class SlotAllocator {
   }
 
   /**
+   * Whether {@code target}, granted a lease of {@code type}, runs the shared buildkitd and so is
+   * charged its memory (qits-2503): CI is reserved there ({@code r[CI] > 0}), a CI lease occupies it
+   * ({@code n[CI] > 0}: GRANTED, RUNNING or ENDING), or the candidate is CI. The reservation counts
+   * even when ignored in slots or memory: the runner starts the builder for a target that may take
+   * CI, whether or not it runs a CI lease right now.
+   */
+  static boolean takesCi(TargetSlots target, SlotType type) {
+    return type == SlotType.CI
+        || target.reservations().getOrDefault(SlotType.CI, 0) > 0
+        || target.used().getOrDefault(SlotType.CI, 0) > 0;
+  }
+
+  /**
    * {@code Σ_u r[u] × c[u] > C}: what the reservations would hold in memory with every type at zero
    * use is more than the target has, so in memory they are ignored — the memory twin of {@link
-   * #reservationsExceedTotal}. They still hold as slots. False when the capacity is unknown.
+   * #reservationsExceedTotal}. They still hold as slots. False when the capacity is unknown. The
+   * builder (qits-2503) is not in this sum: it is no reservation but fixed overhead, charged
+   * whether the reservations are honoured or ignored.
    */
   public static boolean reservationsExceedMemory(TargetSlots target) {
     Long capacity = target.memory().capacityBytes();

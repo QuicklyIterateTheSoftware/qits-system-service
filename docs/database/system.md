@@ -41,6 +41,7 @@ erDiagram
   %% target: eu.wohlben.qits.system.targets.entity.Target (targets)
   target {
     uuid id PK "not null"
+    long builder_memory_bytes
     jsonb capabilities
     uuid causation_id
     string client_id
