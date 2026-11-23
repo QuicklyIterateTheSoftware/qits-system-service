@@ -189,7 +189,7 @@ leases held for it sets reservations its memory can carry.
 
 The builder is charged on a target that takes CI (qits-2503). An image build a CI lease sends to the
 target's shared buildkitd runs in the builder's cgroup, outside the lease's own `limits.memory`; the
-runner starts that buildkitd under `--memory` = `BUILDER_CONCURRENT_BUILDS × 6 GiB` and reports the cap
+runner starts that buildkitd under `--memory` = `BUILDER_CONCURRENT_BUILDS × 8 GiB` (8 GiB: the 6g heap of qits-projects-service's native build plus room around it) and reports the cap
 in its inventory as `builderMemoryBytes`, stored as `builder_memory_bytes` and shown in the target's
 `memory`. A target takes CI when CI is reserved there (`reservations.ci > 0`), a CI lease occupies it
 (GRANTED, RUNNING or ENDING), or the lease being placed is CI — the same test the `buildkit` health
@@ -202,9 +202,9 @@ to report the cap (null) is charged nothing for it. The builder is not part of t
 and no longer stands in for the builder.
 
 What that costs, counted rather than lost: ws-proof (16 GiB, so 14 GiB of capacity, CI reserved 2)
-holds one 6g lease beside its 6 GiB builder, not two (6 + 6 + 6 > 14); the workstation (29.2 GiB, so
-27.2 GiB of capacity) goes from four concurrent 6g leases to three once it takes CI (4 × 6 + 6 = 30 >
-27.2). That is the builder's memory counted, which those leases' image builds were using all along
+holds one 6g lease beside its 8 GiB builder (6 + 8 = 14), not two; the workstation (31.2 GiB, so
+29.2 GiB of capacity) goes from four concurrent 6g leases to three once it takes CI (4 × 6 + 8 = 32 >
+29.2). That is the builder's memory counted, which those leases' image builds were using all along
 outside their caps — not a regression.
 
     POST   /system/api/targets                       declare one; answers its install line, once

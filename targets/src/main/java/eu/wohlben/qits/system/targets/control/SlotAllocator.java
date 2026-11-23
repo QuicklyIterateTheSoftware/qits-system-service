@@ -59,7 +59,7 @@ import java.util.UUID;
  *
  * <p><b>The builder is charged on a target that takes CI</b> (qits-2503). An image build a CI lease
  * sends to the target's shared buildkitd runs in the builder's cgroup, outside the lease's own
- * {@code limits.memory}, and the runner caps that builder at {@code BUILDER_CONCURRENT_BUILDS × 6
+ * {@code limits.memory}, and the runner caps that builder at {@code BUILDER_CONCURRENT_BUILDS × 8
  * GiB} and reports the cap as {@code builder_memory_bytes} ({@code B}, 0 when unreported — an older
  * runner). It is charged once per target, and only when the target takes CI: {@code r[CI] > 0}, or
  * {@code n[CI] > 0}, or the candidate is a CI lease. A workspace- or desk-only target never starts
@@ -71,7 +71,7 @@ import java.util.UUID;
  *
  * The builder stays out of the {@code Σ_u r[u] × c[u] > C} comparison: that asks whether the
  * reservations alone could ever be honoured in memory, and the builder is no reservation — it is
- * fixed overhead, charged whether they are honoured or ignored. At 6g a lease and a 6 GiB builder,
+ * fixed overhead, charged whether they are honoured or ignored. At 6g a lease and an 8 GiB builder,
  * ws-proof (14 GiB) holds one CI lease beside the builder, not two.
  *
  * <p><b>The order.</b> One queue across types, {@code priority desc, requested_at asc} (the lease id
