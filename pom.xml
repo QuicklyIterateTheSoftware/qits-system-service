@@ -167,6 +167,7 @@
         <qits.workspaces-service-pacts-qits-system-service.version>2026.1115.230904</qits.workspaces-service-pacts-qits-system-service.version>
         <qits.bootstrap-cli-pacts-qits-system-service.version>2026.1023.225504</qits.bootstrap-cli-pacts-qits-system-service.version>
         <qits.network-access-service-pacts-qits-system-service.version>2026.1110.181120</qits.network-access-service-pacts-qits-system-service.version>
+        <qits.agents-service-pacts-qits-system-service.version>2026.1124.133343</qits.agents-service-pacts-qits-system-service.version>
 
         <compiler-plugin.version>3.15.0</compiler-plugin.version>
         <surefire-plugin.version>3.5.4</surefire-plugin.version>
@@ -394,6 +395,13 @@
                 <groupId>${project.groupId}</groupId>
                 <artifactId>qits-network-access-service-pacts-qits-system-service</artifactId>
                 <version>${qits.network-access-service-pacts-qits-system-service.version}</version>
+            </dependency>
+            <dependency>
+                <!-- Test scope at every declaration site: a consumer's pact, verified by
+                     ConsumerPactVerificationTest. -->
+                <groupId>${project.groupId}</groupId>
+                <artifactId>qits-agents-service-pacts-qits-system-service</artifactId>
+                <version>${qits.agents-service-pacts-qits-system-service.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
