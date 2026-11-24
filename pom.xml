@@ -117,7 +117,7 @@
              to. One version for both: they are released together from qits-runner-javalib. -->
         <qits.eventstream.version>2026.1120.94334</qits.eventstream.version>
         <qits.db-core.version>2026.1107.191249</qits.db-core.version>
-        <qits.runner.version>2026.1123.151210</qits.runner.version>
+        <qits.runner.version>2026.1124.4122</qits.runner.version>
         <!-- The qits-system-runner's own frames (qits-1481): SystemRunnerProtocol, SystemRunnerCodec
              and SystemRunnerBinary, whose VERSION is the runner image every target is pinned to.
              Published by qits-system-runner-daemon. -->
@@ -153,7 +153,7 @@
              shared golden-master reader from qits-integrations-quarkus, and the recorded answers of
              the one provider this service calls, qits-idp (OIDC discovery and JWKS). Exact pins. -->
         <qits.pact-consumer.version>2026.1106.507</qits.pact-consumer.version>
-        <qits.idp-golden-masters.version>2026.1122.143700</qits.idp-golden-masters.version>
+        <qits.idp-golden-masters.version>2026.1123.194348</qits.idp-golden-masters.version>
         <!-- The provider half: each consumer's pact, published as a jar holding
              `pacts/<consumer>_qits-system-service.json` and verified by
              contracts/ConsumerPactVerificationTest. qits-landing-app is the first (its target
