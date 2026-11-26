@@ -162,7 +162,7 @@ public class TargetAllocation {
     Map<UUID, Map<SlotType, Integer>> used = Targets.usedInTransaction();
     Map<UUID, Long> committed = committedInTransaction();
     Map<UUID, Map<SlotType, Long>> lastCharges = lastChargesInTransaction();
-    long reserve = nodeMemoryReserve(config);
+    long reserve = nodeMemoryReserve();
     List<TargetSlots> slots = new ArrayList<>();
     Map<UUID, Target> byId = new HashMap<>();
     for (Target target : rows) {
@@ -254,6 +254,11 @@ public class TargetAllocation {
    * reading of the key: placement and the patch door's memory check ({@link Targets#patch}) both
    * take it from here.
    */
+  long nodeMemoryReserve() {
+    return nodeMemoryReserve(config);
+  }
+
+  /** {@link #nodeMemoryReserve()} for a caller holding only the config ({@link Targets#patch}). */
   static long nodeMemoryReserve(TargetsConfig config) {
     var parsed = DockerSizes.parse(config.nodeMemoryReserve());
     if (parsed.isEmpty()) {
