@@ -7,6 +7,7 @@ import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -618,6 +619,129 @@ public final class SlotAllocator {
       available = Math.max(0L, available - h * price);
     }
     return honoured;
+  }
+
+  /**
+   * Why {@code target}'s slot settings can never be met by its memory (qits-2581), or null when they
+   * can: the sentence the patch door answers 400 {@code SLOTS_EXCEED_MEMORY} with. The figures are
+   * placement's own, on the target with nothing used: {@code C}, {@code B} and {@code c[u]} from
+   * {@link TargetSlots#memory()}.
+   *
+   * <ul>
+   *   <li>{@code C} unknown: null — a target that reports no memory is held to its slots alone.
+   *   <li>A maximum {@code m[t]} that can never be reached even alone: with {@code c[t] > 0}, {@code
+   *       m[t] > ⌊(C − [t = CI or r[CI] > 0] × B) / c[t]⌋}. An unset maximum is not checked.
+   *   <li>Reservations that cannot all be honoured at once: {@code h[u] < r[u]} for some {@code u},
+   *       {@code h} as {@link #honouredReservations} computes it on the empty target, the builder
+   *       charged iff {@code r[CI] > 0}. Skipped when {@code Σ r > T}, which the slots already ignore.
+   * </ul>
+   *
+   * A type never granted there ({@code c[u] = 0}) is priced at nothing, as placement prices it, so it
+   * is never checked.
+   */
+  public static String settingsRefusal(TargetSlots target) {
+    Memory memory = target.memory();
+    Long capacity = memory.capacityBytes();
+    if (capacity == null) {
+      return null;
+    }
+    boolean reservesCi = target.reservations().getOrDefault(SlotType.CI, 0) > 0;
+    for (SlotType type : SlotType.values()) {
+      Integer maximum = target.maximums().get(type);
+      long price = memory.lastCharge().getOrDefault(type, 0L);
+      if (maximum == null || price == 0) {
+        continue;
+      }
+      boolean builder = (type == SlotType.CI || reservesCi) && memory.builderBytes() > 0;
+      long available = Math.max(0L, capacity - (builder ? memory.builderBytes() : 0L));
+      long limit = available / price;
+      if (maximum > limit) {
+        return "target "
+            + target.name()
+            + " holds at most "
+            + limit
+            + " "
+            + type.name()
+            + " lease(s) of "
+            + gib(price)
+            + " "
+            + capacityOf(capacity, builder ? memory.builderBytes() : 0L)
+            + ", not "
+            + maximum;
+      }
+    }
+    if (reservationsExceedTotal(target.total(), target.reservations())) {
+      return null;
+    }
+    TargetSlots empty =
+        new TargetSlots(
+            target.id(),
+            target.name(),
+            target.total(),
+            target.reservations(),
+            target.maximums(),
+            null,
+            true,
+            false,
+            true,
+            memory);
+    Map<SlotType, Integer> honoured =
+        honouredReservations(empty, reservesCi ? SlotType.CI : SlotType.WORKSPACE);
+    List<SlotType> counted = new ArrayList<>();
+    boolean shortfall = false;
+    for (SlotType u : SlotType.values()) {
+      if (target.reservations().getOrDefault(u, 0) > 0
+          && memory.lastCharge().getOrDefault(u, 0L) > 0) {
+        counted.add(u);
+        shortfall |= honoured.get(u) < target.reservations().get(u);
+      }
+    }
+    if (!shortfall) {
+      return null;
+    }
+    boolean onePrice =
+        counted.stream().map(u -> memory.lastCharge().get(u)).distinct().count() == 1;
+    List<String> can = new ArrayList<>();
+    List<String> asked = new ArrayList<>();
+    for (SlotType u : counted) {
+      String each = onePrice ? "" : " of " + gib(memory.lastCharge().get(u));
+      can.add(honoured.get(u) + " " + u.name() + each);
+      asked.add(target.reservations().get(u) + " " + u.name());
+    }
+    boolean builder = reservesCi && memory.builderBytes() > 0;
+    return "target "
+        + target.name()
+        + " can honour at most "
+        + joined(can)
+        + " reserved lease(s)"
+        + (onePrice ? " of " + gib(memory.lastCharge().get(counted.get(0))) : "")
+        + " "
+        + capacityOf(capacity, builder ? memory.builderBytes() : 0L)
+        + ", not "
+        + joined(asked);
+  }
+
+  private static final double GIB = 1024d * 1024 * 1024;
+
+  /** {@code 29.2 GiB}: one decimal, a trailing {@code .0} dropped. */
+  static String gib(long bytes) {
+    String text = String.format(Locale.ROOT, "%.1f", bytes / GIB);
+    return (text.endsWith(".0") ? text.substring(0, text.length() - 2) : text) + " GiB";
+  }
+
+  /** {@code (29.2 GiB less the 8 GiB builder)}, or {@code (29.2 GiB)} with no builder charged. */
+  private static String capacityOf(long capacity, long builder) {
+    return builder > 0
+        ? "(" + gib(capacity) + " less the " + gib(builder) + " builder)"
+        : "(" + gib(capacity) + ")";
+  }
+
+  /** {@code a}, {@code a and b}, {@code a, b and c}. */
+  private static String joined(List<String> parts) {
+    if (parts.size() <= 1) {
+      return String.join("", parts);
+    }
+    return String.join(", ", parts.subList(0, parts.size() - 1)) + " and " + parts.get(parts.size() - 1);
   }
 
   /**

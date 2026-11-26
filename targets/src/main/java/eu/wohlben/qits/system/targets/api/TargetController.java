@@ -314,7 +314,10 @@ public class TargetController {
   @APIResponse(responseCode = "200", description = "The target as it now is")
   @APIResponse(
       responseCode = "400",
-      description = "A malformed description, reservation or maximum")
+      description =
+          "A malformed description, reservation or maximum; SLOTS_EXCEED_MEMORY: the target's"
+              + " reported memory can never hold the maximum or the reservations, and the message"
+              + " names the limit")
   @APIResponse(responseCode = "404", description = "No such target")
   @APIResponse(
       responseCode = "409",

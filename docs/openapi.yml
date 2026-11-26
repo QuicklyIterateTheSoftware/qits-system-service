@@ -2085,7 +2085,9 @@ paths:
               schema:
                 $ref: "#/components/schemas/Target"
         "400":
-          description: "A malformed description, reservation or maximum"
+          description: "A malformed description, reservation or maximum; SLOTS_EXCEED_MEMORY:\
+            \ the target's reported memory can never hold the maximum or the reservations,\
+            \ and the message names the limit"
         "404":
           description: No such target
         "409":
