@@ -29,16 +29,34 @@
           "site" : "TargetDockerController.exec(String, String, ExecRequest)"
         },
         {
+          "type" : "eu.wohlben.qits.system.targets.api.TargetViews$CapacityDto",
+          "kind" : "via",
+          "via" : "eu.wohlben.qits.system.targets.control.TargetAllocation$Capacity",
+          "site" : "TargetController.capacity(String)"
+        },
+        {
           "type" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
           "kind" : "mapper",
           "via" : null,
           "site" : "TargetViews.view(Lease)"
         },
         {
+          "type" : "eu.wohlben.qits.system.targets.api.TargetViews$TargetCapacityDto",
+          "kind" : "via",
+          "via" : "eu.wohlben.qits.system.targets.control.TargetAllocation$Capacity",
+          "site" : "TargetController.capacity(String)"
+        },
+        {
           "type" : "eu.wohlben.qits.system.targets.control.Leases$NewLease",
           "kind" : "assembler",
           "via" : null,
           "site" : "LeaseController.create(CreateLeaseRequest)"
+        },
+        {
+          "type" : "eu.wohlben.qits.system.targets.control.TargetAllocation$Capacity",
+          "kind" : "assembler",
+          "via" : null,
+          "site" : "TargetAllocation.capacity(SlotType)"
         },
         {
           "type" : "eu.wohlben.qits.system.targets.runner.TargetDocker$Outcome",
@@ -77,6 +95,14 @@
           "method" : "GET",
           "path" : "/leases/{id}",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
+          "kind" : "returns",
+          "cardinality" : "single"
+        },
+        {
+          "operationId" : "getTargetCapacity",
+          "method" : "GET",
+          "path" : "/targets/capacity",
+          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$CapacityDto",
           "kind" : "returns",
           "cardinality" : "single"
         },
@@ -177,6 +203,12 @@
           "site" : "TargetDockerController.exec(String, String, ExecRequest)"
         },
         {
+          "type" : "eu.wohlben.qits.system.targets.api.TargetViews$CapacityDto",
+          "kind" : "via",
+          "via" : "eu.wohlben.qits.system.targets.control.TargetAllocation$Capacity",
+          "site" : "TargetController.capacity(String)"
+        },
+        {
           "type" : "eu.wohlben.qits.system.targets.api.TargetViews$HealthCheckRequested",
           "kind" : "assembler",
           "via" : null,
@@ -225,6 +257,12 @@
           "site" : "PatchTargetRequest.reservations()"
         },
         {
+          "type" : "eu.wohlben.qits.system.targets.api.TargetViews$TargetCapacityDto",
+          "kind" : "via",
+          "via" : "eu.wohlben.qits.system.targets.control.TargetAllocation$Capacity",
+          "site" : "TargetController.capacity(String)"
+        },
+        {
           "type" : "eu.wohlben.qits.system.targets.api.TargetViews$TargetDto",
           "kind" : "mapper",
           "via" : null,
@@ -241,6 +279,12 @@
           "kind" : "via",
           "via" : "eu.wohlben.qits.system.targets.api.TargetViews$LeaseDto",
           "site" : "LeaseController.create(CreateLeaseRequest)"
+        },
+        {
+          "type" : "eu.wohlben.qits.system.targets.control.TargetAllocation$Capacity",
+          "kind" : "assembler",
+          "via" : null,
+          "site" : "TargetAllocation.capacity(SlotType)"
         },
         {
           "type" : "eu.wohlben.qits.system.targets.runner.TargetDocker$Outcome",
@@ -323,6 +367,14 @@
           "method" : "GET",
           "path" : "/targets/{id}",
           "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$Login",
+          "kind" : "returns",
+          "cardinality" : "single"
+        },
+        {
+          "operationId" : "getTargetCapacity",
+          "method" : "GET",
+          "path" : "/targets/capacity",
+          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$CapacityDto",
           "kind" : "returns",
           "cardinality" : "single"
         },
@@ -525,13 +577,39 @@
       "knownGap" : null,
       "dtos" : [
         {
+          "type" : "eu.wohlben.qits.system.targets.api.TargetViews$CapacityDto",
+          "kind" : "via",
+          "via" : "eu.wohlben.qits.system.targets.control.TargetAllocation$Capacity",
+          "site" : "TargetController.capacity(String)"
+        },
+        {
+          "type" : "eu.wohlben.qits.system.targets.api.TargetViews$TargetCapacityDto",
+          "kind" : "via",
+          "via" : "eu.wohlben.qits.system.targets.control.TargetAllocation$Capacity",
+          "site" : "TargetController.capacity(String)"
+        },
+        {
           "type" : "eu.wohlben.qits.system.targets.api.TargetViews$WorkVolumeDto",
           "kind" : "assembler",
           "via" : null,
           "site" : "WorkVolumeController.purge(String)"
+        },
+        {
+          "type" : "eu.wohlben.qits.system.targets.control.TargetAllocation$Capacity",
+          "kind" : "assembler",
+          "via" : null,
+          "site" : "TargetAllocation.capacity(SlotType)"
         }
       ],
       "operations" : [
+        {
+          "operationId" : "getTargetCapacity",
+          "method" : "GET",
+          "path" : "/targets/capacity",
+          "dto" : "eu.wohlben.qits.system.targets.api.TargetViews$CapacityDto",
+          "kind" : "returns",
+          "cardinality" : "single"
+        },
         {
           "operationId" : "purgeWorkVolume",
           "method" : "DELETE",
