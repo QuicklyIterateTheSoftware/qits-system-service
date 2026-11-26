@@ -166,10 +166,11 @@ public class TargetAllocation {
     Map<UUID, Map<SlotType, Integer>> used = Targets.usedInTransaction();
     Map<UUID, Long> committed = committedInTransaction();
     Map<UUID, Map<SlotType, Long>> lastCharges = lastChargesInTransaction();
-    Map<UUID, Integer> building = buildingInTransaction();
     long reserve = nodeMemoryReserve();
     List<TargetSlots> slots = new ArrayList<>();
     Map<UUID, Target> byId = new HashMap<>();
+    // qits-2568: each target's occupying leases that build, counted against its builder's width.
+    Map<UUID, Integer> building = buildingInTransaction();
     for (Target target : rows) {
       byId.put(target.id, target);
       slots.add(
