@@ -949,6 +949,49 @@ components:
           type: string
         detail:
           type: string
+    TargetCapacity:
+      type: object
+      properties:
+        slotType:
+          $ref: "#/components/schemas/SlotType"
+        held:
+          type: integer
+          format: int32
+          description: "Its GRANTED, RUNNING and ENDING leases on every target"
+        queued:
+          type: integer
+          format: int32
+          description: Its QUEUED leases
+        grantable:
+          type: integer
+          format: int32
+          description: "How many more the targets would grant now, once the queue\
+            \ is placed: the sum of targets[].grantable"
+        targets:
+          type: array
+          items:
+            $ref: "#/components/schemas/TargetCapacityEntry"
+          description: "One per target, by name"
+    TargetCapacityEntry:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/UUID"
+        name:
+          type: string
+        held:
+          type: integer
+          format: int32
+          description: "Its GRANTED, RUNNING and ENDING leases of the type"
+        grantable:
+          type: integer
+          format: int32
+          description: How many more of the type it would grant now
+        detail:
+          type: string
+          description: "Why it grants no more: the allocator's refusal, as a queued\
+            \ lease's detail reads, such as 'target ws-proof runs its maximum of 3\
+            \ WORKSPACE lease(s)'"
     TargetHealthCheckRequested:
       type: object
       properties:
@@ -2007,6 +2050,38 @@ paths:
         - qits:desk-admin
         - qits:desk
         - qits:system
+  /system/api/targets/capacity:
+    get:
+      summary: How many more leases of a slot type the targets can grant now
+      operationId: getTargetCapacity
+      parameters:
+      - name: slotType
+        in: query
+        schema:
+          type: string
+      responses:
+        "200":
+          description: "The held, queued and grantable counts, per target"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TargetCapacity"
+        "400":
+          description: "No slotType, or an unknown one"
+        "401":
+          description: Not Authorized
+        "403":
+          description: Not Allowed
+      tags:
+      - Target Controller
+      security:
+      - SecurityScheme:
+        - qits:system
+        - qits:admin
+        - qits:admin-agent
+        - qits:desk-admin
+        - qits:desk
+        - qits:agent
   /system/api/targets/install.sh:
     get:
       summary: The generic install script the install line pipes to sh
@@ -3057,4 +3132,4 @@ paths:
         - qits:system
 info:
   title: qits-platform-system API
-  version: 2026.1125.220841
+  version: 2026.1126.200147

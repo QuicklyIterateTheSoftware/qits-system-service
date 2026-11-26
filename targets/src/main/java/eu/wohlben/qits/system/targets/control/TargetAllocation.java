@@ -163,36 +163,10 @@ public class TargetAllocation {
       return new Outcome(List.of(), List.of(), Set.of());
     }
     List<Target> rows = Target.<Target>listAll();
-    Map<UUID, Map<SlotType, Integer>> used = Targets.usedInTransaction();
-    Map<UUID, Long> committed = committedInTransaction();
-    Map<UUID, Map<SlotType, Long>> lastCharges = lastChargesInTransaction();
-    long reserve = nodeMemoryReserve();
-    List<TargetSlots> slots = new ArrayList<>();
+    List<TargetSlots> slots = slotsInTransaction(rows);
     Map<UUID, Target> byId = new HashMap<>();
-    // qits-2568: each target's occupying leases that build, counted against its builder's width.
-    Map<UUID, Integer> building = buildingInTransaction();
     for (Target target : rows) {
       byId.put(target.id, target);
-      slots.add(
-          new TargetSlots(
-              target.id,
-              target.name,
-              target.slotsTotal,
-              target.reservations(),
-              target.maximums(),
-              used.getOrDefault(target.id, Map.of()),
-              presence.connected(target.id),
-              target.quarantined(),
-              target.signedIn(),
-              new Memory(
-                  Memory.capacity(
-                      reserve, target.memoryMaxBytes, target.memoryTotalBytes),
-                  committed.getOrDefault(target.id, 0L),
-                  lastCharges.get(target.id),
-                  Memory.builderOf(target.builderMemoryBytes)))
-              .withBuilder(
-                  new SlotAllocator.Builder(
-                      target.builderConcurrentBuilds, building.getOrDefault(target.id, 0))));
     }
     Map<UUID, Lease> leases = new HashMap<>();
     Map<UUID, WorkVolume> volumes = new HashMap<>();
@@ -214,16 +188,7 @@ public class TargetAllocation {
           pinned = volume.targetId;
         }
       }
-      requests.add(
-          new Request(
-              lease.id,
-              lease.slotType,
-              lease.priority,
-              lease.requestedAt,
-              pinned,
-              DockerSizes.charge(lease.spec),
-              lease.avoidTargetId,
-              lease.builds));
+      requests.add(requestOf(lease, pinned));
     }
     List<Decision> decisions = SlotAllocator.allocate(slots, requests);
     Set<UUID> granted = new LinkedHashSet<>();
@@ -257,6 +222,132 @@ public class TargetAllocation {
       granted.add(target.id);
     }
     return new Outcome(decisions, changed, granted);
+  }
+
+  /**
+   * Every target as {@link SlotAllocator} sees it now, inside the caller's transaction: its slots,
+   * maximums and used counts, its connection, quarantine and sign-in, its {@link Memory} and its
+   * {@link SlotAllocator.Builder}. The one reading of the rows a pass ({@link #pass}) and the
+   * capacity read ({@link #capacity}, qits-2573) both place against.
+   */
+  List<TargetSlots> slotsInTransaction(List<Target> rows) {
+    Map<UUID, Map<SlotType, Integer>> used = Targets.usedInTransaction();
+    Map<UUID, Long> committed = committedInTransaction();
+    Map<UUID, Map<SlotType, Long>> lastCharges = lastChargesInTransaction();
+    long reserve = nodeMemoryReserve();
+    // qits-2568: each target's occupying leases that build, counted against its builder's width.
+    Map<UUID, Integer> building = buildingInTransaction();
+    List<TargetSlots> slots = new ArrayList<>();
+    for (Target target : rows) {
+      slots.add(
+          new TargetSlots(
+                  target.id,
+                  target.name,
+                  target.slotsTotal,
+                  target.reservations(),
+                  target.maximums(),
+                  used.getOrDefault(target.id, Map.of()),
+                  presence.connected(target.id),
+                  target.quarantined(),
+                  target.signedIn(),
+                  new Memory(
+                      Memory.capacity(reserve, target.memoryMaxBytes, target.memoryTotalBytes),
+                      committed.getOrDefault(target.id, 0L),
+                      lastCharges.get(target.id),
+                      Memory.builderOf(target.builderMemoryBytes)))
+              .withBuilder(
+                  new SlotAllocator.Builder(
+                      target.builderConcurrentBuilds, building.getOrDefault(target.id, 0))));
+    }
+    return slots;
+  }
+
+  /** A queued lease as {@link SlotAllocator} places it, pinned to {@code pinned} (or nothing). */
+  static Request requestOf(Lease lease, UUID pinned) {
+    return new Request(
+        lease.id,
+        lease.slotType,
+        lease.priority,
+        lease.requestedAt,
+        pinned,
+        DockerSizes.charge(lease.spec),
+        lease.avoidTargetId,
+        lease.builds);
+  }
+
+  /**
+   * What the targets could still grant of {@code type} now (qits-2573), and how many leases of it
+   * wait: {@link SlotAllocator#grantable} over the rows a pass reads, with the queue as a pass would
+   * place it, priced as {@link SlotAllocator#grantable} says ({@link #newestChargeInTransaction}) — a lease pinned by its work volume on that volume's target, one whose volume is being
+   * purged left out. A read: no lock, no write, no event, so it never holds a pass.
+   */
+  public Capacity capacity(SlotType type) {
+    return QuarkusTransaction.requiringNew()
+        .call(
+            () -> {
+              List<Target> rows = Target.<Target>list("order by name");
+              List<TargetSlots> slots = slotsInTransaction(rows);
+              List<Request> requests = new ArrayList<>();
+              int queued = 0;
+              for (Lease lease : Lease.<Lease>list("state = ?1 order by id", LeaseState.QUEUED)) {
+                if (lease.slotType == type) {
+                  queued++;
+                }
+                UUID pinned = lease.pinTargetId;
+                if (lease.workKey != null) {
+                  WorkVolume volume =
+                      WorkVolume.findById(new WorkVolume.Key(lease.ownerApp, lease.workKey));
+                  if (volume != null) {
+                    if (volume.purgeRequestedAt != null) {
+                      continue;
+                    }
+                    pinned = volume.targetId;
+                  }
+                }
+                requests.add(requestOf(lease, pinned));
+              }
+              return new Capacity(
+                  type,
+                  queued,
+                  SlotAllocator.grantable(slots, requests, type, newestChargeInTransaction(type)));
+            });
+  }
+
+  /**
+   * The charge of the newest lease of {@code type} granted on any target (0 if none): what {@link
+   * #capacity} prices a new lease at on a target that never ran that type (qits-2573). Of two
+   * granted in the same instant the larger id wins, as {@link #lastChargesInTransaction} keeps it.
+   */
+  static long newestChargeInTransaction(SlotType type) {
+    List<?> rows =
+        Lease.getEntityManager()
+            .createNativeQuery(
+                "select spec -> 'limits' ->> 'memory' from lease"
+                    + " where slot_type = ?1 and target_id is not null and granted_at is not null"
+                    + " order by granted_at desc, id desc limit 1")
+            .setParameter(1, type.name())
+            .getResultList();
+    if (rows.isEmpty()) {
+      return 0L;
+    }
+    return DockerSizes.parse((String) rows.get(0)).orElse(0);
+  }
+
+  /**
+   * {@link #capacity}'s answer: {@code queued}, the leases of {@code type} that wait; {@code
+   * targets}, each target's {@link SlotAllocator.Grantable}, by name.
+   */
+  public record Capacity(SlotType type, int queued, List<SlotAllocator.Grantable> targets) {
+
+    /** The leases of {@code type} the targets hold now. */
+    public int held() {
+      return targets.stream().mapToInt(SlotAllocator.Grantable::held).sum();
+    }
+
+    /** How many more the targets can grant now, summed. */
+    public int grantable() {
+      return targets.stream().mapToInt(SlotAllocator.Grantable::grantable).sum();
+    }
   }
 
   /**

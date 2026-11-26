@@ -1,0 +1,15 @@
+{
+  "slotType": "WORKSPACE",
+  "held": 1,
+  "queued": 0,
+  "grantable": 2,
+  "targets": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "name": "lab",
+      "held": 1,
+      "grantable": 2,
+      "detail": "target lab has no free WORKSPACE slot"
+    }
+  ]
+}

@@ -389,10 +389,20 @@ public final class SlotAllocator {
    * One pass over {@code queue}, in {@link #QUEUE_ORDER}: a decision per request, in that order.
    */
   public static List<Decision> allocate(List<TargetSlots> targets, List<Request> queue) {
+    return place(stateOf(targets), queue);
+  }
+
+  /** The targets by id, in their order: the state a pass grants into. */
+  private static Map<UUID, TargetSlots> stateOf(List<TargetSlots> targets) {
     Map<UUID, TargetSlots> state = new LinkedHashMap<>();
     for (TargetSlots target : targets) {
       state.put(target.id(), target);
     }
+    return state;
+  }
+
+  /** {@link #allocate}'s pass over {@code state}, which each grant updates in place. */
+  private static List<Decision> place(Map<UUID, TargetSlots> state, List<Request> queue) {
     List<Request> ordered = new ArrayList<>(queue);
     ordered.sort(QUEUE_ORDER);
     List<Decision> decisions = new ArrayList<>();
@@ -406,6 +416,63 @@ public final class SlotAllocator {
       decisions.add(decision);
     }
     return decisions;
+  }
+
+  /**
+   * What one target could still grant of a type (qits-2573): {@code held}, its GRANTED, RUNNING and
+   * ENDING leases of that type now; {@code grantable}, how many more the rule would grant there
+   * once the queue is placed; {@code detail}, the refusal that stopped the count, null while it
+   * stopped at nothing (never: the slot rule always ends it).
+   */
+  public record Grantable(UUID targetId, String name, int held, int grantable, String detail) {}
+
+  /**
+   * <b>How many more leases of {@code type} the targets can grant right now</b> (qits-2573), by
+   * this rule and no other. The real {@code queue} is placed first, exactly as a pass would place
+   * it ({@link #allocate}), so a lease already waiting takes its place before any new one. Then, on
+   * that state, each target is given one more lease of {@code type} at a time while {@link
+   * #refusal} answers nothing — the slots, the maximum, the memory with its builder and honoured
+   * reservations, connection, quarantine and sign-in — each counted at once ({@link
+   * TargetSlots#plus}). A new lease is unpinned, avoids nothing and builds nothing.
+   *
+   * <p>Each one is charged {@code type}'s last charge on that target ({@link Memory#lastCharge}),
+   * else {@code fallbackCharge}: the estate's newest charge of {@code type} (a target that never ran
+   * one is priced like the last one granted anywhere), else 0. The targets are counted
+   * independently, so the sum is what a burst of new leases could take.
+   *
+   * @return one entry per target, in {@code targets}' order
+   */
+  public static List<Grantable> grantable(
+      List<TargetSlots> targets, List<Request> queue, SlotType type, long fallbackCharge) {
+    Map<UUID, TargetSlots> state = stateOf(targets);
+    place(state, queue);
+    long fallback = Math.max(0, fallbackCharge);
+    List<Grantable> out = new ArrayList<>();
+    for (TargetSlots before : targets) {
+      TargetSlots target = state.get(before.id());
+      long last = target.memory().lastCharge().getOrDefault(type, 0L);
+      long charge = last > 0 ? last : fallback;
+      TargetSlots next = target;
+      int count = 0;
+      String stoppedBy = null;
+      // The slot rule refuses once n_total reaches T; the bound only guards a total gone negative.
+      for (int guard = Math.max(0, target.total()); guard >= 0; guard--) {
+        stoppedBy = refusal(next, type, charge, false);
+        if (stoppedBy != null) {
+          break;
+        }
+        next = next.plus(type, charge);
+        count++;
+      }
+      out.add(
+          new Grantable(
+              target.id(),
+              target.name(),
+              before.used().getOrDefault(type, 0),
+              count,
+              stoppedBy));
+    }
+    return out;
   }
 
   private static Decision decide(Map<UUID, TargetSlots> state, Request request) {

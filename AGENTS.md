@@ -99,6 +99,17 @@ workspace (0 + 6 + 8 + 6 = 20 > 14), whichever is queued first; at 32 GiB it hon
 concurrent 6g leases, not four, once it takes CI. Change it in
 `TargetAllocatorTest` first: the dossier's worked example is the first table there.
 
+**What the targets could still grant is the same rule, asked, not a second copy** (qits-2573).
+`GET /system/api/targets/capacity?slotType=<type>` (the read roles of `GET /targets` and `qits:desk`) answers
+`{slotType, held, queued, grantable, targets[{id, name, held, grantable, detail}]}`:
+`TargetAllocation.capacity` reads the rows a pass reads (`slotsInTransaction`, the queue as a pass
+pins it, a purging volume's lease left out) with no lock and no write, and `SlotAllocator.grantable`
+places the real queue first (`allocate`'s own pass), then adds one more lease of the type per target
+while `refusal` answers nothing, each charged the type's last charge there, else the estate's newest
+charge of the type (`newestChargeInTransaction`), else 0. `detail` is the refusal that stopped the count. qits-projects
+reads it for its delivery desk's slots: a desk's capacity is `grantable` WORKSPACE leases, never a
+configured number. Change the rule and this follows; `TargetGrantableTest` is its table.
+
 **`login` and `slots` are reported, never a quarantine** (`TargetHealth.REPORT_ONLY`). They fail
 the recorded health and its detail; quarantine and reinstatement decide on every other check. A
 signed-out target keeps running CI — the allocator's sign-in gate holds only its WORKSPACE, DESK and

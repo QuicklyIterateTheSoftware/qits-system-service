@@ -277,6 +277,37 @@ public class TargetViews {
           String image,
       @Schema(description = "When the newest release moved it here") Instant updatedAt) {}
 
+  /**
+   * How many leases of one slot type the targets can still grant (qits-2573): {@code GET
+   * /system/api/targets/capacity}. The allocator's own rule, run over the queue as a pass would.
+   */
+  @Schema(name = "TargetCapacity")
+  public record CapacityDto(
+      SlotType slotType,
+      @Schema(description = "Its GRANTED, RUNNING and ENDING leases on every target") int held,
+      @Schema(description = "Its QUEUED leases") int queued,
+      @Schema(
+              description =
+                  "How many more the targets would grant now, once the queue is placed: the sum of"
+                      + " targets[].grantable")
+          int grantable,
+      @Schema(description = "One per target, by name") List<TargetCapacityDto> targets) {}
+
+  /** One target's part of {@link CapacityDto}. */
+  @Schema(name = "TargetCapacityEntry")
+  @JsonInclude(JsonInclude.Include.ALWAYS)
+  public record TargetCapacityDto(
+      UUID id,
+      String name,
+      @Schema(description = "Its GRANTED, RUNNING and ENDING leases of the type") int held,
+      @Schema(description = "How many more of the type it would grant now") int grantable,
+      @Schema(
+              description =
+                  "Why it grants no more: the allocator's refusal, as a queued lease's detail"
+                      + " reads, such as 'target ws-proof runs its maximum of 3 WORKSPACE"
+                      + " lease(s)'")
+          String detail) {}
+
   // --- mapping ----------------------------------------------------------------------------------
 
   public TargetDto view(Target target, Map<SlotType, Integer> used) {

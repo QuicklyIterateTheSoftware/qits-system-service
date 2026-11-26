@@ -425,6 +425,15 @@ class GoldenMasterRecordingTest {
               200,
               null,
               Map.of()),
+          // qits-2573: what the targets can still grant, qits-projects' delivery-desk slots.
+          call(
+              ProviderStates.A_CONNECTED_TARGET_WITH_LEASES,
+              "getTargetCapacity",
+              "GET",
+              API + "/targets/capacity?slotType=WORKSPACE",
+              200,
+              null,
+              Map.of()),
           call(ProviderStates.A_DECLARED_TARGET, "getTarget", "GET", TARGET, 200, null, Map.of()),
           call(
               ProviderStates.A_DECLARED_TARGET,

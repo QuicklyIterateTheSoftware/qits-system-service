@@ -29,6 +29,7 @@ import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.EnumMap;
@@ -66,6 +67,8 @@ import org.jboss.logging.Logger;
       TargetViews.HealthCheckRequested.class,
       TargetViews.SignInView.class,
       TargetViews.WarmImageDto.class,
+      TargetViews.CapacityDto.class,
+      TargetViews.TargetCapacityDto.class,
       TargetController.StartSignInRequest.class,
       TargetController.SignInCodeRequest.class,
       TargetController.CreateTargetRequest.class,
@@ -279,6 +282,39 @@ public class TargetController {
       description = "One per slot type a slot image was released for, in slot type order; empty when none")
   public List<TargetViews.WarmImageDto> warmImages() {
     return warmImages.rows().stream().map(TargetViews::view).toList();
+  }
+
+  /**
+   * How many leases of {@code slotType} the targets can still grant now (qits-2573): the
+   * allocator's own rule ({@code SlotAllocator.grantable}), with the queue placed first. qits-projects
+   * reads it for its delivery desk's slots.
+   */
+  @GET
+  @Path("/capacity")
+  @RolesAllowed({SYSTEM, ADMIN, ADMIN_AGENT, DESK_ADMIN, DESK, AGENT})
+  @Operation(
+      operationId = "getTargetCapacity",
+      summary = "How many more leases of a slot type the targets can grant now")
+  @APIResponse(responseCode = "200", description = "The held, queued and grantable counts, per target")
+  @APIResponse(responseCode = "400", description = "No slotType, or an unknown one")
+  public TargetViews.CapacityDto capacity(@QueryParam("slotType") String slotType) {
+    SlotType type = SlotType.parse(slotType);
+    if (type == null) {
+      throw TargetRefusal.badRequest(
+          "slotType is one of ci, workspace, desk or agent, not " + slotType);
+    }
+    TargetAllocation.Capacity capacity = allocation.capacity(type);
+    return new TargetViews.CapacityDto(
+        type,
+        capacity.held(),
+        capacity.queued(),
+        capacity.grantable(),
+        capacity.targets().stream()
+            .map(
+                t ->
+                    new TargetViews.TargetCapacityDto(
+                        t.targetId(), t.name(), t.held(), t.grantable(), t.detail()))
+            .toList());
   }
 
   @GET

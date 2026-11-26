@@ -321,6 +321,24 @@
       "dependsOn": [],
       "operations": [
         {
+          "operationId": "getTargetCapacity",
+          "method": "GET",
+          "path": "/system/api/targets/capacity",
+          "query": {
+            "slotType": "WORKSPACE"
+          },
+          "status": 200,
+          "file": "a-connected-target-with-leases/getTargetCapacity.json",
+          "frozen": {
+            "ids": [
+              "$.targets[*].id"
+            ],
+            "instants": [],
+            "strings": [],
+            "listFilteredTo": null
+          }
+        },
+        {
           "operationId": "listLeases",
           "method": "GET",
           "path": "/system/api/leases",

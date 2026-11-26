@@ -337,6 +337,57 @@ class TargetDoorsTest {
   }
 
   @Test
+  void theCapacityDoorAnswersHeldQueuedAndGrantablePerTargetByTheAllocatorsRule() {
+    UUID lab = UUID.randomUUID();
+    TargetRows.target(lab, "lab", 4, "client-lab", false);
+    TargetRows.lease(
+        UUID.randomUUID(), SlotType.WORKSPACE, "qits-workspaces", "41", LeaseState.RUNNING, lab);
+    TargetRows.lease(
+        UUID.randomUUID(), SlotType.WORKSPACE, "qits-workspaces", "42", LeaseState.QUEUED, null);
+    TargetRows.lease(UUID.randomUUID(), SlotType.CI, "qits-ci", "run-1", LeaseState.QUEUED, null);
+    // No runner is connected in the suite, so the allocator grants the lab nothing and says why.
+    as("qits-projects", "qits:system")
+        .queryParam("slotType", "workspace")
+        .get(API + "/capacity")
+        .then()
+        .statusCode(200)
+        .body("slotType", equalTo("WORKSPACE"))
+        .body("held", equalTo(1))
+        .body("queued", equalTo(1))
+        .body("grantable", equalTo(0))
+        .body("targets[0].id", equalTo(lab.toString()))
+        .body("targets[0].name", equalTo("lab"))
+        .body("targets[0].held", equalTo(1))
+        .body("targets[0].grantable", equalTo(0))
+        .body("targets[0].detail", equalTo("target lab is not connected"));
+    as("dyn-agent", "qits:agent")
+        .queryParam("slotType", "CI")
+        .get(API + "/capacity")
+        .then()
+        .statusCode(200)
+        .body("slotType", equalTo("CI"))
+        .body("held", equalTo(0))
+        .body("queued", equalTo(1));
+  }
+
+  @Test
+  void theCapacityDoorAdmitsTheDeskAndRefusesAnUnknownSlotTypeAndACallerWithNoReadRole() {
+    admin().queryParam("slotType", "gpu").get(API + "/capacity").then().statusCode(400);
+    admin().get(API + "/capacity").then().statusCode(400);
+    as("a-desk", "qits:desk")
+        .queryParam("slotType", "workspace")
+        .get(API + "/capacity")
+        .then()
+        .statusCode(200)
+        .body("slotType", equalTo("WORKSPACE"));
+    as("a-runner", "qits:target-runner-registration")
+        .queryParam("slotType", "workspace")
+        .get(API + "/capacity")
+        .then()
+        .statusCode(403);
+  }
+
+  @Test
   void beforeTheFirstHelloAnySumGoes() {
     UUID id = UUID.randomUUID();
     TargetRows.target(id, "fresh", 0, null, true);
