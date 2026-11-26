@@ -81,8 +81,10 @@ class BuilderCapAllocatorTest {
         builds);
   }
 
-  private static Request pinned(UUID target, boolean builds) {
-    return new Request(UUID.randomUUID(), SlotType.CI, 0, T0, target, SIX_G, null, builds);
+  private static Request pinned(UUID target, int secondsAfter, boolean builds) {
+    return new Request(
+        UUID.randomUUID(), SlotType.CI, 0, T0.plusSeconds(secondsAfter), target, SIX_G, null,
+        builds);
   }
 
   // --- the cap -----------------------------------------------------------------------------------
@@ -155,7 +157,7 @@ class BuilderCapAllocatorTest {
     List<Decision> decisions =
         SlotAllocator.allocate(
             List.of(roomy(WORKSTATION, "workstation", 1, 2, 2)),
-            List.of(pinned(WORKSTATION, true), pinned(WORKSTATION, false)));
+            List.of(pinned(WORKSTATION, 0, true), pinned(WORKSTATION, 1, false)));
     assertEquals(
         "target workstation runs 2 image-building CI lease(s) for a builder of 1 build(s) at a"
             + " time",
