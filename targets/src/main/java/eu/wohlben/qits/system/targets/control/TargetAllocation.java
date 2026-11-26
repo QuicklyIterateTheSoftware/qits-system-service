@@ -162,7 +162,7 @@ public class TargetAllocation {
     Map<UUID, Map<SlotType, Integer>> used = Targets.usedInTransaction();
     Map<UUID, Long> committed = committedInTransaction();
     Map<UUID, Map<SlotType, Long>> lastCharges = lastChargesInTransaction();
-    long reserve = nodeMemoryReserve();
+    long reserve = nodeMemoryReserve(config);
     List<TargetSlots> slots = new ArrayList<>();
     Map<UUID, Target> byId = new HashMap<>();
     for (Target target : rows) {
@@ -249,8 +249,12 @@ public class TargetAllocation {
     return new Outcome(decisions, changed, granted);
   }
 
-  /** {@code qits.system.targets.node-memory-reserve} in bytes; 2g when it does not parse. */
-  long nodeMemoryReserve() {
+  /**
+   * {@code qits.system.targets.node-memory-reserve} in bytes; 2g when it does not parse. The one
+   * reading of the key: placement and the patch door's memory check ({@link Targets#patch}) both
+   * take it from here.
+   */
+  static long nodeMemoryReserve(TargetsConfig config) {
     var parsed = DockerSizes.parse(config.nodeMemoryReserve());
     if (parsed.isEmpty()) {
       LOG.warnf(
@@ -303,6 +307,27 @@ public class TargetAllocation {
       charges
           .computeIfAbsent((UUID) row[0], k -> new EnumMap<>(SlotType.class))
           .put(SlotType.valueOf((String) row[1]), DockerSizes.parse((String) row[2]).orElse(0));
+    }
+    return charges;
+  }
+
+  /**
+   * {@link #lastChargesInTransaction()} for one target: the charge of the most recently granted
+   * lease of each type on {@code targetId} (qits-2581, the patch door's memory check).
+   */
+  @SuppressWarnings("unchecked")
+  static Map<SlotType, Long> lastChargesInTransaction(UUID targetId) {
+    Map<SlotType, Long> charges = new EnumMap<>(SlotType.class);
+    List<Object[]> rows =
+        Lease.getEntityManager()
+            .createNativeQuery(
+                "select distinct on (slot_type) slot_type, spec -> 'limits' ->> 'memory' from lease"
+                    + " where target_id = :target and granted_at is not null"
+                    + " order by slot_type, granted_at desc, id desc")
+            .setParameter("target", targetId)
+            .getResultList();
+    for (Object[] row : rows) {
+      charges.put(SlotType.valueOf((String) row[0]), DockerSizes.parse((String) row[1]).orElse(0));
     }
     return charges;
   }

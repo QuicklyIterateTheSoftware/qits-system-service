@@ -165,6 +165,13 @@ granted nothing more on that target, however many shared slots are free. A patch
 merges like `reservations` — a member left out keeps its value, an explicit `null` clears it (no
 ceiling), and `0` is a ceiling (that type never runs there), never a clear. A maximum below its
 type's reservation is 409 `MAXIMUM_BELOW_RESERVATION`; one above the total is harmless.
+A patch that carries reservations or maximums is also held to the target's memory once it has
+reported it (qits-2581): a maximum that could never be reached even alone, or reservations that
+could not all be honoured at once, is 400 `SLOTS_EXCEED_MEMORY`, whose message names the limit
+(`target workstation holds at most 3 CI lease(s) of 6 GiB (29.2 GiB less the 8 GiB builder), not
+6`). It uses placement's figures (`SlotAllocator.settingsRefusal`): a type never granted there is
+priced at nothing and not checked, an unset maximum is not checked, and a target that has not
+reported its memory is held to its slots alone.
 
 Memory is one more conjunct (qits-2362), beside the slots and never instead of them. A target that
 reports its memory (`memoryMaxBytes`, the node's root `memory.max`, and `memoryTotalBytes`, its
@@ -220,7 +227,8 @@ outside their caps — not a regression.
     POST   /system/api/targets                       declare one; answers its install line, once
     GET    /system/api/targets[/{id}[/health]]       slots, reservations, maximums, used, login, ...
     PATCH  /system/api/targets/{id}                  description, reservations, maximums (409
-                                                     RESERVATIONS_EXCEED_TOTAL, MAXIMUM_BELOW_RESERVATION)
+                                                     RESERVATIONS_EXCEED_TOTAL, MAXIMUM_BELOW_RESERVATION;
+                                                     400 SLOTS_EXCEED_MEMORY)
     DELETE /system/api/targets/{id}                  409 TARGET_BUSY while a lease is live; else Retire
     POST   /system/api/targets/{id}/registration-token | greenlight | healthcheck | login-check
     POST   /system/api/targets/{id}/sign-ins        {harness: claude|kimi}: 202 STARTING; the runner logs in

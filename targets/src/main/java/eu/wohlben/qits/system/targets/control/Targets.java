@@ -8,6 +8,7 @@ import eu.wohlben.qits.system.targets.entity.Target;
 import eu.wohlben.qits.system.targets.entity.WorkVolume;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
 import jakarta.persistence.LockModeType;
 import jakarta.persistence.PersistenceException;
 import java.time.Instant;
@@ -29,6 +30,8 @@ import java.util.regex.Pattern;
  */
 @ApplicationScoped
 public class Targets {
+
+  @Inject TargetsConfig config;
 
   /** A target's name: a lower-case letter, then up to 63 lower-case letters, digits and hyphens. */
   public static final Pattern NAME = Pattern.compile("[a-z][a-z0-9-]{0,63}");
@@ -248,7 +251,10 @@ public class Targets {
    * TargetRefusal#RESERVATIONS_EXCEED_TOTAL} when the reservations' sum is above a reported total
    * ({@code slotsTotal > 0}); before the first {@code hello} any sum goes. 409 {@link
    * TargetRefusal#MAXIMUM_BELOW_RESERVATION} when a resulting maximum is below its type's resulting
-   * reservation. A maximum above the total is kept: it is harmless.
+   * reservation. A maximum above the total is kept: it is harmless. 400 {@link
+   * TargetRefusal#SLOTS_EXCEED_MEMORY} when the target has reported its memory and the resulting
+   * maximums or reservations can never fit it (qits-2581, {@link SlotAllocator#settingsRefusal});
+   * a target that has not is held to its slots alone, and a description-only patch is never judged.
    */
   public Target patch(UUID id, String description, Reservations reservations, Maximums maximums) {
     requireDescription(description);
@@ -303,6 +309,7 @@ public class Targets {
                   }
                   if (reservations != null || maximums != null) {
                     requireMaximumsCoverReservations(target);
+                    requireMemoryHoldsSlots(target, TargetAllocation.nodeMemoryReserve(config));
                   }
                   return target;
                 });
@@ -723,6 +730,35 @@ public class Targets {
                 + " on target "
                 + target.name);
       }
+    }
+  }
+
+  /**
+   * 400 {@link TargetRefusal#SLOTS_EXCEED_MEMORY} when {@code target}'s memory can never hold its
+   * slot settings, with placement's figures: its capacity less {@code reserveBytes}, its builder and
+   * the last charge of each type granted there.
+   */
+  static void requireMemoryHoldsSlots(Target target, long reserveBytes) {
+    String refusal =
+        SlotAllocator.settingsRefusal(
+            new SlotAllocator.TargetSlots(
+                target.id,
+                target.name,
+                target.slotsTotal,
+                target.reservations(),
+                target.maximums(),
+                null,
+                true,
+                false,
+                true,
+                new SlotAllocator.Memory(
+                    SlotAllocator.Memory.capacity(
+                        reserveBytes, target.memoryMaxBytes, target.memoryTotalBytes),
+                    0,
+                    TargetAllocation.lastChargesInTransaction(target.id),
+                    SlotAllocator.Memory.builderOf(target.builderMemoryBytes))));
+    if (refusal != null) {
+      throw TargetRefusal.badRequest(TargetRefusal.SLOTS_EXCEED_MEMORY, refusal);
     }
   }
 

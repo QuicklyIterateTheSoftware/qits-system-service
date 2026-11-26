@@ -290,6 +290,7 @@ response types are registered on their own controllers' `@RegisterForReflection`
 
 **`{"message": "…"}` and nothing else**, plus `"code"` on a refusal a client branches on
 (`NODE_REMOTE`, and the targets module's `TargetRefusal` codes: `RESERVATIONS_EXCEED_TOTAL`,
+`SLOTS_EXCEED_MEMORY`,
 `TARGET_BUSY`, `TARGET_UNAVAILABLE`, `LEASE_EXISTS`, `SLOT_TYPE_NOT_YOURS`, `NOT_A_TENANT`,
 `NOT_YOUR_LEASE`, `IMAGE_NOT_ALLOWED`, `ENV_KEY_NOT_ALLOWED`, `WORK_VOLUME_IN_USE`,
 `SIGN_IN_RUNNING`, `SIGN_IN_NOT_FOUND`, `SIGN_IN_NOT_AWAITING_CODE`, `DOCKER_REFUSED`,

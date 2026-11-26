@@ -89,6 +89,31 @@ public final class TargetRows {
             });
   }
 
+  /** Sets the memory a target reports: its MemTotal and its builder's cap, null for none. */
+  public static void memory(UUID id, Long memoryTotalBytes, Long builderMemoryBytes) {
+    QuarkusTransaction.requiringNew()
+        .run(
+            () -> {
+              Target target = Target.findById(id);
+              target.memoryTotalBytes = memoryTotalBytes;
+              target.builderMemoryBytes = builderMemoryBytes;
+            });
+  }
+
+  /** Sets a lease's {@code spec.limits.memory}, the charge placement prices its type at. */
+  public static void memoryLimit(UUID leaseId, String memory) {
+    QuarkusTransaction.requiringNew()
+        .run(
+            () -> {
+              Lease lease = Lease.findById(leaseId);
+              lease.spec =
+                  "{\"image\":\"registry.qits.wohlben.eu/qits/workspace:1\","
+                      + "\"limits\":{\"memory\":\""
+                      + memory
+                      + "\"}}";
+            });
+  }
+
   /** Sets a lease's project, as its owner's create would have. */
   public static void project(UUID leaseId, UUID projectId) {
     QuarkusTransaction.requiringNew()
