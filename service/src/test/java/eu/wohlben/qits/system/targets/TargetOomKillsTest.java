@@ -255,6 +255,21 @@ class TargetOomKillsTest {
           .body("memory.reportedAt", notNullValue());
       assertEquals(Long.valueOf(NODE_TOTAL), TargetRows.reloadTarget(target).memoryTotalBytes);
       assertEquals(Long.valueOf(NODE_BUILDER), TargetRows.reloadTarget(target).builderMemoryBytes);
+      assertNull(
+          TargetRows.reloadTarget(target).builderConcurrentBuilds,
+          "a runner before qits-2568 reports no builder width");
+
+      // qits-2568: the builder gate's width is stored and shown beside the builder's cap.
+      runner.inventory(
+          List.of(), List.of(), new NodeMemory(6L, 9L, NODE_MAX, NODE_TOTAL, NODE_BUILDER, 1));
+      until(
+          "the builder width",
+          () -> Integer.valueOf(1).equals(TargetRows.reloadTarget(target).builderConcurrentBuilds));
+      agent()
+          .get("/system/api/targets/" + target)
+          .then()
+          .statusCode(200)
+          .body("memory.builderConcurrentBuilds", equalTo(1));
     }
   }
 
