@@ -52,6 +52,10 @@ import org.jboss.logging.Logger;
  * its {@code builder_memory_bytes} — the cap of the shared buildkitd, which {@link SlotAllocator}
  * charges only on a target that takes CI (qits-2503; null from an older runner, charged nothing);
  * each request's charge is its spec's {@code limits.memory} ({@link DockerSizes#charge}).
+ *
+ * <p><b>The builder</b> (qits-2568). Each target's {@link SlotAllocator.Builder}: its {@code
+ * builder_concurrent_builds} (null from an older runner, nothing capped) and how many of its
+ * occupying leases carry {@code builds}; each request carries its lease's {@code builds}.
  */
 @ApplicationScoped
 public class TargetAllocation {
@@ -162,6 +166,7 @@ public class TargetAllocation {
     Map<UUID, Map<SlotType, Integer>> used = Targets.usedInTransaction();
     Map<UUID, Long> committed = committedInTransaction();
     Map<UUID, Map<SlotType, Long>> lastCharges = lastChargesInTransaction();
+    Map<UUID, Integer> building = buildingInTransaction();
     long reserve = nodeMemoryReserve();
     List<TargetSlots> slots = new ArrayList<>();
     Map<UUID, Target> byId = new HashMap<>();
@@ -183,7 +188,10 @@ public class TargetAllocation {
                       reserve, target.memoryMaxBytes, target.memoryTotalBytes),
                   committed.getOrDefault(target.id, 0L),
                   lastCharges.get(target.id),
-                  Memory.builderOf(target.builderMemoryBytes))));
+                  Memory.builderOf(target.builderMemoryBytes)))
+              .withBuilder(
+                  new SlotAllocator.Builder(
+                      target.builderConcurrentBuilds, building.getOrDefault(target.id, 0))));
     }
     Map<UUID, Lease> leases = new HashMap<>();
     Map<UUID, WorkVolume> volumes = new HashMap<>();
@@ -213,7 +221,8 @@ public class TargetAllocation {
               lease.requestedAt,
               pinned,
               DockerSizes.charge(lease.spec),
-              lease.avoidTargetId));
+              lease.avoidTargetId,
+              lease.builds));
     }
     List<Decision> decisions = SlotAllocator.allocate(slots, requests);
     Set<UUID> granted = new LinkedHashSet<>();
@@ -276,6 +285,26 @@ public class TargetAllocation {
       committed.merge((UUID) row[0], DockerSizes.charge((String) row[1]), Long::sum);
     }
     return committed;
+  }
+
+  /**
+   * How many of each target's GRANTED, RUNNING and ENDING leases send image builds to its builder
+   * (qits-2568): what {@link SlotAllocator.Builder#building()} counts.
+   */
+  static Map<UUID, Integer> buildingInTransaction() {
+    Map<UUID, Integer> building = new HashMap<>();
+    List<Object[]> rows =
+        Lease.getEntityManager()
+            .createQuery(
+                "select l.targetId, count(l) from Lease l where l.targetId is not null"
+                    + " and l.builds = true and l.state in :occupying group by l.targetId",
+                Object[].class)
+            .setParameter("occupying", LeaseState.OCCUPYING)
+            .getResultList();
+    for (Object[] row : rows) {
+      building.put((UUID) row[0], ((Number) row[1]).intValue());
+    }
+    return building;
   }
 
   /**

@@ -72,7 +72,9 @@ public class Leases {
 
   /**
    * What an owner asks for. {@code spec} is checked by {@link LeaseSpecs#require}; {@code
-   * avoidTargetId} is a soft preference the allocator honours for an unpinned lease (qits-2382).
+   * avoidTargetId} is a soft preference the allocator honours for an unpinned lease (qits-2382);
+   * {@code builds} says the lease sends image builds to the target's builder (qits-2568), and is
+   * kept only on a CI lease.
    */
   public record NewLease(
       SlotType slotType,
@@ -83,7 +85,25 @@ public class Leases {
       JsonNode spec,
       UUID pinTargetId,
       Map<String, String> adopt,
-      UUID avoidTargetId) {}
+      UUID avoidTargetId,
+      boolean builds) {
+
+    /** A lease that builds no image. */
+    public NewLease(
+        SlotType slotType,
+        String ownerRef,
+        UUID projectId,
+        String workKey,
+        int priority,
+        JsonNode spec,
+        UUID pinTargetId,
+        Map<String, String> adopt,
+        UUID avoidTargetId) {
+      this(
+          slotType, ownerRef, projectId, workKey, priority, spec, pinTargetId, adopt, avoidTargetId,
+          false);
+    }
+  }
 
   /** A listing's filter; null members filter nothing. {@code ownerApp} null is every owner. */
   public record Filter(LeaseState state, SlotType slotType, UUID targetId, String ownerApp) {}
@@ -138,6 +158,8 @@ public class Leases {
                     lease.workKey = request.workKey();
                     lease.pinTargetId = request.pinTargetId();
                     lease.avoidTargetId = request.avoidTargetId();
+                    // qits-2568: only CI sends image builds; on any other type the flag is dropped.
+                    lease.builds = request.builds() && request.slotType() == SlotType.CI;
                     lease.priority = request.priority();
                     lease.state = LeaseState.QUEUED;
                     lease.spec = LeaseSpecs.text(spec);

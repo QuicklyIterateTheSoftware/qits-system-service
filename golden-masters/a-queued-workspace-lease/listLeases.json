@@ -8,6 +8,7 @@
     "workKey": "ws-17",
     "pinTargetId": null,
     "avoidTargetId": null,
+    "builds": false,
     "targetId": null,
     "priority": 0,
     "state": "QUEUED",

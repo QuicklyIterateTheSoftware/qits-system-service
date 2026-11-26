@@ -95,7 +95,13 @@ public class LeaseController {
       @Schema(description = "{container, volume} of a retired runner's work to take over")
           Map<String, String> adopt,
       @Schema(description = "Prefer any other target; this one only when no other can take the lease")
-          UUID avoidTargetId) {}
+          UUID avoidTargetId,
+      @Schema(
+              description =
+                  "The lease sends image builds to the target's shared builder (qits-2568);"
+                      + " placement caps such leases per target at the builder gate's width plus"
+                      + " one. Kept only on a CI lease; default false")
+          Boolean builds) {}
 
   @Schema(name = "ReplaceLeaseSpecRequest")
   public record ReplaceSpecRequest(@Schema(required = true) JsonNode spec) {}
@@ -132,7 +138,8 @@ public class LeaseController {
                 request.spec(),
                 request.pinTargetId(),
                 request.adopt(),
-                request.avoidTargetId()));
+                request.avoidTargetId(),
+                Boolean.TRUE.equals(request.builds())));
     return Response.status(Response.Status.CREATED).entity(TargetViews.view(lease)).build();
   }
 

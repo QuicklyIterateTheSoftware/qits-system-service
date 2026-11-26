@@ -211,6 +211,17 @@ reservation is honoured (qits-2515): it is fixed overhead, not a reservation. Th
 `node-memory-reserve` (2g) is what the node's own processes keep — the kernel, docker, the runner —
 and no longer stands in for the builder.
 
+Image-building CI leases are capped at the builder's width plus one (qits-2568). qits-ci asks for a
+CI lease with `builds: true` when the run's pipeline has a `build: true` step, and the runner reports
+its build gate's width (`BUILDER_CONCURRENT_BUILDS`, the builds qits-ci-daemon's gate lets onto the
+buildkitd at once) as `builderConcurrentBuilds`, stored as `builder_concurrent_builds` and shown in
+the target's `memory`. A lease that builds is granted on a target only while fewer than width + 1 of
+its GRANTED, RUNNING and ENDING leases build: one past the width keeps the builder fed, and a lease
+beyond that would only wait at the gate holding its whole charge. A lease that builds nothing is
+never held by it, so the memory goes to the short runs instead. A capped lease waits with `no target
+has builder room for an image-building CI lease` (or, pinned, the target and its builder named); a
+runner too old to report the width (null) caps nothing.
+
 What that costs, counted rather than lost: ws-proof (16 GiB, so 14 GiB of capacity, CI reserved 2)
 holds one 6g lease beside its 8 GiB builder (6 + 8 = 14), not two — a CI lease, since qits-2515; the workstation (31.2 GiB, so
 29.2 GiB of capacity) goes from four concurrent 6g leases to three once it takes CI (4 × 6 + 8 = 32 >

@@ -50,6 +50,7 @@
       "memoryMaxBytes": null,
       "memoryTotalBytes": null,
       "builderMemoryBytes": null,
+      "builderConcurrentBuilds": null,
       "reportedAt": null
     }
   }

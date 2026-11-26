@@ -88,6 +88,12 @@ public class TargetViews {
                       + " runner. Image builds run there, outside a CI lease's own limit, so"
                       + " placement charges it on a target that takes CI")
           Long builderMemoryBytes,
+      @Schema(
+              description =
+                  "How many image builds the target's builder gate lets onto its buildkitd at once"
+                      + " (qits-2568); null from an older runner. Placement grants a CI lease that"
+                      + " builds only while fewer than this plus one such leases occupy the target")
+          Integer builderConcurrentBuilds,
       @Schema(description = "When the runner last reported these") Instant reportedAt) {}
 
   @Schema(name = "Target")
@@ -195,6 +201,12 @@ public class TargetViews {
       String workKey,
       UUID pinTargetId,
       UUID avoidTargetId,
+      @Schema(
+              description =
+                  "The lease sends image builds to the target's shared builder (qits-2568);"
+                      + " placement caps such leases per target at the builder gate's width plus"
+                      + " one")
+          boolean builds,
       UUID targetId,
       int priority,
       String state,
@@ -303,6 +315,7 @@ public class TargetViews {
             target.memoryMaxBytes,
             target.memoryTotalBytes,
             target.builderMemoryBytes,
+            target.builderConcurrentBuilds,
             target.memoryReportedAt));
   }
 
@@ -340,6 +353,7 @@ public class TargetViews {
         lease.workKey,
         lease.pinTargetId,
         lease.avoidTargetId,
+        lease.builds,
         lease.targetId,
         lease.priority,
         lease.state.name(),

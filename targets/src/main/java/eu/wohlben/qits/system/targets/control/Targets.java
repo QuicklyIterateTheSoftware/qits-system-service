@@ -538,6 +538,22 @@ public class Targets {
       Long memoryMaxBytes,
       Long memoryTotalBytes,
       Long builderMemoryBytes) {
+    return recordMemory(
+        id, nodeOomKills, kernelOomKills, memoryMaxBytes, memoryTotalBytes, builderMemoryBytes, null);
+  }
+
+  /**
+   * {@link #recordMemory(UUID, Long, Long, Long, Long, Long)} with the builder gate's width
+   * (qits-2568, {@code node.builderConcurrentBuilds}): null from a runner too old to report it.
+   */
+  public MemoryRecorded recordMemory(
+      UUID id,
+      Long nodeOomKills,
+      Long kernelOomKills,
+      Long memoryMaxBytes,
+      Long memoryTotalBytes,
+      Long builderMemoryBytes,
+      Integer builderConcurrentBuilds) {
     return QuarkusTransaction.requiringNew()
         .call(
             () -> {
@@ -552,6 +568,7 @@ public class Targets {
               target.memoryMaxBytes = memoryMaxBytes;
               target.memoryTotalBytes = memoryTotalBytes;
               target.builderMemoryBytes = builderMemoryBytes;
+              target.builderConcurrentBuilds = builderConcurrentBuilds;
               target.memoryReportedAt = Instant.now();
               if (before == null || after == null || after <= before) {
                 return new MemoryRecorded(target, 0, List.of());

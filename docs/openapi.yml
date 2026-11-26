@@ -189,6 +189,11 @@ components:
           description: Prefer any other target; this one only when no other can take
             the lease
           type: string
+        builds:
+          type: boolean
+          description: The lease sends image builds to the target's shared builder
+            (qits-2568); placement caps such leases per target at the builder gate's
+            width plus one. Kept only on a CI lease; default false
     CreateTargetRequest:
       type: object
       required:
@@ -436,6 +441,11 @@ components:
           $ref: "#/components/schemas/UUID"
         avoidTargetId:
           $ref: "#/components/schemas/UUID"
+        builds:
+          type: boolean
+          description: The lease sends image builds to the target's shared builder
+            (qits-2568); placement caps such leases per target at the builder gate's
+            width plus one
         targetId:
           $ref: "#/components/schemas/UUID"
         priority:
@@ -981,6 +991,13 @@ components:
           description: "The memory cap of the target's shared buildkitd (qits-2503);\
             \ null from an older runner. Image builds run there, outside a CI lease's\
             \ own limit, so placement charges it on a target that takes CI"
+        builderConcurrentBuilds:
+          type: integer
+          format: int32
+          description: How many image builds the target's builder gate lets onto its
+            buildkitd at once (qits-2568); null from an older runner. Placement grants
+            a CI lease that builds only while fewer than this plus one such leases
+            occupy the target
         reportedAt:
           $ref: "#/components/schemas/Instant"
           description: When the runner last reported these
@@ -3038,4 +3055,4 @@ paths:
         - qits:system
 info:
   title: qits-platform-system API
-  version: 2026.1122.192546
+  version: 2026.1125.220841

@@ -50,6 +50,14 @@ public class Lease extends PanacheEntityBase implements CausedRow {
   @Column(name = "avoid_target_id")
   public UUID avoidTargetId;
 
+  /**
+   * The owner says this lease sends image builds to its target's shared builder (qits-2568): a
+   * qits-ci run whose pipeline has a {@code build: true} step. Placement caps such leases per
+   * target at the builder gate's width plus one. Kept only on a CI lease; false on every other.
+   */
+  @Column(nullable = false)
+  public boolean builds;
+
   @Column(name = "target_id")
   public UUID targetId;
 

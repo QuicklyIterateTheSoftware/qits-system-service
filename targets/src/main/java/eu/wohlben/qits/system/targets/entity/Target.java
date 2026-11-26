@@ -152,6 +152,15 @@ public class Target extends PanacheEntityBase implements CausedRow {
   @Column(name = "builder_memory_bytes")
   public Long builderMemoryBytes;
 
+  /**
+   * How many image builds the target's builder gate lets onto its buildkitd at once, as its runner
+   * last reported it (qits-2568, {@code node.builderConcurrentBuilds}). Placement grants a CI lease
+   * that builds only while fewer than this plus one such leases occupy the target. Null before a
+   * runner reported it, or from a runner too old to: then nothing is capped.
+   */
+  @Column(name = "builder_concurrent_builds")
+  public Integer builderConcurrentBuilds;
+
   /** When those last arrived; null before a runner reported any. */
   @Column(name = "memory_reported_at")
   public Instant memoryReportedAt;

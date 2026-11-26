@@ -137,6 +137,34 @@ class LeaseDoorsTest {
         .body("avoidTargetId", nullValue());
   }
 
+  /**
+   * qits-2568: a CI lease that sends image builds says so, and the flag is kept and answered; absent
+   * is false, and on any other type it is dropped.
+   */
+  @Test
+  void aCiLeaseThatBuildsIsKeptAndAnsweredAndNoOtherTypeKeepsIt() {
+    String id =
+        lease("dev-qits-ci", "CI", "run-1", CI_IMAGE, ",\"builds\":true")
+            .then()
+            .statusCode(201)
+            .body("builds", equalTo(true))
+            .extract()
+            .path("id");
+    assertTrue(TargetRows.reload(UUID.fromString(id)).builds);
+    lease("dev-qits-ci", "CI", "run-2", CI_IMAGE, "")
+        .then()
+        .statusCode(201)
+        .body("builds", equalTo(false));
+    String workspace =
+        lease("dev-qits-workspaces", "WORKSPACE", "17", WORKSPACE_IMAGE, ",\"builds\":true")
+            .then()
+            .statusCode(201)
+            .body("builds", equalTo(false))
+            .extract()
+            .path("id");
+    assertFalse(TargetRows.reload(UUID.fromString(workspace)).builds);
+  }
+
   @Test
   void aLiveLeaseForTheSameRefIsRefused() {
     lease("dev-qits-ci", "CI", "run-1", CI_IMAGE, "").then().statusCode(201);

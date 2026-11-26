@@ -79,6 +79,24 @@ import java.util.UUID;
  * no workspace ({@code 0 + 6 + 8 + 6 = 20 > 14}); at 32 GiB it honours ci 2 and workspace 1, and a
  * workspace fits while {@code M + 12 + 8 + 6 ≤ 32}.
  *
+ * <p><b>Image-building CI leases are capped at the builder's width plus one</b> (qits-2568). A CI
+ * lease whose run sends image builds to the target's shared buildkitd ({@link Request#builds()},
+ * qits-ci's {@code build: true}) passes qits-ci-daemon's target-wide build gate (qits-1807) only
+ * {@code W} at a time, {@code W} the gate's width as the runner reports it ({@code
+ * builder_concurrent_builds}). A lease past that waits at the gate holding its whole charge while
+ * its step's clock is stopped: on 2026-11-22 four release runs held the workstation's memory for half
+ * an hour, one building, and runs of seconds waited behind them. So with {@code b} the target's
+ * GRANTED, RUNNING and ENDING leases that build, a lease that builds also needs
+ *
+ * <pre>
+ *   W unknown  or  b &lt; W + {@value #BUILDER_HEADROOM}
+ * </pre>
+ *
+ * — the one past {@code W} keeps the builder fed, its build already queued when one ends. A lease
+ * that builds nothing is never held by it, so the memory the capped ones would have held goes to
+ * them. A capped lease waits with {@code target workstation runs 2 image-building CI lease(s) for a
+ * builder of 1 build(s) at a time} when pinned, else {@value #NO_BUILDER_ROOM}.
+ *
  * <p><b>The order.</b> One queue across types, {@code priority desc, requested_at asc} (the lease id
  * breaks a tie, so a pass is deterministic). Each lease is considered on its own: one that cannot be
  * placed does not hold back the ones behind it. A lease pinned to a target — by {@code
@@ -98,6 +116,41 @@ public final class SlotAllocator {
 
   private SlotAllocator() {}
 
+  /**
+   * How many image-building leases a target holds beyond its builder's width (qits-2568): one, so
+   * the next build is already queued at the gate when one ends.
+   */
+  public static final int BUILDER_HEADROOM = 1;
+
+  /** The detail of an unpinned lease that builds when every target that would take it is full. */
+  public static final String NO_BUILDER_ROOM =
+      "no target has builder room for an image-building CI lease";
+
+  /**
+   * A target's builder as this pass sees it (qits-2568): {@code width}, how many image builds its
+   * gate lets onto its buildkitd at once, null when the runner reports none (then nothing is
+   * capped); {@code building}, its GRANTED, RUNNING and ENDING leases that build.
+   */
+  public record Builder(Integer width, int building) {
+
+    /** No width reported: nothing capped. */
+    public static final Builder UNKNOWN = new Builder(null, 0);
+
+    public Builder {
+      width = width == null ? null : Math.max(0, width);
+      building = Math.max(0, building);
+    }
+
+    /** {@code W} known and {@code b ≥ W + 1}: no more leases that build. */
+    public boolean full() {
+      return width != null && building >= width + BUILDER_HEADROOM;
+    }
+
+    Builder plusOne() {
+      return new Builder(width, building + 1);
+    }
+  }
+
   /** What a target offers, as of this pass. */
   public record TargetSlots(
       UUID id,
@@ -109,13 +162,32 @@ public final class SlotAllocator {
       boolean connected,
       boolean quarantined,
       boolean signedIn,
-      Memory memory) {
+      Memory memory,
+      Builder builder) {
 
     public TargetSlots {
       reservations = counts(reservations);
       maximums = ceilings(maximums);
       used = counts(used);
       memory = memory == null ? Memory.UNKNOWN : memory;
+      builder = builder == null ? Builder.UNKNOWN : builder;
+    }
+
+    /** A target whose builder reports no width (qits-2568): no lease that builds is capped. */
+    public TargetSlots(
+        UUID id,
+        String name,
+        int total,
+        Map<SlotType, Integer> reservations,
+        Map<SlotType, Integer> maximums,
+        Map<SlotType, Integer> used,
+        boolean connected,
+        boolean quarantined,
+        boolean signedIn,
+        Memory memory) {
+      this(
+          id, name, total, reservations, maximums, used, connected, quarantined, signedIn, memory,
+          null);
     }
 
     /** A target that reports no memory: the slot rule alone. */
@@ -130,7 +202,8 @@ public final class SlotAllocator {
         boolean quarantined,
         boolean signedIn) {
       this(
-          id, name, total, reservations, maximums, used, connected, quarantined, signedIn, null);
+          id, name, total, reservations, maximums, used, connected, quarantined, signedIn,
+          (Memory) null);
     }
 
     /** A target with no maximums. */
@@ -143,13 +216,22 @@ public final class SlotAllocator {
         boolean connected,
         boolean quarantined,
         boolean signedIn) {
-      this(id, name, total, reservations, null, used, connected, quarantined, signedIn, null);
+      this(
+          id, name, total, reservations, null, used, connected, quarantined, signedIn, (Memory) null);
     }
 
     /** The same target with {@code memory}. */
     public TargetSlots withMemory(Memory memory) {
       return new TargetSlots(
-          id, name, total, reservations, maximums, used, connected, quarantined, signedIn, memory);
+          id, name, total, reservations, maximums, used, connected, quarantined, signedIn, memory,
+          builder);
+    }
+
+    /** The same target with {@code builder} (qits-2568). */
+    public TargetSlots withBuilder(Builder builder) {
+      return new TargetSlots(
+          id, name, total, reservations, maximums, used, connected, quarantined, signedIn, memory,
+          builder);
     }
 
     public int usedTotal() {
@@ -165,6 +247,11 @@ public final class SlotAllocator {
     }
 
     TargetSlots plus(SlotType type, long chargeBytes) {
+      return plus(type, chargeBytes, false);
+    }
+
+    /** One more lease of {@code type}; one more that builds when {@code builds} (qits-2568). */
+    TargetSlots plus(SlotType type, long chargeBytes, boolean builds) {
       Map<SlotType, Integer> next = new EnumMap<>(used);
       next.merge(type, 1, Integer::sum);
       return new TargetSlots(
@@ -177,7 +264,8 @@ public final class SlotAllocator {
           connected,
           quarantined,
           signedIn,
-          memory.plus(type, chargeBytes));
+          memory.plus(type, chargeBytes),
+          builds ? builder.plusOne() : builder);
     }
   }
 
@@ -251,7 +339,20 @@ public final class SlotAllocator {
       Instant requestedAt,
       UUID pinnedTo,
       long chargeBytes,
-      UUID avoiding) {
+      UUID avoiding,
+      boolean builds) {
+
+    /** A lease that builds no image (qits-2568). */
+    public Request(
+        UUID leaseId,
+        SlotType type,
+        int priority,
+        Instant requestedAt,
+        UUID pinnedTo,
+        long chargeBytes,
+        UUID avoiding) {
+      this(leaseId, type, priority, requestedAt, pinnedTo, chargeBytes, avoiding, false);
+    }
 
     /** A lease that avoids no target. */
     public Request(
@@ -297,7 +398,9 @@ public final class SlotAllocator {
     for (Request request : ordered) {
       Decision decision = decide(state, request);
       if (decision.granted()) {
-        state.computeIfPresent(decision.targetId(), (id, target) -> target.plus(request.type(), request.chargeBytes()));
+        state.computeIfPresent(
+            decision.targetId(),
+            (id, target) -> target.plus(request.type(), request.chargeBytes(), request.builds()));
       }
       decisions.add(decision);
     }
@@ -310,7 +413,7 @@ public final class SlotAllocator {
       if (pinned == null) {
         return new Decision(request.leaseId(), null, "the target it is pinned to is gone");
       }
-      String refusal = refusal(pinned, request.type(), request.chargeBytes());
+      String refusal = refusal(pinned, request.type(), request.chargeBytes(), request.builds());
       return refusal == null
           ? new Decision(request.leaseId(), pinned.id(), null)
           : new Decision(request.leaseId(), null, refusal);
@@ -331,8 +434,13 @@ public final class SlotAllocator {
     TargetSlots best = null;
     TargetSlots signedOut = null;
     boolean memoryShort = false;
+    boolean builderFull = false;
     for (TargetSlots target : candidates) {
       if (!target.available() || !slotsFit(target, request.type())) {
+        continue;
+      }
+      if (request.builds() && target.builder().full()) {
+        builderFull = true;
         continue;
       }
       if (!memoryFits(target, request.type(), request.chargeBytes())) {
@@ -355,6 +463,9 @@ public final class SlotAllocator {
     if (signedOut != null) {
       return new Decision(request.leaseId(), null, notSignedIn(signedOut.name()));
     }
+    if (builderFull) {
+      return new Decision(request.leaseId(), null, NO_BUILDER_ROOM);
+    }
     if (memoryShort) {
       return new Decision(
           request.leaseId(),
@@ -370,6 +481,11 @@ public final class SlotAllocator {
    * when it would.
    */
   static String refusal(TargetSlots target, SlotType type, long chargeBytes) {
+    return refusal(target, type, chargeBytes, false);
+  }
+
+  /** {@link #refusal(TargetSlots, SlotType, long)} for a lease that builds when {@code builds}. */
+  static String refusal(TargetSlots target, SlotType type, long chargeBytes, boolean builds) {
     if (target.quarantined()) {
       return "target " + target.name() + " is quarantined";
     }
@@ -388,6 +504,9 @@ public final class SlotAllocator {
     if (!slotsFit(target, type)) {
       return "target " + target.name() + " has no free " + type.name() + " slot";
     }
+    if (builds && target.builder().full()) {
+      return builderFull(target);
+    }
     if (!memoryFits(target, type, chargeBytes)) {
       return "target " + target.name() + " has no memory for " + sized(type, chargeBytes);
     }
@@ -395,6 +514,17 @@ public final class SlotAllocator {
       return notSignedIn(target.name());
     }
     return null;
+  }
+
+  /** The detail of a lease that builds on a target whose builder is full (qits-2568). */
+  static String builderFull(TargetSlots target) {
+    return "target "
+        + target.name()
+        + " runs "
+        + target.builder().building()
+        + " image-building CI lease(s) for a builder of "
+        + target.builder().width()
+        + " build(s) at a time";
   }
 
   /** The queued lease's detail on a signed-out target, naming the command that fixes it. */

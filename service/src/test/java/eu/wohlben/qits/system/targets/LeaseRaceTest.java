@@ -269,6 +269,51 @@ class LeaseRaceTest {
   }
 
   /**
+   * qits-2568: the builder's reported width is read off the row, and the target's RUNNING and ENDING
+   * leases that build are counted against it: a builder of 1 holds two, so a third waits for builder
+   * room while a lease that builds nothing is granted beside them. A row without a width caps
+   * nothing.
+   */
+  @Test
+  void aFullBuilderHoldsBackOnlyTheLeasesThatBuild() throws Exception {
+    bearers.grant("Bearer race", "target-runner-client-race", "qits:target-runner");
+    try (FakeTargetRunner runner = FakeTargetRunner.dial(base, "Bearer race")) {
+      runner.hello(4, "vol");
+      HealthCheck check = runner.await(HealthCheck.class);
+      runner.healthChecked(check.requestId(), true);
+      runner.await(Reinstated.class);
+      runner.await(Ack.class, a -> a.slots() == 4);
+      UUID running = UUID.randomUUID();
+      UUID ending = UUID.randomUUID();
+      UUID building = UUID.randomUUID();
+      UUID plain = UUID.randomUUID();
+      TargetRows.lease(running, SlotType.CI, "qits-ci", "run-1", LeaseState.RUNNING, target);
+      TargetRows.lease(ending, SlotType.CI, "qits-ci", "run-2", LeaseState.ENDING, target);
+      TargetRows.lease(building, SlotType.CI, "qits-ci", "run-3", LeaseState.QUEUED, null);
+      TargetRows.lease(plain, SlotType.CI, "qits-ci", "run-4", LeaseState.QUEUED, null);
+      QuarkusTransaction.requiringNew()
+          .run(
+              () -> {
+                Lease.<Lease>findById(running).builds = true;
+                Lease.<Lease>findById(ending).builds = true;
+                Lease.<Lease>findById(building).builds = true;
+                Lease.<Lease>findById(building).priority = 100;
+                Target.<Target>findById(target).builderConcurrentBuilds = 1;
+              });
+      allocation.pass();
+      Lease waiting = TargetRows.reload(building);
+      assertEquals(LeaseState.QUEUED, waiting.state);
+      assertEquals("no target has builder room for an image-building CI lease", waiting.detail);
+      assertEquals(LeaseState.GRANTED, TargetRows.reload(plain).state);
+      // An older runner's null width caps nothing.
+      QuarkusTransaction.requiringNew()
+          .run(() -> Target.<Target>findById(target).builderConcurrentBuilds = null);
+      allocation.pass();
+      assertEquals(LeaseState.GRANTED, TargetRows.reload(building).state);
+    }
+  }
+
+  /**
    * qits-2502: an EXITED report whose cgroup sample shows no kill but whose {@code oomKilled} is
    * true still credits the lease, and {@link Leases.Applied#credited()} names it.
    */

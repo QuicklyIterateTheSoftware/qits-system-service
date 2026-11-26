@@ -86,6 +86,10 @@ so it is charged once on a target that takes CI — `r[CI] > 0`, `n[CI] > 0`, or
 (`SlotAllocator.takesCi`, the same test `TargetHealth` counts `buildkit` by) — and never on a
 workspace-, desk- or agent-only target. It comes off `A` before any reservation is honoured: fixed overhead,
 not a reservation. The node reserve is the node's own processes, not the builder.
+A CI lease with `builds` (qits-2568, qits-ci's `build: true`) also needs `W unknown or b < W + 1`:
+`W` the runner's `builder_concurrent_builds` (the build gate's width), `b` the target's occupying
+leases with `builds` (`SlotAllocator.Builder`, `TargetAllocation.buildingInTransaction`). Checked
+after slots and before memory; a lease without `builds` is never held by it.
 `TargetAllocation` reads those from the rows; `SlotAllocator.Memory.capacity` takes
 the min of every known figure (`memory_max_bytes`, `memory_total_bytes`). At 6g a lease and an 8 GiB
 builder, ws-proof (16 GiB − 2 GiB = 14 GiB, ci 2 and workspace 1 reserved: 18 GiB) honours ci 1 and
