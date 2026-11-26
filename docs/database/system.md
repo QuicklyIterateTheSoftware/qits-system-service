@@ -10,6 +10,7 @@ erDiagram
     uuid id PK "not null"
     jsonb adopt
     uuid avoid_target_id
+    boolean builds "not null"
     uuid causation_id
     string detail
     instant ended_at
@@ -41,6 +42,7 @@ erDiagram
   %% target: eu.wohlben.qits.system.targets.entity.Target (targets)
   target {
     uuid id PK "not null"
+    int builder_concurrent_builds
     long builder_memory_bytes
     jsonb capabilities
     uuid causation_id
