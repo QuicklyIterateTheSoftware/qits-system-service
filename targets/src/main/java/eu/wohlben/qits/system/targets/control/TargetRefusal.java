@@ -13,6 +13,12 @@ public class TargetRefusal extends SystemException {
 
   public static final String RESERVATIONS_EXCEED_TOTAL = "RESERVATIONS_EXCEED_TOTAL";
   public static final String MAXIMUM_BELOW_RESERVATION = "MAXIMUM_BELOW_RESERVATION";
+
+  /**
+   * A patch whose maximums or reservations the target's reported memory can never hold
+   * (qits-2581, 400): the message names the limit, see {@link SlotAllocator#settingsRefusal}.
+   */
+  public static final String SLOTS_EXCEED_MEMORY = "SLOTS_EXCEED_MEMORY";
   public static final String TARGET_BUSY = "TARGET_BUSY";
   public static final String TARGET_UNAVAILABLE = "TARGET_UNAVAILABLE";
   public static final String LEASE_EXISTS = "LEASE_EXISTS";

@@ -259,6 +259,83 @@ class TargetDoorsTest {
     assertEquals(Integer.valueOf(4), targets.get(id).maxCi);
   }
 
+  /**
+   * The workstation of 2026-11-23 (qits-2581): 31.2 GiB of MemTotal (29.2 GiB of capacity), an
+   * 8 GiB builder and one CI lease granted there at 6g — room for three CI leases, not six.
+   */
+  private UUID workstation() {
+    UUID id = UUID.randomUUID();
+    TargetRows.target(id, "workstation", 6, "client-workstation", false);
+    TargetRows.memory(id, (long) (31.2 * 1024 * 1024 * 1024), 8L * 1024 * 1024 * 1024);
+    UUID lease = UUID.randomUUID();
+    TargetRows.lease(lease, SlotType.CI, "qits-ci", "run-1", LeaseState.ENDED, id);
+    TargetRows.memoryLimit(lease, "6g");
+    return id;
+  }
+
+  @Test
+  void aMaximumTheMemoryCanNeverReachIsRefusedNamingTheLimit() {
+    UUID id = workstation();
+    patch(id, "{\"maximums\":{\"ci\":6}}")
+        .then()
+        .statusCode(400)
+        .body("code", equalTo("SLOTS_EXCEED_MEMORY"))
+        .body(
+            "message",
+            equalTo(
+                "target workstation holds at most 3 CI lease(s) of 6 GiB"
+                    + " (29.2 GiB less the 8 GiB builder), not 6"));
+    patch(id, "{\"maximums\":{\"ci\":3}}").then().statusCode(200).body("maximums.ci", equalTo(3));
+  }
+
+  @Test
+  void reservationsTheMemoryCannotAllHonourAreRefusedAndNothingIsKept() {
+    UUID id = workstation();
+    patch(id, "{\"reservations\":{\"ci\":6},\"description\":\"not kept\"}")
+        .then()
+        .statusCode(400)
+        .body("code", equalTo("SLOTS_EXCEED_MEMORY"))
+        .body(
+            "message",
+            equalTo(
+                "target workstation can honour at most 3 CI reserved lease(s) of 6 GiB"
+                    + " (29.2 GiB less the 8 GiB builder), not 6 CI"));
+    Target row = targets.get(id);
+    assertEquals(0, row.reservedCi);
+    assertNull(row.description);
+    patch(id, "{\"reservations\":{\"ci\":3}}").then().statusCode(200).body("reservations.ci", equalTo(3));
+  }
+
+  @Test
+  void aTargetWithoutReportedMemoryAcceptsAnySlotNumbers() {
+    UUID id = workstation();
+    TargetRows.memory(id, null, null);
+    patch(id, "{\"reservations\":{\"ci\":6},\"maximums\":{\"ci\":6}}")
+        .then()
+        .statusCode(200)
+        .body("reservations.ci", equalTo(6))
+        .body("maximums.ci", equalTo(6));
+  }
+
+  @Test
+  void aDescriptionOnlyPatchOnAnOverSetTargetIsAccepted() {
+    UUID id = workstation();
+    // Set before the memory was reported, as the live workstation's ci 6 was.
+    TargetRows.memory(id, null, null);
+    patch(id, "{\"reservations\":{\"ci\":6}}").then().statusCode(200);
+    TargetRows.memory(id, (long) (31.2 * 1024 * 1024 * 1024), 8L * 1024 * 1024 * 1024);
+    patch(id, "{\"description\":\"the workstation\"}")
+        .then()
+        .statusCode(200)
+        .body("description", equalTo("the workstation"))
+        .body("reservations.ci", equalTo(6));
+    // Any patch that carries slots is judged on the resulting state, not only the members changed.
+    patch(id, "{\"maximums\":{\"workspace\":1}}")
+        .then()
+        .statusCode(400)
+        .body("code", equalTo("SLOTS_EXCEED_MEMORY"));
+  }
+
   @Test
   void beforeTheFirstHelloAnySumGoes() {
     UUID id = UUID.randomUUID();
