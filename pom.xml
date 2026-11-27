@@ -115,13 +115,13 @@
              plumbing) reaches this service through it. qits-containers-driver is a direct
              dependency of its own, pinned above; the exclusion does not keep it out and is not meant
              to. One version for both: they are released together from qits-runner-javalib. -->
-        <qits.eventstream.version>2026.1126.192104</qits.eventstream.version>
+        <qits.eventstream.version>2026.1127.60632</qits.eventstream.version>
         <qits.db-core.version>2026.1107.191249</qits.db-core.version>
-        <qits.runner.version>2026.1126.190739</qits.runner.version>
+        <qits.runner.version>2026.1127.60359</qits.runner.version>
         <!-- The qits-system-runner's own frames (qits-1481): SystemRunnerProtocol, SystemRunnerCodec
              and SystemRunnerBinary, whose VERSION is the runner image every target is pinned to.
              Published by qits-system-runner-daemon. -->
-        <qits.system-runner-protocol.version>2026.1126.175028</qits.system-runner-protocol.version>
+        <qits.system-runner-protocol.version>2026.1127.62640</qits.system-runner-protocol.version>
         <!-- THE LOGIN PROBE'S LAST-RESORT IMAGE (qits-1593): qits-workspace-daemon-protocol's
              WorkspaceImage carries the `qits/workspace` tag of the release that published it, so a
              brand-new target with no WORKSPACE or DESK lease yet can still be probed and sign in,
@@ -163,7 +163,7 @@
              edit). Named like every pact pin on the estate: the artifactId without its `qits-`. -->
         <qits.landing-app-pacts-qits-system-service.version>2026.1124.23806</qits.landing-app-pacts-qits-system-service.version>
         <qits.maintenance-service-pacts-qits-system-service.version>2026.1124.31628</qits.maintenance-service-pacts-qits-system-service.version>
-        <qits.projects-service-pacts-qits-system-service.version>2026.1112.21947</qits.projects-service-pacts-qits-system-service.version>
+        <qits.projects-service-pacts-qits-system-service.version>2026.1127.2311</qits.projects-service-pacts-qits-system-service.version>
         <qits.workspaces-service-pacts-qits-system-service.version>2026.1115.230904</qits.workspaces-service-pacts-qits-system-service.version>
         <qits.bootstrap-cli-pacts-qits-system-service.version>2026.1023.225504</qits.bootstrap-cli-pacts-qits-system-service.version>
         <qits.network-access-service-pacts-qits-system-service.version>2026.1110.181120</qits.network-access-service-pacts-qits-system-service.version>
